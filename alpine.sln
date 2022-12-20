@@ -5,7 +5,7 @@ VisualStudioVersion = 17.2.32630.192
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "alpine", "src\alpine.vcxproj", "{C9517D06-1C8D-4D3F-815E-DEE1BF5CFA0C}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "application", "application\application.vcxproj", "{5EB1696A-104F-4EAD-9285-960F703AF16D}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "simple", "applications\simple\simple.vcxproj", "{5EB1696A-104F-4EAD-9285-960F703AF16D}"
 	ProjectSection(ProjectDependencies) = postProject
 		{C9517D06-1C8D-4D3F-815E-DEE1BF5CFA0C} = {C9517D06-1C8D-4D3F-815E-DEE1BF5CFA0C}
 	EndProjectSection
