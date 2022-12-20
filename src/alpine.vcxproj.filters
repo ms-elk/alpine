@@ -1,0 +1,26 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="camera.cpp" />
+    <ClCompile Include="mesh.cpp" />
+    <ClCompile Include="obj_converter.cpp" />
+    <ClCompile Include="lambertian.cpp" />
+    <ClCompile Include="sampler.cpp" />
+    <ClCompile Include="alpine.cpp" />
+    <ClCompile Include="embree.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="vector.h" />
+    <ClInclude Include="camera.h" />
+    <ClInclude Include="mesh.h" />
+    <ClInclude Include="ray.h" />
+    <ClInclude Include="ppm.h" />
+    <ClInclude Include="obj_converter.h" />
+    <ClInclude Include="material.h" />
+    <ClInclude Include="lambertian.h" />
+    <ClInclude Include="sampler.h" />
+    <ClInclude Include="util.h" />
+    <ClInclude Include="..\include\alpine.h" />
+    <ClInclude Include="kernel.h" />
+  </ItemGroup>
+</Project>
