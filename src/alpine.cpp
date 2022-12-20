@@ -1,6 +1,7 @@
 ﻿#include <alpine.h>
 
 #include "camera.h"
+#include "debug_scene.h"
 #include "kernel.h"
 #include "material.h"
 #include "mesh.h"
@@ -42,6 +43,8 @@ public:
     void render(int spp);
 
     void saveImage(const char* filename);
+
+    void addDebugScene();
 
 private:
     Alpine()
@@ -160,6 +163,13 @@ Alpine::saveImage(const char* filename)
     writePPM(filename, mWidth, mHeight, mFrameBuffer.data());
 }
 
+void
+Alpine::addDebugScene()
+{
+    mScene.push_back(createDebugTriangle());
+    kernel::updateScene();
+}
+
 ///////////////////////////////////////////////////////////////
 void
 initialize(int width, int height, int maxDepth)
@@ -194,5 +204,11 @@ void
 saveImage(const char* filename)
 {
     Alpine::getInstance().saveImage(filename);
+}
+
+void
+addDebugScene()
+{
+    Alpine::getInstance().addDebugScene();
 }
 }

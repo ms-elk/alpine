@@ -15,4 +15,7 @@ void setCamera(
 void render(int spp);
 
 void saveImage(const char* filename);
+
+// debug
+void addDebugScene();
 }
