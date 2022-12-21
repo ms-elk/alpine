@@ -5,6 +5,8 @@ void initialize(int width, int height, int maxDepth);
 
 bool loadObj(const char* filename);
 
+void setBackgroundColor(float r, float g, float b);
+
 void setCamera(
     const float eye[3],
     const float at[3],

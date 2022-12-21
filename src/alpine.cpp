@@ -30,6 +30,8 @@ public:
         return inst;
     }
 
+    inline void setBackgroundColor(float r, float g, float b) { mBackgroundColor = Vector3f(r, g, b); }
+
     void initialize(int width, int height, int maxDepth);
 
     bool loadObj(const char* filename);
@@ -58,6 +60,8 @@ private:
     int mWidth = 0;
     int mHeight = 0;
     int mMaxDepth = 0;
+
+    Vector3f mBackgroundColor = Vector3f(1.0f);
 
     std::vector<Vector3f> mFrameBuffer;
     std::vector<std::shared_ptr<Shape>> mScene;
@@ -122,8 +126,7 @@ Alpine::render(int spp)
 
                     if (!isect.shapePtr)
                     {
-                        const Vector3f backGroundColor(1.0f);
-                        radiance += throughput * backGroundColor;
+                        radiance += throughput * mBackgroundColor;
                         break;
                     }
 
@@ -183,6 +186,12 @@ bool
 loadObj(const char* filename)
 {
     return Alpine::getInstance().loadObj(filename);
+}
+
+void
+setBackgroundColor(float r, float g, float b)
+{
+    Alpine::getInstance().setBackgroundColor(r, g, b);
 }
 
 void
