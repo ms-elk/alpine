@@ -19,23 +19,28 @@ Vector2f get2D()
 
 Vector2f sampleConcentricDisk(const Vector2f& u)
 {
-    // Map uniform random numbers to $[-1,1]^2$
-    Vector2 uOffset = { 2.f * u.x - 1, 2.f * u.y - 1 };
+    // map uniform random numbers to $[-1,1]^2$
+    Vector2f uOffset(2.0f * u.x - 1.0f, 2.0f * u.y - 1.0f);
 
-    // Handle degeneracy at the origin
-    if (uOffset.x == 0 && uOffset.y == 0) return Vector2f{ 0, 0 };
+    // handle degeneracy at the origin
+    if (uOffset.x == 0 && uOffset.y == 0)
+    {
+        return Vector2f(0.0f);
+    }
 
-    // Apply concentric mapping to point
+    // apply concentric mapping to point
     float theta, r;
-    if (std::abs(uOffset.x) > std::abs(uOffset.y)) {
+    if (std::abs(uOffset.x) > std::abs(uOffset.y))
+    {
         r = uOffset.x;
         theta = 0.25f * PI * (uOffset.y / uOffset.x);
     }
-    else {
+    else
+    {
         r = uOffset.y;
         theta = 0.5f * PI * (1.0f - 0.5f * (uOffset.x / uOffset.y));
     }
-    return Vector2{ r * std::cos(theta), r * std::sin(theta) };
+    return Vector2f(r * std::cos(theta), r * std::sin(theta));
 }
 
 Vector3f sampleCosineWeightedHemisphere(float& pdf, const Vector2f& u)
