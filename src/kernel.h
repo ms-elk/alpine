@@ -17,6 +17,8 @@ bool createMesh(
     const std::vector<Vector3ui>& prims,
     void* ptr);
 
+bool createSphere(const std::vector<Vector4f>& vertices, void* ptr);
+
 void updateScene();
 
 struct Intersection

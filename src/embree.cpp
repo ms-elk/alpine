@@ -79,6 +79,30 @@ createMesh(
     return true;
 }
 
+bool
+createSphere(const std::vector<Vector4f>& vertices, void* ptr)
+{
+    if (!gDevice || !gScene)
+    {
+        return false;
+    }
+
+    auto sphere = rtcNewGeometry(gDevice, RTC_GEOMETRY_TYPE_SPHERE_POINT);
+
+    // register the pointer of the mesh
+    rtcSetGeometryUserData(sphere, ptr);
+
+    Vector4f* vertexBuffer = (Vector4f*)rtcSetNewGeometryBuffer(
+        sphere, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT4, sizeof(Vector4f), vertices.size());
+    memcpy(vertexBuffer, vertices.data(), sizeof(Vector4f) * vertices.size());
+
+    rtcCommitGeometry(sphere);
+    rtcAttachGeometry(gScene, sphere);
+    rtcReleaseGeometry(sphere);
+
+    return true;
+}
+
 void
 updateScene()
 {

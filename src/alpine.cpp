@@ -8,6 +8,7 @@
 #include "obj_converter.h"
 #include "ray.h"
 #include "sampler.h"
+#include "sphere.h"
 #include "util.h"
 #include "ppm.h"
 
@@ -167,6 +168,7 @@ void
 Alpine::addDebugScene()
 {
     mScene.push_back(createDebugTriangle());
+    mScene.push_back(createDebugSphere());
     kernel::updateScene();
 }
 

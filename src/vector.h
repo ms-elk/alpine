@@ -182,4 +182,50 @@ Vector3<T> transformBasis(const Vector3<T>& v, const Vector3<T>& basis)
 
 using Vector3f = Vector3<float>;
 using Vector3ui = Vector3<unsigned int>;
+
+template <typename T>
+class Vector4
+{
+public:
+    Vector4() { x = y = z = w = 0; }
+    Vector4(T x, T y, T z, T w) : x(x), y(y), z(z), w(w) {}
+    Vector4(T v) : x(v), y(v), z(v), w(v) {}
+    Vector4(const Vector4<T>& v) : x(v.x), y(v.y), z(v.z), w(v.w) {}
+    Vector4(const float v[4]) : x(v[0]), y(v[1]), z(v[2]), w(v[3]) {}
+
+    Vector4<T>& operator=(const Vector4<T>& v)
+    {
+        x = v.x;
+        y = v.y;
+        z = v.z;
+        w = v.w;
+
+        return *this;
+    }
+
+    Vector4<T> operator+(const Vector4<T>& v) const
+    {
+        return Vector4(x + v.x, y + v.y, z + v.z, w + v.w);
+    }
+
+    Vector4<T> operator-(const Vector4<T>& v) const
+    {
+        return Vector4(x - v.x, y - v.y, z - v.z, w - v.w);
+    }
+
+    Vector4<T> operator*(const T f) const
+    {
+        return Vector4(x * f, y * f, z * f, w * f);
+    }
+
+    Vector4<T> operator/(const T f) const
+    {
+        return Vector4(x / f, y / f, z / f, w / f);
+    }
+
+public:
+    T x, y, z, w;
+};
+
+using Vector4f = Vector4<float>;
 }

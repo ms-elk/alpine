@@ -9,6 +9,7 @@
     <ClCompile Include="alpine.cpp" />
     <ClCompile Include="embree.cpp" />
     <ClCompile Include="debug_scene.cpp" />
+    <ClCompile Include="sphere.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="vector.h" />
@@ -24,5 +25,7 @@
     <ClInclude Include="..\include\alpine.h" />
     <ClInclude Include="kernel.h" />
     <ClInclude Include="debug_scene.h" />
+    <ClInclude Include="sphere.h" />
+    <ClInclude Include="shape.h" />
   </ItemGroup>
 </Project>
