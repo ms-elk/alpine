@@ -13,11 +13,11 @@ bool initialize();
 void finalize();
 
 bool createMesh(
-    const std::vector<Vector3f>& vertices,
-    const std::vector<Vector3ui>& prims,
+    const std::vector<float3>& vertices,
+    const std::vector<uint3>& prims,
     void* ptr);
 
-bool createSphere(const std::vector<Vector4f>& vertices, void* ptr);
+bool createSphere(const std::vector<float4>& vertices, void* ptr);
 
 void updateScene();
 
@@ -25,7 +25,7 @@ struct Intersection
 {
     void* shapePtr;
     unsigned int primId;
-    Vector3f ng;
+    float3 ng;
     float u;
     float v;
     float t;

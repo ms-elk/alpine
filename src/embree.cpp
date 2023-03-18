@@ -50,8 +50,8 @@ finalize()
 
 bool
 createMesh(
-    const std::vector<Vector3f>& vertices,
-    const std::vector<Vector3ui>& prims,
+    const std::vector<float3>& vertices,
+    const std::vector<uint3>& prims,
     void* ptr)
 {
     if (!gDevice || !gScene)
@@ -64,13 +64,13 @@ createMesh(
     // register the pointer of the mesh
     rtcSetGeometryUserData(mesh, ptr);
 
-    Vector3f* vertexBuffer = (Vector3f*)rtcSetNewGeometryBuffer(
-        mesh, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vector3f), vertices.size());
-    memcpy(vertexBuffer, vertices.data(), sizeof(Vector3f) * vertices.size());
+    float3* vertexBuffer = (float3*)rtcSetNewGeometryBuffer(
+        mesh, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(float3), vertices.size());
+    memcpy(vertexBuffer, vertices.data(), sizeof(float3) * vertices.size());
 
     unsigned int* indexBuffer = (unsigned int*)rtcSetNewGeometryBuffer(
-        mesh, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Vector3ui), prims.size());
-    memcpy(indexBuffer, prims.data(), sizeof(Vector3ui) * prims.size());
+        mesh, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(uint3), prims.size());
+    memcpy(indexBuffer, prims.data(), sizeof(uint3) * prims.size());
 
     rtcCommitGeometry(mesh);
     rtcAttachGeometry(gScene, mesh);
@@ -80,7 +80,7 @@ createMesh(
 }
 
 bool
-createSphere(const std::vector<Vector4f>& vertices, void* ptr)
+createSphere(const std::vector<float4>& vertices, void* ptr)
 {
     if (!gDevice || !gScene)
     {
@@ -92,9 +92,9 @@ createSphere(const std::vector<Vector4f>& vertices, void* ptr)
     // register the pointer of the mesh
     rtcSetGeometryUserData(sphere, ptr);
 
-    Vector4f* vertexBuffer = (Vector4f*)rtcSetNewGeometryBuffer(
-        sphere, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT4, sizeof(Vector4f), vertices.size());
-    memcpy(vertexBuffer, vertices.data(), sizeof(Vector4f) * vertices.size());
+    float4* vertexBuffer = (float4*)rtcSetNewGeometryBuffer(
+        sphere, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT4, sizeof(float4), vertices.size());
+    memcpy(vertexBuffer, vertices.data(), sizeof(float4) * vertices.size());
 
     rtcCommitGeometry(sphere);
     rtcAttachGeometry(gScene, sphere);
@@ -144,7 +144,7 @@ intersect(const Ray& ray)
         isect.shapePtr = nullptr;
     }
     isect.primId = rayhit.hit.primID;
-    isect.ng = normalize(Vector3f(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z));
+    isect.ng = normalize(float3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z));
     isect.u = rayhit.hit.u;
     isect.v = rayhit.hit.v;
     isect.t = rayhit.ray.tfar;

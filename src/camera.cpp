@@ -8,9 +8,9 @@ constexpr float FILM_DIST = 1.0f;
 
 void
 Camera::set(
-    const Vector3f& eye,
-    const Vector3f& at,
-    const Vector3f& up,
+    const float3& eye,
+    const float3& at,
+    const float3& up,
     float fovy,
     float aspect)
 {
@@ -31,11 +31,11 @@ Camera::generateRay(float x, float y) const
     float filmX = (x - 0.5f) * mFilmWidth;
     float filmY = (0.5f - y) * mFilmHeight;
 
-    const auto toWorld = [&](const Vector3f& v)
+    const auto toWorld = [&](const float3& v)
     {
         return mBase[0] * v.x + mBase[1] * v.y + mBase[2] * v.z;
     };
-    Vector3f dir = normalize(toWorld(Vector3f(filmX, filmY, FILM_DIST)));
+    float3 dir = normalize(toWorld(float3(filmX, filmY, FILM_DIST)));
 
     Ray ray;
     ray.org = mEye;

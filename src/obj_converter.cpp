@@ -26,14 +26,14 @@ createMesh(const char* filename)
     for (const auto& om : objMaterials)
     {
         const auto& d = om.diffuse;
-        materials.push_back(std::make_shared<Lambertian>(Vector3f(d[0], d[1], d[2])));
+        materials.push_back(std::make_shared<Lambertian>(float3(d[0], d[1], d[2])));
     }
 
     auto meshData = std::make_shared<Mesh::Data>();
 
     size_t vertexCount = attrib.vertices.size() / 3;
     meshData->vertices.resize(vertexCount);
-    memcpy(meshData->vertices.data(), attrib.vertices.data(), sizeof(Vector3f) * vertexCount);
+    memcpy(meshData->vertices.data(), attrib.vertices.data(), sizeof(float3) * vertexCount);
 
     for (const auto& shape : objShapes)
     {
@@ -43,7 +43,7 @@ createMesh(const char* filename)
         for (int i = 0; i < primCount; ++i)
         {
             const auto* index = &sm.indices[3*i];
-            meshData->prims.push_back(Vector3ui(index[0].vertex_index, index[1].vertex_index, index[2].vertex_index));
+            meshData->prims.push_back(uint3(index[0].vertex_index, index[1].vertex_index, index[2].vertex_index));
 
             meshData->materials.push_back(materials[sm.material_ids[i]]);
         }

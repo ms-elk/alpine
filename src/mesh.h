@@ -14,8 +14,8 @@ class Mesh : public Shape
 public:
     struct Data
     {
-        std::vector<Vector3f> vertices;
-        std::vector<Vector3ui> prims;
+        std::vector<float3> vertices;
+        std::vector<uint3> prims;
         std::vector<std::shared_ptr<Material>> materials;
     };
 

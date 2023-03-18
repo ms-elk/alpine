@@ -14,13 +14,13 @@ public:
     virtual ~Material() {};
 
     // TODO: implement BSDF class, and remove ng
-    virtual Vector3f evaluate(const Vector3f& wo, const Vector3f& wi) const = 0;
+    virtual float3 evaluate(const float3& wo, const float3& wi) const = 0;
 
-    virtual Vector3f sample(
-        const Vector3f& wo,
-        const Vector3f& ng, // tmp
-        const Vector2f& u,
-        Vector3f& wi,
+    virtual float3 sample(
+        const float3& wo,
+        const float3& ng, // tmp
+        const float2& u,
+        float3& wi,
         float& pdf) const = 0;
 };
 }

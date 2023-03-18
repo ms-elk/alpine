@@ -6,19 +6,19 @@ namespace alpine {
 class Lambertian : public Material
 {
 public:
-    Lambertian (const Vector3f& albedo) : mAlbedo(albedo) {}
+    Lambertian (const float3& albedo) : mAlbedo(albedo) {}
     virtual ~Lambertian() {}
 
-    virtual Vector3f evaluate(const Vector3f& wo,const Vector3f& wi) const override;
+    virtual float3 evaluate(const float3& wo,const float3& wi) const override;
 
-    virtual Vector3f sample(
-        const Vector3f& wo,
-        const Vector3f& ng,
-        const Vector2f& u,
-        Vector3f& wi,
+    virtual float3 sample(
+        const float3& wo,
+        const float3& ng,
+        const float2& u,
+        float3& wi,
         float& pdf) const override;
 
 private:
-    Vector3f mAlbedo;
+    float3 mAlbedo;
 };
 }

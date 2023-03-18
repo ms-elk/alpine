@@ -30,7 +30,7 @@ public:
         return inst;
     }
 
-    inline void setBackgroundColor(float r, float g, float b) { mBackgroundColor = Vector3f(r, g, b); }
+    inline void setBackgroundColor(float r, float g, float b) { mBackgroundColor = float3(r, g, b); }
 
     void initialize(int width, int height, int maxDepth);
 
@@ -61,9 +61,9 @@ private:
     int mHeight = 0;
     int mMaxDepth = 0;
 
-    Vector3f mBackgroundColor = Vector3f(1.0f);
+    float3 mBackgroundColor = float3(1.0f);
 
-    std::vector<Vector3f> mFrameBuffer;
+    std::vector<float3> mFrameBuffer;
     std::vector<std::shared_ptr<Shape>> mScene;
 
     Camera mCamera;
@@ -103,7 +103,7 @@ Alpine::setCamera(
     float fovy,
     float aspect)
 {
-    mCamera.set(Vector3f(eye), Vector3f(at), Vector3f(up), fovy, aspect);
+    mCamera.set(float3(eye), float3(at), float3(up), fovy, aspect);
 }
 
 void
@@ -115,11 +115,11 @@ Alpine::render(int spp)
         {
             for (int x = 0; x < mWidth; ++x)
             {
-                Vector2f jitter = get2D();
+                float2 jitter = get2D();
                 auto ray = mCamera.generateRay((x + jitter.x) / float(mWidth), (y + jitter.y) / float(mHeight));
 
-                Vector3f throughput(1.0f, 1.0f, 1.0f);
-                Vector3f radiance(0.0f, 0.0f, 0.0f);
+                float3 throughput(1.0f, 1.0f, 1.0f);
+                float3 radiance(0.0f, 0.0f, 0.0f);
                 for (int depth = 0; depth < mMaxDepth; ++depth)
                 {
                     auto isect = kernel::intersect(ray);
@@ -133,9 +133,9 @@ Alpine::render(int spp)
                     const auto* shape = static_cast<Shape*>(isect.shapePtr);
                     auto isectAttr = shape->getIntersectionAttributes(ray, isect);
 
-                    Vector3f wi;
+                    float3 wi;
                     float pdf;
-                    Vector3 bsdf = isectAttr.material->sample(ray.dir, isect.ng, get2D(), wi, pdf);
+                    float3 bsdf = isectAttr.material->sample(ray.dir, isect.ng, get2D(), wi, pdf);
                     if (pdf == 0.0f)
                     {
                         break;
@@ -144,7 +144,7 @@ Alpine::render(int spp)
                     float cosTerm = std::abs(dot(wi, isect.ng));
                     throughput = throughput * bsdf * cosTerm / pdf;
 
-                    Vector3f rayOffset = isect.ng * 0.001f;
+                    float3 rayOffset = isect.ng * 0.001f;
                     ray.org = ray.org + ray.dir * isect.t + rayOffset;
                     ray.dir = wi;
                 }
