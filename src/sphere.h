@@ -14,7 +14,7 @@ class Sphere : public Shape
 public:
     struct Data
     {
-        std::vector<Vector4f> vertices;
+        std::vector<float4> vertices;
         std::vector<std::shared_ptr<Material>> materials;
     };
 

@@ -8,127 +8,162 @@ class Vector2
 {
 public:
     Vector2() { x = y = 0; }
-    Vector2(T x, T y) : x(x), y(y) {}
-    Vector2(T v) : x(v), y(v) {}
-    Vector2(const Vector2<T>& v) : x(v.x), y(v.y) {}
-    Vector2(const float v[2]) : x(v[0]), y(v[1]) {}
+    Vector2(T x, T y) : v{ x, y } {}
+    Vector2(T v) : v{ v, v } {}
+    Vector2(const Vector2<T>& v) : v{ v.x, v.y } {}
+    Vector2(const T v[2]) : v{ v[0], v[1] } {}
 
-    Vector2<T>& operator=(const Vector2<T>& v)
+    Vector2<T>& operator=(const Vector2<T>& rhs)
     {
-        x = v.x;
-        y = v.y;
+        x = rhs.x;
+        y = rhs.y;
 
         return *this;
     }
 
-    Vector2<T> operator+(const Vector2<T>& v) const
+    Vector2<T> operator+(const Vector2<T>& rhs) const
     {
-        return Vector2(x + v.x, y + v.y);
+        return { x + rhs.x, y + rhs.y };
     }
 
-    Vector2<T> operator-(const Vector2<T>& v) const
+    Vector2<T> operator-(const Vector2<T>& rhs) const
     {
-        return Vector2(x - v.x, y - v.y);
+        return { x - rhs.x, y - rhs.y };
     }
 
-    Vector2<T> operator*(const T f) const
+    Vector2<T> operator*(const T rhs) const
     {
-        return Vector2(x * f, y * f);
+        return { x * rhs, y * rhs };
     }
 
-    Vector2<T> operator/(const T f) const
+    Vector2<T> operator/(const T rhs) const
     {
-        return Vector2(x / f, y / f);
+        return { x / rhs, y / rhs };
     }
 
 public:
-    T x, y;
+    union
+    {
+        T v[2];
+        struct
+        {
+            T x, y;
+        };
+    };
 };
 
-using Vector2f = Vector2<float>;
+template <typename T>
+T dot(const Vector2<T>& v0, const Vector2<T>& v1)
+{
+    return v0.x * v1.x + v0.y * v1.y;
+}
+
+using float2 = Vector2<float>;
 
 template <typename T>
 class Vector3
 {
 public:
     Vector3() { x = y = z = 0; }
-    Vector3(T x, T y, T z) : x(x), y(y), z(z) {}
-    Vector3(T v) : x(v), y(v), z(v) {}
-    Vector3(const Vector3<T>& v) : x(v.x), y(v.y), z(v.z) {}
-    Vector3(const float v[3]) : x(v[0]), y(v[1]), z(v[2]) {}
+    Vector3(T x, T y, T z) : v{ x, y, z } {}
+    Vector3(T v) : v{ v, v, v } {}
+    Vector3(const Vector3<T>& v) : v{ v.x, v.y, v.z } {}
+    Vector3(const T v[3]) : v{ v[0], v[1], v[2] } {}
 
-    Vector3<T>& operator=(const Vector3<T>& v)
+    T& operator[](unsigned int i)
     {
-        x = v.x;
-        y = v.y;
-        z = v.z;
+        return v[i];
+    }
+
+    const T& operator[](unsigned int i) const
+    {
+        return v[i];
+    }
+
+    Vector3<T>& operator=(const Vector3<T>& rhs)
+    {
+        x = rhs.x;
+        y = rhs.y;
+        z = rhs.z;
 
         return *this;
     }
 
-    Vector3<T>& operator+=(const Vector3<T>& v)
+    Vector3<T>& operator+=(const Vector3<T>& rhs)
     {
-        x += v.x;
-        y += v.y;
-        z += v.z;
+        x += rhs.x;
+        y += rhs.y;
+        z += rhs.z;
 
         return *this;
     }
 
-    Vector3<T>& operator-=(const Vector3<T>& v)
+    Vector3<T>& operator-=(const Vector3<T>& rhs)
     {
-        x -= v.x;
-        y -= v.y;
-        z -= v.z;
+        x -= rhs.x;
+        y -= rhs.y;
+        z -= rhs.z;
 
         return *this;
     }
 
-    Vector3<T>& operator*=(const T f)
+    Vector3<T>& operator*=(const T rhs)
     {
-        x *= f;
-        y *= f;
-        z *= f;
+        x *= rhs;
+        y *= rhs;
+        z *= rhs;
 
         return *this;
     }
 
-    Vector3<T>& operator/=(const T f)
+    Vector3<T>& operator/=(const T rhs)
     {
-        x /= f;
-        y /= f;
-        z /= f;
+        x /= rhs;
+        y /= rhs;
+        z /= rhs;
 
         return *this;
     }
 
-    Vector3<T> operator+(const Vector3<T>& v) const
+    Vector3<T> operator+(const Vector3<T>& rhs) const
     {
-        return Vector3(x + v.x, y + v.y, z + v.z);
+        return { x + rhs.x, y + rhs.y, z + rhs.z };
     }
 
-    Vector3<T> operator-(const Vector3<T>& v) const
+    Vector3<T> operator-() const
     {
-        return Vector3(x - v.x, y - v.y, z - v.z);
+        return { -x, -y, -z };
     }
 
-    Vector3<T> operator*(const Vector3<T>& v) const
+    Vector3<T> operator-(const Vector3<T>& rhs) const
     {
-        return Vector3(x * v.x, y * v.y, z * v.z);
+        return { x - rhs.x, y - rhs.y, z - rhs.z };
     }
 
-    Vector3<T> operator*(const T f) const
+    Vector3<T> operator*(const Vector3<T>& rhs) const
     {
-        return Vector3(x * f, y * f, z * f);
+        return { x * rhs.x, y * rhs.y, z * rhs.z };
     }
 
-    Vector3<T> operator/(const T f) const
+    Vector3<T> operator*(const T rhs) const
     {
-        return Vector3(x / f, y / f, z / f);
+        return { x * rhs, y * rhs, z * rhs };
+    }
+
+    Vector3<T> operator/(const T rhs) const
+    {
+        return { x / rhs, y / rhs, z / rhs };
     }
 
 public:
-    T x, y, z;
+    union
+    {
+        T v[3];
+        struct
+        {
+            T x, y, z;
+        };
+    };
 };
 
 template <typename T>
@@ -150,7 +185,7 @@ Vector3<T> cross(const Vector3<T>& v0, const Vector3<T>& v1)
     float y = v0.z * v1.x - v0.x * v1.z;
     float z = v0.x * v1.y - v0.y * v1.x;
 
-    return Vector3<T>(x, y, z);
+    return { x, y, z };
 }
 
 template <typename T>
@@ -180,52 +215,66 @@ Vector3<T> transformBasis(const Vector3<T>& v, const Vector3<T>& basis)
     return tv;
 }
 
-using Vector3f = Vector3<float>;
-using Vector3ui = Vector3<unsigned int>;
+using float3 = Vector3<float>;
+using uint3 = Vector3<unsigned int>;
+using byte3 = Vector3<char>;
 
 template <typename T>
 class Vector4
 {
 public:
     Vector4() { x = y = z = w = 0; }
-    Vector4(T x, T y, T z, T w) : x(x), y(y), z(z), w(w) {}
-    Vector4(T v) : x(v), y(v), z(v), w(v) {}
-    Vector4(const Vector4<T>& v) : x(v.x), y(v.y), z(v.z), w(v.w) {}
-    Vector4(const float v[4]) : x(v[0]), y(v[1]), z(v[2]), w(v[3]) {}
+    Vector4(T x, T y, T z, T w) : v{ x, y, z, w } {}
+    Vector4(T v) : v{ v, v, v, v } {}
+    Vector4(const Vector4<T>& v) : v{ v.x, v.y, v.z, v.w } {}
+    Vector4(const T v[4]) : v{ v[0], v[1], v[2], v[3] } {}
 
-    Vector4<T>& operator=(const Vector4<T>& v)
+    Vector4<T>& operator=(const Vector4<T>& rhs)
     {
-        x = v.x;
-        y = v.y;
-        z = v.z;
-        w = v.w;
+        x = rhs.x;
+        y = rhs.y;
+        z = rhs.z;
+        w = rhs.w;
 
         return *this;
     }
 
-    Vector4<T> operator+(const Vector4<T>& v) const
+    Vector4<T> operator+(const Vector4<T>& rhs) const
     {
-        return Vector4(x + v.x, y + v.y, z + v.z, w + v.w);
+        return { x + rhs.x, y + rhs.y, z + rhs.z, w + rhs.w };
     }
 
-    Vector4<T> operator-(const Vector4<T>& v) const
+    Vector4<T> operator-(const Vector4<T>& rhs) const
     {
-        return Vector4(x - v.x, y - v.y, z - v.z, w - v.w);
+        return { x - rhs.x, y - rhs.y, z - rhs.z, w - rhs.w };
     }
 
-    Vector4<T> operator*(const T f) const
+    Vector4<T> operator*(const T rhs) const
     {
-        return Vector4(x * f, y * f, z * f, w * f);
+        return { x * rhs, y * rhs, z * rhs, w * rhs };
     }
 
-    Vector4<T> operator/(const T f) const
+    Vector4<T> operator/(const T rhs) const
     {
-        return Vector4(x / f, y / f, z / f, w / f);
+        return { x / rhs, y / rhs, z / rhs, w / rhs };
     }
 
 public:
-    T x, y, z, w;
+    union
+    {
+        T v[4];
+        struct
+        {
+            T x, y, z, w;
+        };
+    };
 };
 
-using Vector4f = Vector4<float>;
+template <typename T>
+T dot(const Vector4<T>& v0, const Vector4<T>& v1)
+{
+    return v0.x * v1.x + v0.y * v1.y + v0.z * v1.z + v0.w * v1.w;
+}
+
+using float4 = Vector4<float>;
 }

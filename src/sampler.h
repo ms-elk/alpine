@@ -3,7 +3,7 @@
 #include "vector.h"
 
 namespace alpine {
-Vector2f get2D();
-Vector2f sampleConcentricDisk(const Vector2f& u);
-Vector3f sampleCosineWeightedHemisphere(float& pdf, const Vector2f& u);
+float2 get2D();
+float2 sampleConcentricDisk(const float2& u);
+float3 sampleCosineWeightedHemisphere(float& pdf, const float2& u);
 }

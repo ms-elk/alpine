@@ -5,7 +5,7 @@
 namespace alpine {
 struct Ray
 {
-    Vector3f org;
-    Vector3f dir;
+    float3 org;
+    float3 dir;
 };
 }

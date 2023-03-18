@@ -11,18 +11,18 @@ public:
     Camera() {};
 
     void set(
-        const Vector3f& eye,
-        const Vector3f& at,
-        const Vector3f& up,
+        const float3& eye,
+        const float3& at,
+        const float3& up,
         float fovy,
         float aspect);
 
     Ray generateRay(float x, float y) const;
 
 private:
-    Vector3f mEye;
+    float3 mEye;
     float mFilmWidth = 0.0f;
     float mFilmHeight = 0.0f;
-    Vector3f mBase[3];
+    float3 mBase[3];
 };
 }
