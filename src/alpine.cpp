@@ -31,6 +31,7 @@ public:
     }
 
     inline void setBackgroundColor(float r, float g, float b) { mBackgroundColor = float3(r, g, b); }
+    inline const void* getFrameBuffer() const { return mFrameBuffer.data(); }
 
     void initialize(int width, int height, int maxDepth);
 
@@ -43,9 +44,11 @@ public:
         float fovy,
         float aspect);
 
+    void resetAccumulation();
+
     void render(int spp);
 
-    void saveImage(const char* filename);
+    void saveImage(const char* filename) const;
 
     void addDebugScene();
 
@@ -63,7 +66,10 @@ private:
 
     float3 mBackgroundColor = float3(1.0f);
 
-    std::vector<float3> mFrameBuffer;
+    std::vector<float3> mAccumBuffer;
+    std::vector<byte3> mFrameBuffer;
+    int mTotalSamples = 0;
+
     std::vector<std::shared_ptr<Shape>> mScene;
 
     Camera mCamera;
@@ -76,6 +82,7 @@ Alpine::initialize(int width, int height, int maxDepth)
     mHeight = height;
     mMaxDepth = maxDepth;
     int pixelCount = mWidth * mHeight;
+    mAccumBuffer.resize(pixelCount);
     mFrameBuffer.resize(pixelCount);
     mScene.reserve(MAX_SHAPES);
 }
@@ -104,6 +111,13 @@ Alpine::setCamera(
     float aspect)
 {
     mCamera.set(float3(eye), float3(at), float3(up), fovy, aspect);
+}
+
+void
+Alpine::resetAccumulation()
+{
+    mTotalSamples = 0;
+    std::fill(mAccumBuffer.begin(), mAccumBuffer.end(), float3(0.0f));
 }
 
 void
@@ -150,21 +164,28 @@ Alpine::render(int spp)
                 }
 
                 int index = y * mWidth + x;
-                mFrameBuffer[index] += radiance;
+                mAccumBuffer[index] += radiance;
             }
         }
     }
+    mTotalSamples += spp;
 
-    for (auto& pixel : mFrameBuffer)
+    for (int i = 0; i < mFrameBuffer.size(); ++i)
     {
-        pixel /= float(spp);
+        auto pixel = mAccumBuffer[i];
+        pixel /= float(mTotalSamples);
+
+        auto& fb = mFrameBuffer[i];
+        fb.x = static_cast<char>(std::clamp(pixel.x, 0.0f, 1.0f) * 255.0f + 0.5f);
+        fb.y = static_cast<char>(std::clamp(pixel.y, 0.0f, 1.0f) * 255.0f + 0.5f);
+        fb.z = static_cast<char>(std::clamp(pixel.z, 0.0f, 1.0f) * 255.0f + 0.5f);
     }
 }
 
 void
-Alpine::saveImage(const char* filename)
+Alpine::saveImage(const char* filename) const
 {
-    writePPM(filename, mWidth, mHeight, mFrameBuffer.data());
+    writePPM(filename, mWidth, mHeight, mAccumBuffer.data());
 }
 
 void
@@ -206,9 +227,21 @@ setCamera(
 }
 
 void
+resetAccumulation()
+{
+    Alpine::getInstance().resetAccumulation();
+}
+
+void
 render(int spp)
 {
     Alpine::getInstance().render(spp);
+}
+
+const void*
+getFrameBuffer()
+{
+    return Alpine::getInstance().getFrameBuffer();
 }
 
 void
