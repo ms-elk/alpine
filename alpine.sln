@@ -10,6 +10,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "simple", "applications\simp
 		{C9517D06-1C8D-4D3F-815E-DEE1BF5CFA0C} = {C9517D06-1C8D-4D3F-815E-DEE1BF5CFA0C}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "viewer", "applications\viewer\viewer.vcxproj", "{9A8AF945-57C9-459E-9FAC-F5339C5260A7}"
+	ProjectSection(ProjectDependencies) = postProject
+		{C9517D06-1C8D-4D3F-815E-DEE1BF5CFA0C} = {C9517D06-1C8D-4D3F-815E-DEE1BF5CFA0C}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -24,6 +29,10 @@ Global
 		{5EB1696A-104F-4EAD-9285-960F703AF16D}.Debug|x64.Build.0 = Debug|x64
 		{5EB1696A-104F-4EAD-9285-960F703AF16D}.Release|x64.ActiveCfg = Release|x64
 		{5EB1696A-104F-4EAD-9285-960F703AF16D}.Release|x64.Build.0 = Release|x64
+		{9A8AF945-57C9-459E-9FAC-F5339C5260A7}.Debug|x64.ActiveCfg = Debug|x64
+		{9A8AF945-57C9-459E-9FAC-F5339C5260A7}.Debug|x64.Build.0 = Debug|x64
+		{9A8AF945-57C9-459E-9FAC-F5339C5260A7}.Release|x64.ActiveCfg = Release|x64
+		{9A8AF945-57C9-459E-9FAC-F5339C5260A7}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
