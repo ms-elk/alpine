@@ -115,6 +115,7 @@
     <ClInclude Include="kernel.h" />
     <ClInclude Include="lambertian.h" />
     <ClInclude Include="material.h" />
+    <ClInclude Include="matrix.h" />
     <ClInclude Include="mesh.h" />
     <ClInclude Include="obj_converter.h" />
     <ClInclude Include="ppm.h" />

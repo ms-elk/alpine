@@ -27,5 +27,6 @@
     <ClInclude Include="debug_scene.h" />
     <ClInclude Include="sphere.h" />
     <ClInclude Include="shape.h" />
+    <ClInclude Include="matrix.h" />
   </ItemGroup>
 </Project>
