@@ -19,10 +19,12 @@ Camera::set(
     mFilmHeight = FILM_DIST * std::tan(0.5f * fovy);
     mFilmWidth = mFilmHeight * aspect;
 
-    auto view = normalize(at - eye);
-    mBase[2] = view;
-    mBase[0] = normalize(cross(up, mBase[2]));
-    mBase[1] = cross(mBase[2], mBase[0]);
+    float3 viewZ = normalize(at - mEye);
+    float3 viewX = normalize(cross(up, viewZ));
+    float3 viewY = cross(viewZ, viewX);
+    mViewMatrix.setColumn(0, viewX);
+    mViewMatrix.setColumn(1, viewY);
+    mViewMatrix.setColumn(2, viewZ);
 }
 
 Ray
@@ -30,12 +32,7 @@ Camera::generateRay(float x, float y) const
 {
     float filmX = (x - 0.5f) * mFilmWidth;
     float filmY = (0.5f - y) * mFilmHeight;
-
-    const auto toWorld = [&](const float3& v)
-    {
-        return mBase[0] * v.x + mBase[1] * v.y + mBase[2] * v.z;
-    };
-    float3 dir = normalize(toWorld(float3(filmX, filmY, FILM_DIST)));
+    float3 dir = normalize(mul(mViewMatrix, float3(filmX, filmY, FILM_DIST)));
 
     Ray ray;
     ray.org = mEye;

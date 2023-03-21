@@ -194,27 +194,6 @@ Vector3<T> normalize(const Vector3<T>& v)
     return v / length(v);
 }
 
-template <typename T>
-Vector3<T> transformBasis(const Vector3<T>& v, const Vector3<T>& basis)
-{
-    Vector3<T> tv;
-
-    Vector3<T> up(0, 0, 1);
-    Vector3<T> tan = cross(basis, up);
-    if (length(tan) > 0.001f)
-    {
-        tan = normalize(tan);
-        Vector3<T> bi = cross(tan, basis);
-        tv = tan * v.x + bi * v.y + basis * v.z;
-    }
-    else
-    {
-        tv = basis.z >= 0.0f ? v : v * -1.0f;
-    }
-
-    return tv;
-}
-
 using float3 = Vector3<float>;
 using uint3 = Vector3<unsigned int>;
 using byte3 = Vector3<char>;

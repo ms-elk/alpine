@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include "matrix.h"
 #include "vector.h"
 
 namespace alpine {
@@ -23,6 +24,6 @@ private:
     float3 mEye;
     float mFilmWidth = 0.0f;
     float mFilmHeight = 0.0f;
-    float3 mBase[3];
+    float3x3 mViewMatrix;
 };
 }
