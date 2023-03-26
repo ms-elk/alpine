@@ -22,19 +22,8 @@ Lambertian::sample(
 
     const auto toWorld = [&](const float3& v)
     {
-        const float3 up(0.0f, 0.0f, 0.1f);
-        float3 tan = cross(ng, up);
-
-        if (length(tan) > 0.001f)
-        {
-            tan = normalize(tan);
-            float3 bi = cross(tan, ng);
-            return tan * v.x + bi * v.y + ng * v.z;
-        }
-        else
-        {
-            return ng.z >= 0.0f ? v : v * -1.0f;
-        }
+        auto [ b1, b2 ] = getBasis(ng);
+        return b1 * v.x + b2 * v.y + ng * v.z;
     };
     wi = toWorld(wiLocal);
 

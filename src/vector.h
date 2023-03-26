@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <cmath>
+#include <tuple>
 
 namespace alpine {
 template <typename T>
@@ -192,6 +193,16 @@ template <typename T>
 Vector3<T> normalize(const Vector3<T>& v)
 {
     return v / length(v);
+}
+
+template <typename T>
+std::tuple<Vector3<T>, Vector3<T>> getBasis(const Vector3<T>& v)
+{
+    Vector3<T> v1 = std::abs(v.x) > std::abs(v.y)
+            ? normalize(Vector3<T>(-v.z, 0.0f, v.x))
+            : normalize(Vector3<T>(0.0f, v.z, -v.y));
+    Vector3<T> v2 = cross(v, v1);
+    return { v1, v2 };
 }
 
 using float3 = Vector3<float>;
