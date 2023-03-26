@@ -2,6 +2,7 @@
 
 #include "camera.h"
 #include "debug_scene.h"
+#include "image.h"
 #include "kernel.h"
 #include "material.h"
 #include "mesh.h"
@@ -10,8 +11,8 @@
 #include "sampler.h"
 #include "sphere.h"
 #include "util.h"
-#include "ppm.h"
 
+#include <algorithm>
 #include <memory>
 #include <vector>
 
@@ -185,7 +186,7 @@ Alpine::render(int spp)
 void
 Alpine::saveImage(const char* filename) const
 {
-    writePPM(filename, mWidth, mHeight, mAccumBuffer.data());
+    writePPM(filename, mWidth, mHeight, mFrameBuffer.data());
 }
 
 void

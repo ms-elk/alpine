@@ -1,12 +1,11 @@
-﻿#pragma once
+﻿#include "image.h"
 
 #include <fstream>
 #include <algorithm>
 
 namespace alpine {
-template <typename T>
 bool
-writePPM(const char* filename, int width, int height, const T* image)
+writePPM(const char* filename, int width, int height, const byte3* image)
 {
     std::ofstream ppm(filename);
     if (!ppm)
@@ -22,10 +21,10 @@ writePPM(const char* filename, int width, int height, const T* image)
     {
         for (int x = 0; x < width; ++x)
         {
-            const auto& pixel = image[y * width + x];
-            int r = static_cast<int>(std::clamp(pixel.x, 0.0f, 1.0f) * 255.0f + 0.5f);
-            int g = static_cast<int>(std::clamp(pixel.y, 0.0f, 1.0f) * 255.0f + 0.5f);
-            int b = static_cast<int>(std::clamp(pixel.z, 0.0f, 1.0f) * 255.0f + 0.5f);
+            const byte3& pixel = image[y * width + x];
+            unsigned int r = static_cast<unsigned int>(pixel.x);
+            unsigned int g = static_cast<unsigned int>(pixel.y);
+            unsigned int b = static_cast<unsigned int>(pixel.z);
             ppm << r << ' ' << g << ' ' << b << std::endl;
         }
     }
