@@ -45,6 +45,8 @@ public:
         float fovy,
         float aspect);
 
+    void rotateCamera(float theta, float phi);
+
     void resetAccumulation();
 
     void render(int spp);
@@ -112,6 +114,12 @@ Alpine::setCamera(
     float aspect)
 {
     mCamera.set(float3(eye), float3(at), float3(up), fovy, aspect);
+}
+
+void
+Alpine::rotateCamera(float theta, float phi)
+{
+    mCamera.rotate(theta, phi);
 }
 
 void
@@ -225,6 +233,12 @@ setCamera(
     float aspect)
 {
     Alpine::getInstance().setCamera(eye, at, up, fovy, aspect);
+}
+
+void
+rotateCamera(float theta, float phi)
+{
+    Alpine::getInstance().rotateCamera(theta, phi);
 }
 
 void

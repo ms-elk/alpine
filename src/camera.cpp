@@ -1,7 +1,10 @@
 ﻿#include "camera.h"
 
 #include "ray.h"
+#include "util.h"
 #include "vector.h"
+
+#include <algorithm>
 
 namespace alpine {
 constexpr float FILM_DIST = 1.0f;
@@ -15,16 +18,42 @@ Camera::set(
     float aspect)
 {
     mEye = eye;
+    mAt = at;
+    mUp = up;
 
     mFilmHeight = FILM_DIST * std::tan(0.5f * fovy);
     mFilmWidth = mFilmHeight * aspect;
 
-    float3 viewZ = normalize(at - mEye);
-    float3 viewX = normalize(cross(up, viewZ));
-    float3 viewY = cross(viewZ, viewX);
-    mViewMatrix.setColumn(0, viewX);
-    mViewMatrix.setColumn(1, viewY);
-    mViewMatrix.setColumn(2, viewZ);
+    updateViewMatrix();
+}
+
+void
+Camera::rotate(float theta, float phi)
+{
+    float3 toEye = mEye - mAt;
+    float toEyeDist = length(toEye);
+
+    if(toEyeDist == 0.0f)
+    {
+        return;
+    }
+
+    toEye /= toEyeDist;
+
+    theta += std::atan2(toEye.x, toEye.z);
+    phi = std::clamp(std::acos(toEye.y) - phi, 0.0f, PI);
+
+    float sinTheta = std::sin(theta);
+    float cosTheta = std::cos(theta);
+    float sinPhi = std::sin(phi);
+    float cosPhi = std::cos(phi);
+    toEye.x = sinTheta * sinPhi * toEyeDist;
+    toEye.y = cosPhi * toEyeDist;
+    toEye.z = cosTheta * sinPhi * toEyeDist;
+
+    mEye = toEye + mAt;
+
+    updateViewMatrix();
 }
 
 Ray
@@ -39,5 +68,16 @@ Camera::generateRay(float x, float y) const
     ray.dir = dir;
 
     return ray;
+}
+
+void
+Camera::updateViewMatrix()
+{
+    float3 viewZ = normalize(mAt - mEye);
+    float3 viewX = normalize(cross(mUp, viewZ));
+    float3 viewY = cross(viewZ, viewX);
+    mViewMatrix.setColumn(0, viewX);
+    mViewMatrix.setColumn(1, viewY);
+    mViewMatrix.setColumn(2, viewZ);
 }
 }
