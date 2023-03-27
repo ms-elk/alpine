@@ -18,10 +18,17 @@ public:
         float fovy,
         float aspect);
 
+    void rotate(float theta, float phi);
+
     Ray generateRay(float x, float y) const;
 
 private:
+    void updateViewMatrix();
+
+private:
     float3 mEye;
+    float3 mAt;
+    float3 mUp;
     float mFilmWidth = 0.0f;
     float mFilmHeight = 0.0f;
     float3x3 mViewMatrix;
