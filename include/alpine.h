@@ -10,11 +10,13 @@ void setBackgroundColor(float r, float g, float b);
 // Camera
 void setCamera(
     const float eye[3],
-    const float at[3],
+    const float target[3],
     const float up[3],
     float fovy,
     float aspect);
-void rotateCamera(float theta, float phi);
+void orbitCamera(float theta, float phi);
+void zoomCamera(float z);
+void panCamera(float x, float y);
 
 // Render
 void resetAccumulation();

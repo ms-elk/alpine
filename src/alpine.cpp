@@ -40,12 +40,16 @@ public:
 
     void setCamera(
         const float eye[3],
-        const float at[3],
+        const float target[3],
         const float up[3],
         float fovy,
         float aspect);
 
-    void rotateCamera(float theta, float phi);
+    void orbitCamera(float theta, float phi);
+
+    void zoomCamera(float z);
+
+    void panCamera(float x, float y);
 
     void resetAccumulation();
 
@@ -108,18 +112,30 @@ Alpine::loadObj(const char* filename)
 void
 Alpine::setCamera(
     const float eye[3],
-    const float at[3],
+    const float target[3],
     const float up[3],
     float fovy,
     float aspect)
 {
-    mCamera.set(float3(eye), float3(at), float3(up), fovy, aspect);
+    mCamera.set(float3(eye), float3(target), float3(up), fovy, aspect);
 }
 
 void
-Alpine::rotateCamera(float theta, float phi)
+Alpine::orbitCamera(float theta, float phi)
 {
-    mCamera.rotate(theta, phi);
+    mCamera.orbit(theta, phi);
+}
+
+void
+Alpine::zoomCamera(float z)
+{
+    mCamera.zoom(z);
+}
+
+void
+Alpine::panCamera(float x, float y)
+{
+    mCamera.pan(x, y);
 }
 
 void
@@ -227,18 +243,29 @@ setBackgroundColor(float r, float g, float b)
 void
 setCamera(
     const float eye[3],
-    const float at[3],
+    const float target[3],
     const float up[3],
     float fovy,
     float aspect)
 {
-    Alpine::getInstance().setCamera(eye, at, up, fovy, aspect);
+    Alpine::getInstance().setCamera(eye, target, up, fovy, aspect);
 }
 
 void
-rotateCamera(float theta, float phi)
+orbitCamera(float theta, float phi)
 {
-    Alpine::getInstance().rotateCamera(theta, phi);
+    Alpine::getInstance().orbitCamera(theta, phi);
+}
+
+void
+zoomCamera(float z)
+{
+    Alpine::getInstance().zoomCamera(z);
+}
+
+void panCamera(float x, float y)
+{
+    Alpine::getInstance().panCamera(x, y);
 }
 
 void
