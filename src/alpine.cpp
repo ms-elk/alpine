@@ -13,11 +13,13 @@
 #include "util.h"
 
 #include <algorithm>
+#include <future>
 #include <memory>
 #include <vector>
 
 namespace alpine {
-static constexpr unsigned int MAX_SHAPES = 10;
+static constexpr int MAX_SHAPES = 10;
+static constexpr int TILE_SIZE = 64;
 
 class Alpine
 {
@@ -31,7 +33,10 @@ public:
         return inst;
     }
 
-    inline void setBackgroundColor(float r, float g, float b) { mBackgroundColor = float3(r, g, b); }
+    inline void setBackgroundColor(float r, float g, float b)
+    {
+        mBackgroundColor = float3(r, g, b);
+    }
     inline const void* getFrameBuffer() const { return mFrameBuffer.data(); }
 
     void initialize(int width, int height, int maxDepth);
@@ -77,6 +82,10 @@ private:
     std::vector<byte3> mFrameBuffer;
     int mTotalSamples = 0;
 
+    int mTileWidth = 0;
+    int mTileHeight = 0;
+    std::vector<std::future<void>> mTiles;
+
     std::vector<std::shared_ptr<Shape>> mScene;
 
     Camera mCamera;
@@ -88,9 +97,16 @@ Alpine::initialize(int width, int height, int maxDepth)
     mWidth = width;
     mHeight = height;
     mMaxDepth = maxDepth;
+
     int pixelCount = mWidth * mHeight;
     mAccumBuffer.resize(pixelCount);
     mFrameBuffer.resize(pixelCount);
+
+    mTileWidth = width / TILE_SIZE;
+    mTileHeight = height / TILE_SIZE;
+    unsigned int tileCount = mTileWidth * mTileHeight;
+    mTiles.resize(tileCount);
+
     mScene.reserve(MAX_SHAPES);
 }
 
@@ -150,47 +166,62 @@ Alpine::render(int spp)
 {
     for (int sampleId = 0; sampleId < spp; ++sampleId)
     {
-        for (int y = 0; y < mHeight; ++y)
+        for (int tileId = 0; tileId < mTiles.size(); ++tileId)
         {
-            for (int x = 0; x < mWidth; ++x)
-            {
-                float2 jitter = get2D();
-                auto ray = mCamera.generateRay((x + jitter.x) / float(mWidth), (y + jitter.y) / float(mHeight));
+            mTiles[tileId] = std::async([&, tileId]() {
+                int xBegin = tileId % mTileWidth * TILE_SIZE;
+                int yBegin = tileId / mTileWidth * TILE_SIZE;
 
-                float3 throughput(1.0f, 1.0f, 1.0f);
-                float3 radiance(0.0f, 0.0f, 0.0f);
-                for (int depth = 0; depth < mMaxDepth; ++depth)
+                for (int y = yBegin; y < yBegin + TILE_SIZE; ++y)
                 {
-                    auto isect = kernel::intersect(ray);
-
-                    if (!isect.shapePtr)
+                    for (int x = xBegin; x < xBegin + TILE_SIZE; ++x)
                     {
-                        radiance += throughput * mBackgroundColor;
-                        break;
+                        float2 jitter = get2D();
+                        auto ray = mCamera.generateRay(
+                            (x + jitter.x) / float(mWidth), (y + jitter.y) / float(mHeight));
+
+                        float3 throughput(1.0f, 1.0f, 1.0f);
+                        float3 radiance(0.0f, 0.0f, 0.0f);
+                        for (int depth = 0; depth < mMaxDepth; ++depth)
+                        {
+                            auto isect = kernel::intersect(ray);
+
+                            if (!isect.shapePtr)
+                            {
+                                radiance += throughput * mBackgroundColor;
+                                break;
+                            }
+
+                            const auto* shape = static_cast<Shape*>(isect.shapePtr);
+                            auto isectAttr = shape->getIntersectionAttributes(ray, isect);
+
+                            float3 wi;
+                            float pdf;
+                            float3 bsdf =
+                                isectAttr.material->sample(ray.dir, isect.ng, get2D(), wi, pdf);
+                            if (pdf == 0.0f)
+                            {
+                                break;
+                            }
+
+                            float cosTerm = std::abs(dot(wi, isect.ng));
+                            throughput = throughput * bsdf * cosTerm / pdf;
+
+                            float3 rayOffset = isect.ng * 0.001f;
+                            ray.org = ray.org + ray.dir * isect.t + rayOffset;
+                            ray.dir = wi;
+                        }
+
+                        int index = y * mWidth + x;
+                        mAccumBuffer[index] += radiance;
                     }
-
-                    const auto* shape = static_cast<Shape*>(isect.shapePtr);
-                    auto isectAttr = shape->getIntersectionAttributes(ray, isect);
-
-                    float3 wi;
-                    float pdf;
-                    float3 bsdf = isectAttr.material->sample(ray.dir, isect.ng, get2D(), wi, pdf);
-                    if (pdf == 0.0f)
-                    {
-                        break;
-                    }
-
-                    float cosTerm = std::abs(dot(wi, isect.ng));
-                    throughput = throughput * bsdf * cosTerm / pdf;
-
-                    float3 rayOffset = isect.ng * 0.001f;
-                    ray.org = ray.org + ray.dir * isect.t + rayOffset;
-                    ray.dir = wi;
                 }
+                });
+        }
 
-                int index = y * mWidth + x;
-                mAccumBuffer[index] += radiance;
-            }
+        for (auto& tile : mTiles)
+        {
+            tile.get();
         }
     }
     mTotalSamples += spp;
