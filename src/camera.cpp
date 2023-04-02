@@ -12,13 +12,13 @@ constexpr float FILM_DIST = 1.0f;
 void
 Camera::set(
     const float3& eye,
-    const float3& at,
+    const float3& target,
     const float3& up,
     float fovy,
     float aspect)
 {
     mEye = eye;
-    mAt = at;
+    mTarget = target;
     mUp = up;
 
     mFilmHeight = FILM_DIST * std::tan(0.5f * fovy);
@@ -28,12 +28,11 @@ Camera::set(
 }
 
 void
-Camera::rotate(float theta, float phi)
+Camera::orbit(float theta, float phi)
 {
-    float3 toEye = mEye - mAt;
+    float3 toEye = mEye - mTarget;
     float toEyeDist = length(toEye);
-
-    if(toEyeDist == 0.0f)
+    if (toEyeDist == 0.0f)
     {
         return;
     }
@@ -51,9 +50,23 @@ Camera::rotate(float theta, float phi)
     toEye.y = cosPhi * toEyeDist;
     toEye.z = cosTheta * sinPhi * toEyeDist;
 
-    mEye = toEye + mAt;
+    mEye = toEye + mTarget;
 
     updateViewMatrix();
+}
+
+void
+Camera::zoom(float z)
+{
+    mEye -= mViewMatrix.getColumn(2) * z;
+}
+
+void
+Camera::pan(float x, float y)
+{
+    float3 translation = mViewMatrix.getColumn(0) * x - mViewMatrix.getColumn(1) * y;
+    mEye -= translation;
+    mTarget -= translation;
 }
 
 Ray
@@ -73,7 +86,7 @@ Camera::generateRay(float x, float y) const
 void
 Camera::updateViewMatrix()
 {
-    float3 viewZ = normalize(mAt - mEye);
+    float3 viewZ = normalize(mTarget - mEye);
     float3 viewX = normalize(cross(mUp, viewZ));
     float3 viewY = cross(viewZ, viewX);
     mViewMatrix.setColumn(0, viewX);
