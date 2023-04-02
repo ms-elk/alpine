@@ -23,7 +23,7 @@ main(int argc, char* argv[])
     const int height = 256;
     const int maxDepth = 8;
     const float eye[] = { 278.0f, 273.0f, -600.0f };
-    const float at[] = { 278.0f, 273.0f, 0.0f };
+    const float target[] = { 278.0f, 273.0f, 0.0f };
     const float up[] = { 0.0f, 1.0f, 0.0f };
     const float fovy = PI / 2.0f;
     float aspect = float(width) / float(height);
@@ -37,7 +37,7 @@ main(int argc, char* argv[])
         return 1;
     }
 
-    alpine::setCamera(eye, at, up, fovy, aspect);
+    alpine::setCameraLookAt(eye, target, up, fovy, aspect);
 
     alpine::render(spp);
 

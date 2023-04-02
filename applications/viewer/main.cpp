@@ -15,7 +15,7 @@ enum class MouseAction
     Released,
     LeftPressed,
     MiddlePressed,
-} gMouseAction;
+} gMouseAction = MouseAction::Released;
 float gMousePos[2] = { 0.0f };
 
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
@@ -103,13 +103,13 @@ int main(int argc, char* argv[])
     alpine::initialize(WIDTH, HEIGHT, maxDepth);
 
     const float eye[] = { 0.0f, 0.0f, -5.0f };
-    const float at[] = { 0.0f, 0.0f, 0.0f };
+    const float target[] = { 0.0f, 0.0f, 0.0f };
     const float up[] = { 0.0f, 1.0f, 0.0f };
     alpine::addDebugScene();
 
     const float fovy = PI / 2.0f;
     float aspect = float(WIDTH) / float(HEIGHT);
-    alpine::setCamera(eye, at, up, fovy, aspect);
+    alpine::setCameraLookAt(eye, target, up, fovy, aspect);
 
     const void* pixels = alpine::getFrameBuffer();
 
