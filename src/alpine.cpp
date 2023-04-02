@@ -43,7 +43,7 @@ public:
 
     bool loadObj(const char* filename);
 
-    void setCamera(
+    void setCameraLookAt(
         const float eye[3],
         const float target[3],
         const float up[3],
@@ -126,14 +126,14 @@ Alpine::loadObj(const char* filename)
 }
 
 void
-Alpine::setCamera(
+Alpine::setCameraLookAt(
     const float eye[3],
     const float target[3],
     const float up[3],
     float fovy,
     float aspect)
 {
-    mCamera.set(float3(eye), float3(target), float3(up), fovy, aspect);
+    mCamera.setLookAt(float3(eye), float3(target), float3(up), fovy, aspect);
 }
 
 void
@@ -272,14 +272,14 @@ setBackgroundColor(float r, float g, float b)
 }
 
 void
-setCamera(
+setCameraLookAt(
     const float eye[3],
     const float target[3],
     const float up[3],
     float fovy,
     float aspect)
 {
-    Alpine::getInstance().setCamera(eye, target, up, fovy, aspect);
+    Alpine::getInstance().setCameraLookAt(eye, target, up, fovy, aspect);
 }
 
 void

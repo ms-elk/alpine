@@ -8,7 +8,7 @@ bool loadObj(const char* filename);
 void setBackgroundColor(float r, float g, float b);
 
 // Camera
-void setCamera(
+void setCameraLookAt(
     const float eye[3],
     const float target[3],
     const float up[3],

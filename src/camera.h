@@ -11,7 +11,7 @@ class Camera
 public:
     Camera() {};
 
-    void set(
+    void setLookAt(
         const float3& eye,
         const float3& target,
         const float3& up,

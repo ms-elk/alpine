@@ -10,7 +10,7 @@ namespace alpine {
 constexpr float FILM_DIST = 1.0f;
 
 void
-Camera::set(
+Camera::setLookAt(
     const float3& eye,
     const float3& target,
     const float3& up,
