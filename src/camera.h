@@ -3,24 +3,26 @@
 #include "matrix.h"
 #include "vector.h"
 
+#include <alpine.h>
+
 namespace alpine {
 struct Ray;
 
-class Camera
+class Camera : public ICamera
 {
 public:
     Camera() {};
 
     void setLookAt(
-        const float3& eye,
-        const float3& target,
-        const float3& up,
+        const float eye[3],
+        const float target[3],
+        const float up[3],
         float fovy,
-        float aspect);
+        float aspect) override;
 
-    void orbit(float theta, float phi);
-    void zoom(float z);
-    void pan(float x, float y);
+    void orbit(float theta, float phi) override;
+    void zoom(float z) override;
+    void pan(float x, float y) override;
 
     Ray generateRay(float x, float y) const;
 

@@ -37,6 +37,9 @@ public:
     {
         mBackgroundColor = float3(r, g, b);
     }
+
+    inline ICamera* getCamera() { return &mCamera; }
+
     inline const void* getFrameBuffer() const { return mFrameBuffer.data(); }
 
     void initialize(int width, int height, int maxDepth);
@@ -123,35 +126,6 @@ Alpine::loadObj(const char* filename)
     kernel::updateScene();
 
     return true;
-}
-
-void
-Alpine::setCameraLookAt(
-    const float eye[3],
-    const float target[3],
-    const float up[3],
-    float fovy,
-    float aspect)
-{
-    mCamera.setLookAt(float3(eye), float3(target), float3(up), fovy, aspect);
-}
-
-void
-Alpine::orbitCamera(float theta, float phi)
-{
-    mCamera.orbit(theta, phi);
-}
-
-void
-Alpine::zoomCamera(float z)
-{
-    mCamera.zoom(z);
-}
-
-void
-Alpine::panCamera(float x, float y)
-{
-    mCamera.pan(x, y);
 }
 
 void
@@ -271,32 +245,10 @@ setBackgroundColor(float r, float g, float b)
     Alpine::getInstance().setBackgroundColor(r, g, b);
 }
 
-void
-setCameraLookAt(
-    const float eye[3],
-    const float target[3],
-    const float up[3],
-    float fovy,
-    float aspect)
+ICamera*
+getCamera()
 {
-    Alpine::getInstance().setCameraLookAt(eye, target, up, fovy, aspect);
-}
-
-void
-orbitCamera(float theta, float phi)
-{
-    Alpine::getInstance().orbitCamera(theta, phi);
-}
-
-void
-zoomCamera(float z)
-{
-    Alpine::getInstance().zoomCamera(z);
-}
-
-void panCamera(float x, float y)
-{
-    Alpine::getInstance().panCamera(x, y);
+    return Alpine::getInstance().getCamera();
 }
 
 void
