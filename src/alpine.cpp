@@ -18,8 +18,8 @@
 #include <vector>
 
 namespace alpine {
-static constexpr int MAX_SHAPES = 10;
-static constexpr int TILE_SIZE = 64;
+static constexpr uint32_t MAX_SHAPES = 10;
+static constexpr uint32_t TILE_SIZE = 64;
 
 class Alpine
 {
@@ -42,26 +42,13 @@ public:
 
     inline const void* getFrameBuffer() const { return mFrameBuffer.data(); }
 
-    void initialize(int width, int height, int maxDepth);
+    void initialize(uint32_t width, uint32_t height, uint32_t maxDepth);
 
     bool loadObj(const char* filename);
 
-    void setCameraLookAt(
-        const float eye[3],
-        const float target[3],
-        const float up[3],
-        float fovy,
-        float aspect);
-
-    void orbitCamera(float theta, float phi);
-
-    void zoomCamera(float z);
-
-    void panCamera(float x, float y);
-
     void resetAccumulation();
 
-    void render(int spp);
+    void render(uint32_t spp);
 
     void saveImage(const char* filename) const;
 
@@ -75,18 +62,18 @@ private:
     ~Alpine() { kernel::finalize(); }
 
 private:
-    int mWidth = 0;
-    int mHeight = 0;
-    int mMaxDepth = 0;
+    uint32_t mWidth = 0;
+    uint32_t mHeight = 0;
+    uint32_t mMaxDepth = 0;
 
     float3 mBackgroundColor = float3(1.0f);
 
     std::vector<float3> mAccumBuffer;
     std::vector<byte3> mFrameBuffer;
-    int mTotalSamples = 0;
+    uint32_t mTotalSamples = 0;
 
-    int mTileWidth = 0;
-    int mTileHeight = 0;
+    uint32_t mTileWidth = 0;
+    uint32_t mTileHeight = 0;
     std::vector<std::future<void>> mTiles;
 
     std::vector<std::shared_ptr<Shape>> mScene;
@@ -95,19 +82,19 @@ private:
 };
 
 void
-Alpine::initialize(int width, int height, int maxDepth)
+Alpine::initialize(uint32_t width, uint32_t height, uint32_t maxDepth)
 {
     mWidth = width;
     mHeight = height;
     mMaxDepth = maxDepth;
 
-    int pixelCount = mWidth * mHeight;
+    uint32_t pixelCount = mWidth * mHeight;
     mAccumBuffer.resize(pixelCount);
     mFrameBuffer.resize(pixelCount);
 
     mTileWidth = width / TILE_SIZE;
     mTileHeight = height / TILE_SIZE;
-    unsigned int tileCount = mTileWidth * mTileHeight;
+    uint32_t tileCount = mTileWidth * mTileHeight;
     mTiles.resize(tileCount);
 
     mScene.reserve(MAX_SHAPES);
@@ -136,19 +123,19 @@ Alpine::resetAccumulation()
 }
 
 void
-Alpine::render(int spp)
+Alpine::render(uint32_t spp)
 {
-    for (int sampleId = 0; sampleId < spp; ++sampleId)
+    for (uint32_t sampleId = 0; sampleId < spp; ++sampleId)
     {
-        for (int tileId = 0; tileId < mTiles.size(); ++tileId)
+        for (uint32_t tileId = 0; tileId < mTiles.size(); ++tileId)
         {
             mTiles[tileId] = std::async([&, tileId]() {
-                int xBegin = tileId % mTileWidth * TILE_SIZE;
-                int yBegin = tileId / mTileWidth * TILE_SIZE;
+                uint32_t xBegin = tileId % mTileWidth * TILE_SIZE;
+                uint32_t yBegin = tileId / mTileWidth * TILE_SIZE;
 
-                for (int y = yBegin; y < yBegin + TILE_SIZE; ++y)
+                for (uint32_t y = yBegin; y < yBegin + TILE_SIZE; ++y)
                 {
-                    for (int x = xBegin; x < xBegin + TILE_SIZE; ++x)
+                    for (uint32_t x = xBegin; x < xBegin + TILE_SIZE; ++x)
                     {
                         float2 jitter = get2D();
                         auto ray = mCamera.generateRay(
@@ -156,7 +143,7 @@ Alpine::render(int spp)
 
                         float3 throughput(1.0f, 1.0f, 1.0f);
                         float3 radiance(0.0f, 0.0f, 0.0f);
-                        for (int depth = 0; depth < mMaxDepth; ++depth)
+                        for (uint32_t depth = 0; depth < mMaxDepth; ++depth)
                         {
                             auto isect = kernel::intersect(ray);
 
@@ -186,7 +173,7 @@ Alpine::render(int spp)
                             ray.dir = wi;
                         }
 
-                        int index = y * mWidth + x;
+                        uint32_t index = y * mWidth + x;
                         mAccumBuffer[index] += radiance;
                     }
                 }
@@ -200,15 +187,15 @@ Alpine::render(int spp)
     }
     mTotalSamples += spp;
 
-    for (int i = 0; i < mFrameBuffer.size(); ++i)
+    for (uint32_t i = 0; i < mFrameBuffer.size(); ++i)
     {
         auto pixel = mAccumBuffer[i];
         pixel /= float(mTotalSamples);
 
         auto& fb = mFrameBuffer[i];
-        fb.x = static_cast<char>(std::clamp(pixel.x, 0.0f, 1.0f) * 255.0f + 0.5f);
-        fb.y = static_cast<char>(std::clamp(pixel.y, 0.0f, 1.0f) * 255.0f + 0.5f);
-        fb.z = static_cast<char>(std::clamp(pixel.z, 0.0f, 1.0f) * 255.0f + 0.5f);
+        fb.x = static_cast<uint8_t>(std::clamp(pixel.x, 0.0f, 1.0f) * 255.0f + 0.5f);
+        fb.y = static_cast<uint8_t>(std::clamp(pixel.y, 0.0f, 1.0f) * 255.0f + 0.5f);
+        fb.z = static_cast<uint8_t>(std::clamp(pixel.z, 0.0f, 1.0f) * 255.0f + 0.5f);
     }
 }
 
@@ -228,7 +215,7 @@ Alpine::addDebugScene()
 
 ///////////////////////////////////////////////////////////////
 void
-initialize(int width, int height, int maxDepth)
+initialize(uint32_t width, uint32_t height, uint32_t maxDepth)
 {
     Alpine::getInstance().initialize(width, height, maxDepth);
 }
@@ -258,7 +245,7 @@ resetAccumulation()
 }
 
 void
-render(int spp)
+render(uint32_t spp)
 {
     Alpine::getInstance().render(spp);
 }

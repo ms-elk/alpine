@@ -24,7 +24,7 @@ void updateScene();
 struct Intersection
 {
     void* shapePtr;
-    unsigned int primId;
+    uint32_t primId;
     float3 ng;
     float u;
     float v;

@@ -5,7 +5,7 @@
 
 namespace alpine {
 bool
-writePPM(const char* filename, int width, int height, const byte3* image)
+writePPM(const char* filename, uint32_t width, uint32_t height, const byte3* image)
 {
     std::ofstream ppm(filename);
     if (!ppm)
@@ -17,14 +17,14 @@ writePPM(const char* filename, int width, int height, const byte3* image)
     ppm << width << ' ' << height << std::endl;
     ppm << "255" << std::endl;
 
-    for (int y = 0; y < height; ++y)
+    for (uint32_t y = 0; y < height; ++y)
     {
-        for (int x = 0; x < width; ++x)
+        for (uint32_t x = 0; x < width; ++x)
         {
             const byte3& pixel = image[y * width + x];
-            unsigned int r = static_cast<unsigned int>(pixel.x);
-            unsigned int g = static_cast<unsigned int>(pixel.y);
-            unsigned int b = static_cast<unsigned int>(pixel.z);
+            auto r = static_cast<uint32_t>(pixel.x);
+            auto g = static_cast<uint32_t>(pixel.y);
+            auto b = static_cast<uint32_t>(pixel.z);
             ppm << r << ' ' << g << ' ' << b << std::endl;
         }
     }

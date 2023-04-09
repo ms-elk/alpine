@@ -5,8 +5,8 @@
 
 static constexpr float PI = 3.14159265358979323846f;
 
-static constexpr int WIDTH = 512;
-static constexpr int HEIGHT = 512;
+static constexpr uint32_t WIDTH = 512;
+static constexpr uint32_t HEIGHT = 512;
 
 static constexpr float ZOOM_SPEED = 10.0f;
 
@@ -101,7 +101,7 @@ int main(int argc, char* argv[])
     glfwSetCursorPosCallback(window, cursorPositionCallback);
     glfwSetScrollCallback(window, scrollCallback);
 
-    const int maxDepth = 8;
+    const uint32_t maxDepth = 8;
     alpine::initialize(WIDTH, HEIGHT, maxDepth);
     gCamera = alpine::getCamera();
 

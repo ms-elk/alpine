@@ -1,7 +1,9 @@
 ﻿#pragma once
 
+#include <stdint.h>
+
 namespace alpine {
-void initialize(int width, int height, int maxDepth);
+void initialize(uint32_t width, uint32_t height, uint32_t maxDepth);
 
 bool loadObj(const char* filename);
 
@@ -24,7 +26,7 @@ ICamera* getCamera();
 
 // Render
 void resetAccumulation();
-void render(int spp);
+void render(uint32_t spp);
 
 const void* getFrameBuffer();
 void saveImage(const char* filename);

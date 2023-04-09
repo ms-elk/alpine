@@ -71,12 +71,12 @@ public:
     Vector3(const Vector3<T>& v) : v{ v.x, v.y, v.z } {}
     Vector3(const T v[3]) : v{ v[0], v[1], v[2] } {}
 
-    T& operator[](unsigned int i)
+    T& operator[](uint32_t i)
     {
         return v[i];
     }
 
-    const T& operator[](unsigned int i) const
+    const T& operator[](uint32_t i) const
     {
         return v[i];
     }
@@ -206,8 +206,8 @@ std::tuple<Vector3<T>, Vector3<T>> getBasis(const Vector3<T>& v)
 }
 
 using float3 = Vector3<float>;
-using uint3 = Vector3<unsigned int>;
-using byte3 = Vector3<char>;
+using uint3 = Vector3<uint32_t>;
+using byte3 = Vector3<uint8_t>;
 
 template <typename T>
 class Vector4
