@@ -37,7 +37,8 @@ main(int argc, char* argv[])
         return 1;
     }
 
-    alpine::setCameraLookAt(eye, target, up, fovy, aspect);
+    auto* camera = alpine::getCamera();
+    camera->setLookAt(eye, target, up, fovy, aspect);
 
     alpine::render(spp);
 

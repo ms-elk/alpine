@@ -18,6 +18,8 @@ enum class MouseAction
 } gMouseAction = MouseAction::Released;
 float gMousePos[2] = { 0.0f };
 
+alpine::ICamera* gCamera = nullptr;
+
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 {
     if (action == GLFW_PRESS)
@@ -57,11 +59,11 @@ void cursorPositionCallback(GLFWwindow* window, double xpos, double ypos)
         {
             float theta = deltaX / static_cast<float>(WIDTH) * PI;
             float phi = deltaY / static_cast<float>(HEIGHT) * PI;
-            alpine::orbitCamera(theta, phi);
+            gCamera->orbit(theta, phi);
         }
         else if (gMouseAction == MouseAction::MiddlePressed)
         {
-            alpine::panCamera(deltaX, deltaY);
+            gCamera->pan(deltaX, deltaY);
         }
 
         alpine::resetAccumulation();
@@ -71,7 +73,7 @@ void cursorPositionCallback(GLFWwindow* window, double xpos, double ypos)
 void scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
     float zoom = static_cast<float>(yoffset) * ZOOM_SPEED;
-    alpine::zoomCamera(zoom);
+    gCamera->zoom(zoom);
     alpine::resetAccumulation();
 }
 
@@ -101,6 +103,7 @@ int main(int argc, char* argv[])
 
     const int maxDepth = 8;
     alpine::initialize(WIDTH, HEIGHT, maxDepth);
+    gCamera = alpine::getCamera();
 
     const float eye[] = { 0.0f, 0.0f, -5.0f };
     const float target[] = { 0.0f, 0.0f, 0.0f };
@@ -109,7 +112,7 @@ int main(int argc, char* argv[])
 
     const float fovy = PI / 2.0f;
     float aspect = float(WIDTH) / float(HEIGHT);
-    alpine::setCameraLookAt(eye, target, up, fovy, aspect);
+    gCamera->setLookAt(eye, target, up, fovy, aspect);
 
     const void* pixels = alpine::getFrameBuffer();
 

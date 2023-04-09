@@ -11,15 +11,15 @@ constexpr float FILM_DIST = 1.0f;
 
 void
 Camera::setLookAt(
-    const float3& eye,
-    const float3& target,
-    const float3& up,
+    const float eye[3],
+    const float target[3],
+    const float up[3],
     float fovy,
     float aspect)
 {
-    mEye = eye;
-    mTarget = target;
-    mUp = up;
+    mEye = float3(eye);
+    mTarget = float3(target);
+    mUp = float3(up);
 
     mFilmHeight = FILM_DIST * std::tan(0.5f * fovy);
     mFilmWidth = mFilmHeight * aspect;

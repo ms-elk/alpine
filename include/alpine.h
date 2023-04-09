@@ -7,16 +7,20 @@ bool loadObj(const char* filename);
 
 void setBackgroundColor(float r, float g, float b);
 
-// Camera
-void setCameraLookAt(
-    const float eye[3],
-    const float target[3],
-    const float up[3],
-    float fovy,
-    float aspect);
-void orbitCamera(float theta, float phi);
-void zoomCamera(float z);
-void panCamera(float x, float y);
+class ICamera
+{
+public:
+    virtual void setLookAt(
+        const float eye[3],
+        const float target[3],
+        const float up[3],
+        float fovy,
+        float aspect) = 0;
+    virtual void orbit(float theta, float phi) = 0;
+    virtual void zoom(float z) = 0;
+    virtual void pan(float x, float y) = 0;
+};
+ICamera* getCamera();
 
 // Render
 void resetAccumulation();
