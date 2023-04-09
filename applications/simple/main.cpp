@@ -14,14 +14,14 @@ main(int argc, char* argv[])
     }
 
     // input parameters
-    int spp = std::atoi(argv[1]);
+    uint32_t spp = std::atoi(argv[1]);
     const char* objFilename = argv[2];
     const char* imageFilename = argv[3];
 
     // constant values
-    const int width = 256;
-    const int height = 256;
-    const int maxDepth = 8;
+    const uint32_t width = 256;
+    const uint32_t height = 256;
+    const uint32_t maxDepth = 8;
     const float eye[] = { 278.0f, 273.0f, -600.0f };
     const float target[] = { 278.0f, 273.0f, 0.0f };
     const float up[] = { 0.0f, 1.0f, 0.0f };

@@ -14,12 +14,12 @@ public:
         : v{ v0, v1, v2 }
     {}
 
-    Vector3<T>& operator[](unsigned int i)
+    Vector3<T>& operator[](uint32_t i)
     {
         return v[i];
     }
 
-    const Vector3<T>& operator[](unsigned int i) const
+    const Vector3<T>& operator[](uint32_t i) const
     {
         return v[i];
     }
@@ -33,14 +33,14 @@ public:
         return *this;
     }
 
-    void setColumn(unsigned int i, const Vector3<T>& col)
+    void setColumn(uint32_t i, const Vector3<T>& col)
     {
         v[0][i] = col[0];
         v[1][i] = col[1];
         v[2][i] = col[2];
     }
 
-    const Vector3<T> getColumn(unsigned int i) const
+    const Vector3<T> getColumn(uint32_t i) const
     {
         return { v[0][i], v[1][i], v[2][i] };
     }

@@ -61,7 +61,7 @@ createMesh(const char* filename)
         const auto& sm = shape.mesh;
         size_t primCount = sm.indices.size() / 3;
 
-        for (int i = 0; i < primCount; ++i)
+        for (uint32_t i = 0; i < primCount; ++i)
         {
             const auto* index = &sm.indices[3 * i];
             meshData->prims.push_back(uint3(index[0].vertex_index, index[1].vertex_index, index[2].vertex_index));
