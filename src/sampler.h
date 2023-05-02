@@ -3,7 +3,23 @@
 #include "vector.h"
 
 namespace alpine {
-float2 get2D();
+class Sampler
+{
+public:
+    Sampler() {};
+
+    void reset(uint32_t seed);
+
+    float get1D();
+    float2 get2D();
+
+private:
+    uint32_t next();
+
+private:
+    uint32_t mSeed[4];
+};
+
 float2 sampleConcentricDisk(const float2& u);
 float3 sampleCosineWeightedHemisphere(float& pdf, const float2& u);
 }

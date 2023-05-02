@@ -68,6 +68,7 @@ private:
 
     float3 mBackgroundColor = float3(1.0f);
 
+    std::vector<Sampler> mSamplers;
     std::vector<float3> mAccumBuffer;
     std::vector<byte3> mFrameBuffer;
     uint32_t mTotalSamples = 0;
@@ -89,6 +90,7 @@ Alpine::initialize(uint32_t width, uint32_t height, uint32_t maxDepth)
     mMaxDepth = maxDepth;
 
     uint32_t pixelCount = mWidth * mHeight;
+    mSamplers.resize(pixelCount);
     mAccumBuffer.resize(pixelCount);
     mFrameBuffer.resize(pixelCount);
 
@@ -98,6 +100,8 @@ Alpine::initialize(uint32_t width, uint32_t height, uint32_t maxDepth)
     mTiles.resize(tileCount);
 
     mScene.reserve(MAX_SHAPES);
+
+    resetAccumulation();
 }
 
 bool
@@ -118,8 +122,12 @@ Alpine::loadObj(const char* filename)
 void
 Alpine::resetAccumulation()
 {
-    mTotalSamples = 0;
+    for (uint32_t p = 0; p < mSamplers.size(); ++p)
+    {
+        mSamplers[p].reset(p);
+    }
     std::fill(mAccumBuffer.begin(), mAccumBuffer.end(), float3(0.0f));
+    mTotalSamples = 0;
 }
 
 void
@@ -137,7 +145,9 @@ Alpine::render(uint32_t spp)
                 {
                     for (uint32_t x = xBegin; x < xBegin + TILE_SIZE; ++x)
                     {
-                        float2 jitter = get2D();
+                        uint32_t index = y * mWidth + x;
+                        auto& sampler = mSamplers[index];
+                        float2 jitter = sampler.get2D();
                         auto ray = mCamera.generateRay(
                             (x + jitter.x) / float(mWidth), (y + jitter.y) / float(mHeight));
 
@@ -154,12 +164,13 @@ Alpine::render(uint32_t spp)
                             }
 
                             const auto* shape = static_cast<Shape*>(isect.shapePtr);
-                            auto isectAttr = shape->getIntersectionAttributes(ray, isect);
+                            auto isectAttr
+                                = shape->getIntersectionAttributes(ray, isect);
 
                             float3 wi;
                             float pdf;
-                            float3 bsdf =
-                                isectAttr.material->sample(ray.dir, isect.ng, get2D(), wi, pdf);
+                            float3 bsdf = isectAttr.material->sample(
+                                ray.dir, isect.ng, sampler.get2D(), wi, pdf);
                             if (pdf == 0.0f)
                             {
                                 break;
@@ -173,7 +184,6 @@ Alpine::render(uint32_t spp)
                             ray.dir = wi;
                         }
 
-                        uint32_t index = y * mWidth + x;
                         mAccumBuffer[index] += radiance;
                     }
                 }
