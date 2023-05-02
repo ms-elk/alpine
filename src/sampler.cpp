@@ -3,21 +3,46 @@
 #include "util.h"
 #include <algorithm>
 
-namespace {
-float getRandom()
-{
-    return rand() / (RAND_MAX + 1.0f);
-}
-}
-
 namespace alpine {
-float2 get2D()
+void
+Sampler::reset(uint32_t seed)
 {
-    // TODO: implement a better sampler
-    return float2(getRandom(), getRandom());
+    for (uint32_t i = 1; i <= 4; ++i)
+    {
+        mSeed[i - 1] = seed = 1812433253U * (seed ^ (seed >> 30)) + i;
+    }
 }
 
-float2 sampleConcentricDisk(const float2& u)
+float
+Sampler::get1D()
+{
+    uint32_t rng = next();
+    double value = static_cast<double>(rng)
+        / static_cast<double>(std::numeric_limits<uint32_t>::max());
+    return static_cast<float>(value);
+}
+
+float2
+Sampler::get2D()
+{
+    return { get1D(), get1D() };
+}
+
+uint32_t
+Sampler::next()
+{
+    uint32_t t = mSeed[3];
+    uint32_t s = mSeed[0];
+    mSeed[3] = mSeed[2];
+    mSeed[2] = mSeed[1];
+    mSeed[1] = s;
+    t ^= t << 11;
+    t ^= t >> 8;
+    return mSeed[0] = t ^ s ^ (s >> 19);
+}
+
+float2
+sampleConcentricDisk(const float2& u)
 {
     // map uniform random numbers to $[-1,1]^2$
     float2 uOffset(2.0f * u.x - 1.0f, 2.0f * u.y - 1.0f);
@@ -43,7 +68,8 @@ float2 sampleConcentricDisk(const float2& u)
     return float2(r * std::cos(theta), r * std::sin(theta));
 }
 
-float3 sampleCosineWeightedHemisphere(float& pdf, const float2& u)
+float3
+sampleCosineWeightedHemisphere(float& pdf, const float2& u)
 {
     float2 d = sampleConcentricDisk(u);
     float z = std::sqrt(std::max(0.0f, 1.0f - d.x * d.x - d.y * d.y));
