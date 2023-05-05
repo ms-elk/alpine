@@ -11,6 +11,7 @@
     <ClCompile Include="debug_scene.cpp" />
     <ClCompile Include="sphere.cpp" />
     <ClCompile Include="image.cpp" />
+    <ClCompile Include="texture.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="vector.h" />
@@ -29,5 +30,6 @@
     <ClInclude Include="shape.h" />
     <ClInclude Include="matrix.h" />
     <ClInclude Include="image.h" />
+    <ClInclude Include="texture.h" />
   </ItemGroup>
 </Project>

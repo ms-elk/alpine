@@ -15,7 +15,9 @@ public:
     struct Data
     {
         std::vector<float3> vertices;
+        std::vector<float2> uvs;
         std::vector<uint3> prims;
+        std::vector<uint3> uvPrims;
         std::vector<std::shared_ptr<Material>> materials;
     };
 
@@ -23,7 +25,7 @@ public:
     virtual ~Mesh() override {}
 
     virtual IntersectionAttributes getIntersectionAttributes(
-        const Ray& ray, const kernel::Intersection& isect) const override;
+        const kernel::Intersection& isect) const override;
 
 private:
     std::shared_ptr<Data> mData;

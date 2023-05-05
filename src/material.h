@@ -3,9 +3,7 @@
 #include "vector.h"
 
 namespace alpine {
-namespace kernel {
-struct Intersection;
-}
+struct IntersectionAttributes;
 
 class Material
 {
@@ -14,13 +12,16 @@ public:
     virtual ~Material() {};
 
     // TODO: implement BSDF class, and remove ng
-    virtual float3 evaluate(const float3& wo, const float3& wi) const = 0;
+    virtual float3 evaluate(
+        const float3& wo, const float3& wi, const IntersectionAttributes& isectAttr) const = 0;
 
-    virtual float3 sample(
-        const float3& wo,
-        const float3& ng, // tmp
-        const float2& u,
-        float3& wi,
-        float& pdf) const = 0;
+    struct Sample {
+        float3 bsdf;
+        float3 wi;
+        float pdf;
+    };
+
+    virtual Sample sample(
+        const float3& wo, const float2& u, const IntersectionAttributes& isectAttr) const = 0;
 };
 }

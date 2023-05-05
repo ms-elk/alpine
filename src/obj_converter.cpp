@@ -2,8 +2,12 @@
 
 #include "lambertian.h"
 #include "mesh.h"
+#include "texture.h"
 
 #include <filesystem>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb/stb_image.h>
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tinyobjloader/tiny_obj_loader.h>
@@ -31,7 +35,6 @@ createMesh(const char* filename)
     if (!warn.empty())
     {
         printf("%s", warn.c_str());
-        return nullptr;
     }
 
     if (!loaded)
@@ -44,8 +47,17 @@ createMesh(const char* filename)
     materials.reserve(objMaterials.size());
     for (const auto& om : objMaterials)
     {
+        std::shared_ptr<Texture> diffuseTex = nullptr;
+        if (!om.diffuse_texname.empty())
+        {
+            int32_t w, h, channels;
+            std::string diffuseTexName = filepath.string() + om.diffuse_texname;
+            stbi_uc* data = stbi_load(diffuseTexName.c_str(), &w, &h, &channels, STBI_rgb_alpha);
+            diffuseTex = std::make_shared<Texture>(w, h, data);
+        }
+
         const auto& d = om.diffuse;
-        materials.push_back(std::make_shared<Lambertian>(float3(d[0], d[1], d[2])));
+        materials.push_back(std::make_shared<Lambertian>(float3(d[0], d[1], d[2]), diffuseTex));
     }
 
     auto meshData = std::make_shared<Mesh::Data>();
@@ -54,6 +66,10 @@ createMesh(const char* filename)
     size_t vertexCount = attrib.vertices.size() / 3;
     meshData->vertices.resize(vertexCount);
     memcpy(meshData->vertices.data(), attrib.vertices.data(), sizeof(float3) * vertexCount);
+
+    size_t uvCount = attrib.texcoords.size() / 2;
+    meshData->uvs.resize(uvCount);
+    memcpy(meshData->uvs.data(), attrib.texcoords.data(), sizeof(float2) * uvCount);
 
     // assign prim indices and material IDs
     for (const auto& shape : objShapes)
@@ -64,7 +80,10 @@ createMesh(const char* filename)
         for (uint32_t i = 0; i < primCount; ++i)
         {
             const auto* index = &sm.indices[3 * i];
-            meshData->prims.push_back(uint3(index[0].vertex_index, index[1].vertex_index, index[2].vertex_index));
+            meshData->prims.push_back(
+                uint3(index[0].vertex_index, index[1].vertex_index, index[2].vertex_index));
+            meshData->uvPrims.push_back(
+                uint3(index[0].texcoord_index, index[1].texcoord_index, index[2].texcoord_index));
 
             meshData->materials.push_back(materials[sm.material_ids[i]]);
         }

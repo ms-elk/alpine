@@ -11,7 +11,7 @@ Sphere::Sphere(const std::shared_ptr<Data>& data)
 }
 
 IntersectionAttributes
-Sphere::getIntersectionAttributes(const Ray& ray, const kernel::Intersection& isect) const
+Sphere::getIntersectionAttributes(const kernel::Intersection& isect) const
 {
     IntersectionAttributes isectAttr;
     if (isect.primId < mData->materials.size())

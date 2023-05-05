@@ -1,14 +1,17 @@
 ﻿#pragma once
 
+#include "vector.h"
+
 namespace alpine {
 namespace kernel{
 struct Intersection;
 }
-struct Ray;
 class Material;
 
 struct IntersectionAttributes
 {
+    float3 ns; // TODO
+    float2 uv;
     Material* material = nullptr;
 };
 
@@ -19,6 +22,6 @@ public:
     virtual ~Shape() {}
 
     virtual IntersectionAttributes getIntersectionAttributes(
-        const Ray& ray, const kernel::Intersection& isect) const = 0;
+        const kernel::Intersection& isect) const = 0;
 };
 }
