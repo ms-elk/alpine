@@ -167,14 +167,16 @@ Alpine::render(uint32_t spp)
                             auto isectAttr
                                 = shape->getIntersectionAttributes(isect);
 
+                            float3 wo = -ray.dir;
                             auto ms = isectAttr.material->sample(
-                                ray.dir, sampler.get2D(), isectAttr);
-                            if (ms.pdf == 0.0f)
+                                wo, sampler.get2D(), isectAttr);
+                            bool isReflect = dot(ms.wi, isect.ng) > 0.0f;
+                            float cosTerm = std::abs(dot(ms.wi, isectAttr.ns));
+                            if (ms.pdf == 0.0f || !isReflect || cosTerm == 0.0f)
                             {
                                 break;
                             }
 
-                            float cosTerm = std::abs(dot(ms.wi, isect.ng));
                             throughput = throughput * ms.bsdf * cosTerm / ms.pdf;
 
                             float3 rayOffset = isect.ng * 0.001f;

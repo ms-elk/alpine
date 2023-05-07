@@ -9,7 +9,7 @@ float3
 Lambertian::evaluate(
     const float3& wo, const float3& wi, const IntersectionAttributes& isectAttr) const
 {
-    float3 albedo = mAlbedoTex ? mAlbedoTex->sample(isectAttr.uv).xyz() : mAlbedo;
+    float3 albedo = mBaseColorTex ? mBaseColorTex->sample(isectAttr.uv).xyz() : mBaseColor;
     return albedo / PI;
 }
 

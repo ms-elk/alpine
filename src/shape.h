@@ -18,8 +18,8 @@ struct IntersectionAttributes
 class Shape
 {
 public:
-    Shape(){}
-    virtual ~Shape() {}
+    Shape() = default;
+    virtual ~Shape() = default;
 
     virtual IntersectionAttributes getIntersectionAttributes(
         const kernel::Intersection& isect) const = 0;

@@ -14,16 +14,27 @@ IntersectionAttributes
 Mesh::getIntersectionAttributes(const kernel::Intersection& isect) const
 {
     IntersectionAttributes isectAttr;
+    float b1 = isect.barycentric.x;
+    float b2 = isect.barycentric.y;
+    float b0 = 1.0f - b1 - b2;
 
-    isectAttr.ns = isect.ng; // TODO
+    const auto interpolate = [&](const auto& values, const std::vector<uint3>& prims) {
+        const uint3& idx = prims[isect.primId];
+        return values[idx[0]] * b0 + values[idx[1]] * b1 + values[idx[2]] * b2;
+    };
+
+    if (!mData->normals.empty())
+    {
+        isectAttr.ns = interpolate(mData->normals, mData->normalPrims);
+    }
+    else
+    {
+        isectAttr.ns = isect.ng; // TODO
+    }
 
     if (!mData->uvs.empty())
     {
-        const uint3& idx = mData->uvPrims[isect.primId];
-        float a = isect.barycentric.x;
-        float b = isect.barycentric.y;
-        float c = 1.0f - a - b;
-        isectAttr.uv = mData->uvs[idx[0]] * c + mData->uvs[idx[1]] * a + mData->uvs[idx[2]] * b;
+        isectAttr.uv = interpolate(mData->uvs, mData->uvPrims);
     }
 
     if (isect.primId < mData->materials.size())

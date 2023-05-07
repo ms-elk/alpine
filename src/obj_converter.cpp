@@ -67,6 +67,10 @@ createMesh(const char* filename)
     meshData->vertices.resize(vertexCount);
     memcpy(meshData->vertices.data(), attrib.vertices.data(), sizeof(float3) * vertexCount);
 
+    size_t normalCount = attrib.normals.size() / 3;
+    meshData->normals.resize(normalCount);
+    memcpy(meshData->normals.data(), attrib.normals.data(), sizeof(float3) * normalCount);
+
     size_t uvCount = attrib.texcoords.size() / 2;
     meshData->uvs.resize(uvCount);
     memcpy(meshData->uvs.data(), attrib.texcoords.data(), sizeof(float2) * uvCount);
@@ -82,6 +86,8 @@ createMesh(const char* filename)
             const auto* index = &sm.indices[3 * i];
             meshData->prims.push_back(
                 uint3(index[0].vertex_index, index[1].vertex_index, index[2].vertex_index));
+            meshData->normalPrims.push_back(
+                uint3(index[0].normal_index, index[1].normal_index, index[2].normal_index));
             meshData->uvPrims.push_back(
                 uint3(index[0].texcoord_index, index[1].texcoord_index, index[2].texcoord_index));
 

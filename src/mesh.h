@@ -15,8 +15,10 @@ public:
     struct Data
     {
         std::vector<float3> vertices;
+        std::vector<float3> normals;
         std::vector<float2> uvs;
         std::vector<uint3> prims;
+        std::vector<uint3> normalPrims;
         std::vector<uint3> uvPrims;
         std::vector<std::shared_ptr<Material>> materials;
     };
