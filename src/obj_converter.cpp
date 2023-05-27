@@ -54,7 +54,7 @@ createMesh(const char* filename)
             std::string diffuseTexName = filepath.string() + om.diffuse_texname;
             stbi_uc* data = stbi_load(diffuseTexName.c_str(), &w, &h, &channels, STBI_rgb_alpha);
 
-            if (channels == 4)
+            if (channels == 3 || channels == 4)
             {
                 std::vector<float4> texData(w * h);
                 for (uint32_t i = 0; i < texData.size(); ++i)
@@ -66,7 +66,7 @@ createMesh(const char* filename)
             }
             else
             {
-                printf("The channel count of %s is not valid", om.diffuse_texname.c_str());
+                printf("The channel count of %s is not valid\n", om.diffuse_texname.c_str());
             }
         }
 
