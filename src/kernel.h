@@ -26,8 +26,7 @@ struct Intersection
     void* shapePtr;
     uint32_t primId;
     float3 ng;
-    float u;
-    float v;
+    float2 barycentric;
     float t;
 
 };

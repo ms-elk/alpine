@@ -145,8 +145,8 @@ intersect(const Ray& ray)
     }
     isect.primId = rayhit.hit.primID;
     isect.ng = normalize(float3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z));
-    isect.u = rayhit.hit.u;
-    isect.v = rayhit.hit.v;
+    isect.barycentric.x = rayhit.hit.u;
+    isect.barycentric.y = rayhit.hit.v;
     isect.t = rayhit.ray.tfar;
 
     return isect;

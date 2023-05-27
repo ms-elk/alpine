@@ -6,7 +6,7 @@ namespace alpine {
 class Sampler
 {
 public:
-    Sampler() {};
+    Sampler() : mSeed{ 0 } {};
 
     void reset(uint32_t seed);
 
