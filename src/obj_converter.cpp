@@ -54,13 +54,20 @@ createMesh(const char* filename)
             std::string diffuseTexName = filepath.string() + om.diffuse_texname;
             stbi_uc* data = stbi_load(diffuseTexName.c_str(), &w, &h, &channels, STBI_rgb_alpha);
 
-            std::vector<float4> texData(w * h);
-            for (uint32_t i = 0; i < texData.size(); ++i)
+            if (channels == 4)
             {
-                const uint8_t* d = &data[4 * i];
-                texData[i] = float4(d[0], d[1], d[2], d[3]) / 255.0f;
+                std::vector<float4> texData(w * h);
+                for (uint32_t i = 0; i < texData.size(); ++i)
+                {
+                    const uint8_t* d = &data[4 * i];
+                    texData[i] = float4(d[0], d[1], d[2], d[3]) / 255.0f;
+                }
+                diffuseTex = std::make_shared<Texture<float4>>(w, h, std::move(texData));
             }
-            diffuseTex = std::make_shared<Texture<float4>>(w, h, std::move(texData));
+            else
+            {
+                printf("The channel count of %s is not valid", om.diffuse_texname.c_str());
+            }
         }
 
         const auto& d = om.diffuse;

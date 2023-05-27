@@ -14,6 +14,8 @@ IntersectionAttributes
 Sphere::getIntersectionAttributes(const kernel::Intersection& isect) const
 {
     IntersectionAttributes isectAttr;
+    isectAttr.ns = isect.ng;
+
     if (isect.primId < mData->materials.size())
     {
         isectAttr.material = mData->materials[isect.primId].get();

@@ -3,8 +3,6 @@
 #include <GLFW/glfw3.h>
 #include <GL/gl.h>
 
-#include <string>
-
 static constexpr float PI = 3.14159265358979323846f;
 
 static constexpr uint32_t WIDTH = 512;
@@ -105,24 +103,12 @@ int main(int argc, char* argv[])
 
     const uint32_t maxDepth = 8;
     alpine::initialize(WIDTH, HEIGHT, maxDepth);
-    alpine::setBackgroundColor(10.0f, 10.0f, 10.0f);
     gCamera = alpine::getCamera();
 
     const float eye[] = { 0.0f, 0.0f, -5.0f };
     const float target[] = { 0.0f, 0.0f, 0.0f };
     const float up[] = { 0.0f, 1.0f, 0.0f };
-    //alpine::addDebugScene();
-
-    //const float eye[] = { 278.0f, 273.0f, -600.0f };
-    //const float target[] = { 278.0f, 273.0f, 0.0f };
-    //const float up[] = { 0.0f, 1.0f, 0.0f };
-    const char* objFilename = argv[1];
-    bool loaded = alpine::loadObj(objFilename);
-    if (!loaded)
-    {
-        printf("ERROR: failed to load %s\n", objFilename);
-        return 1;
-    }
+    alpine::addDebugScene();
 
     const float fovy = PI / 2.0f;
     float aspect = float(WIDTH) / float(HEIGHT);
