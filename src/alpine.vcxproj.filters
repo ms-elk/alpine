@@ -29,5 +29,6 @@
     <ClInclude Include="shape.h" />
     <ClInclude Include="matrix.h" />
     <ClInclude Include="image.h" />
+    <ClInclude Include="texture.h" />
   </ItemGroup>
 </Project>

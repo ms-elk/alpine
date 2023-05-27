@@ -1,24 +1,26 @@
 ﻿#pragma once
 
 #include "material.h"
+#include "texture.h"
+
+#include <memory>
 
 namespace alpine {
 class Lambertian : public Material
 {
 public:
-    Lambertian (const float3& albedo) : mAlbedo(albedo) {}
+    Lambertian (const float3& baseColor, const std::shared_ptr<Texture<float4>>& baseColorTex)
+        : mBaseColor(baseColor), mBaseColorTex(baseColorTex) {}
     virtual ~Lambertian() {}
 
-    virtual float3 evaluate(const float3& wo,const float3& wi) const override;
+    virtual float3 evaluate(
+        const float3& wo,const float3& wi, const IntersectionAttributes& isectAttr) const override;
 
-    virtual float3 sample(
-        const float3& wo,
-        const float3& ng,
-        const float2& u,
-        float3& wi,
-        float& pdf) const override;
+    virtual Sample sample(
+        const float3& wo, const float2& u, const IntersectionAttributes& isectAttr) const override;
 
 private:
-    float3 mAlbedo;
+    float3 mBaseColor;
+    std::shared_ptr<Texture<float4>> mBaseColorTex;
 };
 }

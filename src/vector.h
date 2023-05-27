@@ -249,6 +249,11 @@ public:
         return { x / rhs, y / rhs, z / rhs, w / rhs };
     }
 
+    Vector3<T> xyz() const
+    {
+        return Vector3<T>(x, y, z);
+    }
+
 public:
     union
     {

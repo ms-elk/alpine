@@ -22,7 +22,7 @@ public:
     virtual ~Sphere() override {}
 
     virtual IntersectionAttributes getIntersectionAttributes(
-        const Ray& ray, const kernel::Intersection& isect) const override;
+        const kernel::Intersection& isect) const override;
 
 private:
     std::shared_ptr<Data> mData;

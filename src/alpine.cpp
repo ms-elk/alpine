@@ -165,23 +165,23 @@ Alpine::render(uint32_t spp)
 
                             const auto* shape = static_cast<Shape*>(isect.shapePtr);
                             auto isectAttr
-                                = shape->getIntersectionAttributes(ray, isect);
+                                = shape->getIntersectionAttributes(isect);
 
-                            float3 wi;
-                            float pdf;
-                            float3 bsdf = isectAttr.material->sample(
-                                ray.dir, isect.ng, sampler.get2D(), wi, pdf);
-                            if (pdf == 0.0f)
+                            float3 wo = -ray.dir;
+                            auto ms = isectAttr.material->sample(
+                                wo, sampler.get2D(), isectAttr);
+                            bool isReflect = dot(ms.wi, isect.ng) > 0.0f;
+                            float cosTerm = std::abs(dot(ms.wi, isectAttr.ns));
+                            if (ms.pdf == 0.0f || !isReflect || cosTerm == 0.0f)
                             {
                                 break;
                             }
 
-                            float cosTerm = std::abs(dot(wi, isect.ng));
-                            throughput = throughput * bsdf * cosTerm / pdf;
+                            throughput = throughput * ms.bsdf * cosTerm / ms.pdf;
 
                             float3 rayOffset = isect.ng * 0.001f;
                             ray.org = ray.org + ray.dir * isect.t + rayOffset;
-                            ray.dir = wi;
+                            ray.dir = ms.wi;
                         }
 
                         mAccumBuffer[index] += radiance;
