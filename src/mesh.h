@@ -23,13 +23,13 @@ public:
         std::vector<std::shared_ptr<Material>> materials;
     };
 
-    Mesh(const std::shared_ptr<Data>& data);
+    Mesh(Data&& data);
     virtual ~Mesh() override {}
 
     virtual IntersectionAttributes getIntersectionAttributes(
         const kernel::Intersection& isect) const override;
 
 private:
-    std::shared_ptr<Data> mData;
+    Data mData;
 };
 }

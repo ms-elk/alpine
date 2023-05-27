@@ -108,7 +108,6 @@
     <ClCompile Include="obj_converter.cpp" />
     <ClCompile Include="sampler.cpp" />
     <ClCompile Include="sphere.cpp" />
-    <ClCompile Include="texture.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\alpine.h" />

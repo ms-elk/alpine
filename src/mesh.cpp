@@ -4,10 +4,10 @@
 #include "ray.h"
 
 namespace alpine {
-Mesh::Mesh(const std::shared_ptr<Data>& data)
-    : mData(data)
+Mesh::Mesh(Data&& data)
+    : mData(std::move(data))
 {
-    kernel::createMesh(mData->vertices, mData->prims, this);
+    kernel::createMesh(mData.vertices, mData.prims, this);
 }
 
 IntersectionAttributes
@@ -23,23 +23,23 @@ Mesh::getIntersectionAttributes(const kernel::Intersection& isect) const
         return values[idx[0]] * b0 + values[idx[1]] * b1 + values[idx[2]] * b2;
     };
 
-    if (!mData->normals.empty())
+    if (!mData.normals.empty())
     {
-        isectAttr.ns = interpolate(mData->normals, mData->normalPrims);
+        isectAttr.ns = interpolate(mData.normals, mData.normalPrims);
     }
     else
     {
-        isectAttr.ns = isect.ng; // TODO
+        isectAttr.ns = isect.ng;
     }
 
-    if (!mData->uvs.empty())
+    if (!mData.uvs.empty())
     {
-        isectAttr.uv = interpolate(mData->uvs, mData->uvPrims);
+        isectAttr.uv = interpolate(mData.uvs, mData.uvPrims);
     }
 
-    if (isect.primId < mData->materials.size())
+    if (isect.primId < mData.materials.size())
     {
-        isectAttr.material = mData->materials[isect.primId].get();
+        isectAttr.material = mData.materials[isect.primId].get();
     }
 
     return isectAttr;

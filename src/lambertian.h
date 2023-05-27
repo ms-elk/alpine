@@ -9,7 +9,7 @@ namespace alpine {
 class Lambertian : public Material
 {
 public:
-    Lambertian (const float3& baseColor, const std::shared_ptr<Texture>& baseColorTex)
+    Lambertian (const float3& baseColor, const std::shared_ptr<Texture<float4>>& baseColorTex)
         : mBaseColor(baseColor), mBaseColorTex(baseColorTex) {}
     virtual ~Lambertian() {}
 
@@ -21,6 +21,6 @@ public:
 
 private:
     float3 mBaseColor;
-    std::shared_ptr<Texture> mBaseColorTex;
+    std::shared_ptr<Texture<float4>> mBaseColorTex;
 };
 }

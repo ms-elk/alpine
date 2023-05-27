@@ -10,7 +10,7 @@ class Material;
 
 struct IntersectionAttributes
 {
-    float3 ns; // TODO
+    float3 ns;
     float2 uv;
     Material* material = nullptr;
 };

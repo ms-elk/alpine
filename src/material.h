@@ -11,7 +11,6 @@ public:
     Material() {}
     virtual ~Material() {};
 
-    // TODO: implement BSDF class, and remove ng
     virtual float3 evaluate(
         const float3& wo, const float3& wi, const IntersectionAttributes& isectAttr) const = 0;
 

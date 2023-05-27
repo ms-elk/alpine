@@ -47,33 +47,40 @@ createMesh(const char* filename)
     materials.reserve(objMaterials.size());
     for (const auto& om : objMaterials)
     {
-        std::shared_ptr<Texture> diffuseTex = nullptr;
+        std::shared_ptr<Texture<float4>> diffuseTex = nullptr;
         if (!om.diffuse_texname.empty())
         {
             int32_t w, h, channels;
             std::string diffuseTexName = filepath.string() + om.diffuse_texname;
             stbi_uc* data = stbi_load(diffuseTexName.c_str(), &w, &h, &channels, STBI_rgb_alpha);
-            diffuseTex = std::make_shared<Texture>(w, h, data);
+
+            std::vector<float4> texData(w * h);
+            for (uint32_t i = 0; i < texData.size(); ++i)
+            {
+                const uint8_t* d = &data[4 * i];
+                texData[i] = float4(d[0], d[1], d[2], d[3]) / 255.0f;
+            }
+            diffuseTex = std::make_shared<Texture<float4>>(w, h, std::move(texData));
         }
 
         const auto& d = om.diffuse;
         materials.push_back(std::make_shared<Lambertian>(float3(d[0], d[1], d[2]), diffuseTex));
     }
 
-    auto meshData = std::make_shared<Mesh::Data>();
+    Mesh::Data meshData;
 
     // copy vertices from Obj
     size_t vertexCount = attrib.vertices.size() / 3;
-    meshData->vertices.resize(vertexCount);
-    memcpy(meshData->vertices.data(), attrib.vertices.data(), sizeof(float3) * vertexCount);
+    meshData.vertices.resize(vertexCount);
+    memcpy(meshData.vertices.data(), attrib.vertices.data(), sizeof(float3) * vertexCount);
 
     size_t normalCount = attrib.normals.size() / 3;
-    meshData->normals.resize(normalCount);
-    memcpy(meshData->normals.data(), attrib.normals.data(), sizeof(float3) * normalCount);
+    meshData.normals.resize(normalCount);
+    memcpy(meshData.normals.data(), attrib.normals.data(), sizeof(float3) * normalCount);
 
     size_t uvCount = attrib.texcoords.size() / 2;
-    meshData->uvs.resize(uvCount);
-    memcpy(meshData->uvs.data(), attrib.texcoords.data(), sizeof(float2) * uvCount);
+    meshData.uvs.resize(uvCount);
+    memcpy(meshData.uvs.data(), attrib.texcoords.data(), sizeof(float2) * uvCount);
 
     // assign prim indices and material IDs
     for (const auto& shape : objShapes)
@@ -84,17 +91,17 @@ createMesh(const char* filename)
         for (uint32_t i = 0; i < primCount; ++i)
         {
             const auto* index = &sm.indices[3 * i];
-            meshData->prims.push_back(
+            meshData.prims.push_back(
                 uint3(index[0].vertex_index, index[1].vertex_index, index[2].vertex_index));
-            meshData->normalPrims.push_back(
+            meshData.normalPrims.push_back(
                 uint3(index[0].normal_index, index[1].normal_index, index[2].normal_index));
-            meshData->uvPrims.push_back(
+            meshData.uvPrims.push_back(
                 uint3(index[0].texcoord_index, index[1].texcoord_index, index[2].texcoord_index));
 
-            meshData->materials.push_back(materials[sm.material_ids[i]]);
+            meshData.materials.push_back(materials[sm.material_ids[i]]);
         }
     }
 
-    return std::make_shared<Mesh>(meshData);
+    return std::make_shared<Mesh>(std::move(meshData));
 }
 }
