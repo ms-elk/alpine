@@ -17,8 +17,7 @@ Material::Sample
 Lambertian::sample(
     const float3& wo, const float2& u, const IntersectionAttributes& isectAttr) const
 {
-    float pdf = 0.0f;
-    float3 wiLocal = sampleCosineWeightedHemisphere(pdf, u);
+    auto [wiLocal, pdf] = sampleCosineWeightedHemisphere(u);
 
     const auto toWorld = [&](const float3& v)
     {

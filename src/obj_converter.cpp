@@ -2,6 +2,7 @@
 
 #include "lambertian.h"
 #include "mesh.h"
+#include "microfacet.h"
 #include "texture.h"
 
 #include <filesystem>
@@ -47,13 +48,13 @@ createMesh(const char* filename)
     materials.reserve(objMaterials.size());
     for (const auto& om : objMaterials)
     {
-        std::shared_ptr<Texture<float4>> diffuseTex = nullptr;
         if (!om.diffuse_texname.empty())
         {
             int32_t w, h, channels;
             std::string diffuseTexName = filepath.string() + om.diffuse_texname;
             stbi_uc* data = stbi_load(diffuseTexName.c_str(), &w, &h, &channels, STBI_rgb_alpha);
 
+            std::shared_ptr<Texture<float4>> diffuseTex = nullptr;
             if (channels == 3 || channels == 4)
             {
                 std::vector<float4> texData(w * h);
@@ -68,10 +69,19 @@ createMesh(const char* filename)
             {
                 printf("The channel count of %s is not valid\n", om.diffuse_texname.c_str());
             }
-        }
 
-        const auto& d = om.diffuse;
-        materials.push_back(std::make_shared<Lambertian>(float3(d[0], d[1], d[2]), diffuseTex));
+            const auto& d = om.diffuse;
+            materials.push_back(std::make_shared<Lambertian>(float3(d[0], d[1], d[2]), diffuseTex));
+        }
+        //else if (!om.specular_texname.empty())
+        //{
+        //}
+        else
+        {
+            const auto& d = om.diffuse;
+            materials.push_back(std::make_shared<Microfacet>(float2(0.5f, 0.5f), float3(d[0], d[1], d[2]), nullptr));
+            //materials.push_back(std::make_shared<Lambertian>(float3(d[0], d[1], d[2]), nullptr));
+        }
     }
 
     Mesh::Data meshData;
