@@ -2,6 +2,7 @@
 
 #include "lambertian.h"
 #include "mesh.h"
+#include "microfacet.h"
 #include "sphere.h"
 
 namespace alpine {

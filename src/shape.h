@@ -11,6 +11,8 @@ class Material;
 struct IntersectionAttributes
 {
     float3 ns;
+    float3 ss;
+    float3 ts;
     float2 uv;
     Material* material = nullptr;
 };
