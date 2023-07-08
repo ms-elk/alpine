@@ -7,33 +7,6 @@
 #define VNDF_SAMPLEING
 
 namespace alpine {
-float3
-Microfacet::evaluate(
-    const float3& wo, const float3& wi, const IntersectionAttributes& isectAttr) const
-{
-    float cosThetaWo = std::abs(cosTheta(wo));
-    float cosThetaWi = std::abs(cosTheta(wi));
-    if (cosThetaWo == 0.0f || cosThetaWi == 0.0f)
-    {
-        return float3(0.0f);
-    }
-
-    float3 wh = wo + wi;
-    float whLength = length(wh);
-    if (whLength == 0.0f)
-    {
-        return float3(0.0f);
-    }
-    wh /= whLength;
-
-    float3 bc = getBaseColor(isectAttr.uv);
-    float d = computeDistribution(wh);
-    float g2 = computeMaskingShadowing(wo, wi);
-    float3 bsdf = bc * d * g2 / (4.0f * cosThetaWo * cosThetaWi);
-
-    return bsdf;
-}
-
 Material::Sample
 Microfacet::sample(
     const float3& wo, const float2& u, const IntersectionAttributes& isectAttr) const
@@ -70,7 +43,6 @@ Microfacet::sample(
     float pdf = d / (4.0f * dot(wo, wh));
 
     return { estimator, wi, pdf };
-
 #else
     auto [wi, pdf] = sampleCosineWeightedHemisphere(u);
     if (!isSameHemisphere(wo, wi) || pdf == 0.0f)
@@ -81,7 +53,54 @@ Microfacet::sample(
     float3 estimator = evaluate(wo, wi, isectAttr) * std::abs(cosTheta(wi)) / pdf;
 
     return { estimator, wi, pdf };
+#endif
+}
 
+float3
+Microfacet::evaluate(
+    const float3& wo, const float3& wi, const IntersectionAttributes& isectAttr) const
+{
+    float cosThetaWo = std::abs(cosTheta(wo));
+    float cosThetaWi = std::abs(cosTheta(wi));
+    if (cosThetaWo == 0.0f || cosThetaWi == 0.0f)
+    {
+        return float3(0.0f);
+    }
+
+    float3 wh = wo + wi;
+    float whLength = length(wh);
+    if (whLength == 0.0f)
+    {
+        return float3(0.0f);
+    }
+    wh /= whLength;
+
+    float3 bc = getBaseColor(isectAttr.uv);
+    float d = computeDistribution(wh);
+    float g2 = computeMaskingShadowing(wo, wi);
+    float3 bsdf = bc * d * g2 / (4.0f * cosThetaWo * cosThetaWi);
+
+    return bsdf;
+}
+
+float
+Microfacet::computePdf(const float3& wo, const float3& wi) const
+{
+#ifdef VNDF_SAMPLEING
+    float3 wh = wo + wi;
+    float whLength = length(wh);
+    if (whLength == 0.0f)
+    {
+        return 0.0f;
+    }
+    wh /= whLength;
+
+    float d = computeDistribution(wh);
+    float pdf = d / (4.0f * dot(wo, wh));
+
+    return pdf;
+#else
+    return std::max(cosTheta(wi), 0.0f) / PI;
 #endif
 }
 

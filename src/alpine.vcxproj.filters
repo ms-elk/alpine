@@ -13,6 +13,7 @@
     <ClCompile Include="image.cpp" />
     <ClCompile Include="microfacet.cpp" />
     <ClCompile Include="util.cpp" />
+    <ClCompile Include="light.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="vector.h" />
@@ -33,5 +34,6 @@
     <ClInclude Include="image.h" />
     <ClInclude Include="texture.h" />
     <ClInclude Include="microfacet.h" />
+    <ClInclude Include="light.h" />
   </ItemGroup>
 </Project>

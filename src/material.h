@@ -8,11 +8,8 @@ struct IntersectionAttributes;
 class Material
 {
 public:
-    Material() {}
-    virtual ~Material() {};
-
-    virtual float3 evaluate(
-        const float3& wo, const float3& wi, const IntersectionAttributes& isectAttr) const = 0;
+    Material() = default;
+    virtual ~Material() = default;
 
     struct Sample {
         float3 estimator;
@@ -22,5 +19,10 @@ public:
 
     virtual Sample sample(
         const float3& wo, const float2& u, const IntersectionAttributes& isectAttr) const = 0;
+
+    virtual float3 evaluate(
+        const float3& wo, const float3& wi, const IntersectionAttributes& isectAttr) const = 0;
+
+    virtual float computePdf(const float3& wo, const float3& wi) const = 0;
 };
 }
