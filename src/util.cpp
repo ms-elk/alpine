@@ -37,4 +37,15 @@ sampleCosineWeightedHemisphere(const float2& u)
     float pdf = z / PI;
     return { dir, pdf };
 }
+
+std::pair<float3 /* dir*/, float /* pdf */>
+sampleHemisphere(const float2& u)
+{
+    float z = u.x;
+    float r = std::sqrt(std::max(0.0f, 1.0f - z * z));
+    float phi = 2.0f * PI * u.y;
+    float3 dir(r * std::cos(phi), r * std::sin(phi), z);
+    return { dir, 1.0f / (2.0f * PI) };
+}
+
 }

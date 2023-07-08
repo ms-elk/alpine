@@ -9,24 +9,27 @@ float3
 Lambertian::evaluate(
     const float3& wo, const float3& wi, const IntersectionAttributes& isectAttr) const
 {
-    float3 albedo = mBaseColorTex ? mBaseColorTex->sample(isectAttr.uv).xyz() : mBaseColor;
-    return albedo / PI;
+    float3 bc = getBaseColor(isectAttr.uv);
+    float3 bsdf = bc / PI;
+
+    return bsdf;
 }
 
 Material::Sample
 Lambertian::sample(
     const float3& wo, const float2& u, const IntersectionAttributes& isectAttr) const
 {
-    auto [wiLocal, pdf] = sampleCosineWeightedHemisphere(u);
+    auto [wi, pdf] = sampleCosineWeightedHemisphere(u);
+    float3 bc = getBaseColor(isectAttr.uv);
+    float3 estimator = bc; // bsdf * cosTheta / pdf
 
-    const auto toWorld = [&](const float3& v)
-    {
-        auto [ b1, b2 ] = getBasis(isectAttr.ns);
-        return b1 * v.x + b2 * v.y + isectAttr.ns * v.z;
-    };
-    float3 wi = toWorld(wiLocal);
-    float3 bsdf = evaluate(wo, wi, isectAttr);
-
-    return { bsdf, wi, pdf };
+    return { estimator, wi, pdf };
 }
+
+float3
+Lambertian::getBaseColor(const float2& uv) const
+{
+    return mBaseColorTex ? mBaseColorTex->sample(uv).xyz() : mBaseColor;
+}
+
 }

@@ -26,10 +26,10 @@ createDebugSphere()
     auto sphereData = std::make_shared<Sphere::Data>();
 
     sphereData->vertices.push_back(float4(-0.75f, -0.75f, 0.0f, 0.5f));
-    sphereData->materials.push_back(std::make_shared<Microfacet>(float2(0.3f, 0.3f), float3(0.0f, 0.0f, 1.0f), nullptr));
+    sphereData->materials.push_back(std::make_shared<Lambertian>(float3(0.0f, 0.0f, 1.0f), nullptr));
 
     sphereData->vertices.push_back(float4(0.75f, 0.75f, 0.0f, 0.3f));
-    sphereData->materials.push_back(std::make_shared<Microfacet>(float2(0.7f, 0.7f), float3(0.0f, 1.0f, 0.0f), nullptr));
+    sphereData->materials.push_back(std::make_shared<Lambertian>(float3(0.0f, 1.0f, 0.0f), nullptr));
 
     return std::make_shared<Sphere>(sphereData);
 }

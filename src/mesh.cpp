@@ -31,6 +31,7 @@ Mesh::getIntersectionAttributes(const kernel::Intersection& isect) const
     {
         isectAttr.ns = isect.ng;
     }
+    std::tie(isectAttr.ss, isectAttr.ts) = getBasis(isectAttr.ns);
 
     if (!mData.uvs.empty())
     {

@@ -4,6 +4,8 @@
 #include "shape.h"
 #include "util.h"
 
+#define VNDF_SAMPLEING
+
 namespace alpine {
 float3
 Microfacet::evaluate(
@@ -23,56 +25,69 @@ Microfacet::evaluate(
         return float3(0.0f);
     }
     wh /= whLength;
+
+    float3 bc = getBaseColor(isectAttr.uv);
     float d = computeDistribution(wh);
-    float term = d / (4.0f * cosThetaWo * cosThetaWi);
+    float g2 = computeMaskingShadowing(wo, wi);
+    float3 bsdf = bc * d * g2 / (4.0f * cosThetaWo * cosThetaWi);
 
-    if (term > 1.0f)
-    {
-        printf("d: %f\n", term);
-    }
-
-    float3 albedo = mBaseColorTex ? mBaseColorTex->sample(isectAttr.uv).xyz() : mBaseColor;
-    return albedo * term;
+    return bsdf;
 }
 
 Material::Sample
 Microfacet::sample(
     const float3& wo, const float2& u, const IntersectionAttributes& isectAttr) const
 {
-#if 0
+#ifdef VNDF_SAMPLEING
     float3 woh = normalize(float3(mAlpha.x * wo.x, mAlpha.y * wo.y, wo.z));
 
     float2 t = sampleConcentricDisk(u);
     float s = 0.5f * (1.0f + woh.z);
     t.y = (1.0f - s) * std::sqrt(1.0f - t.x * t.x) + s * t.y;
-    float3 nhLocal(t.x, t.y, std::sqrt(std::max(0.0f, 1.0f - t.x * t.x - t.y * t.y)));
+    float3 nhh(t.x, t.y, std::sqrt(std::max(0.0f, 1.0f - t.x * t.x - t.y * t.y)));
 
-    const auto toWorld = [&](const float3& v)
+    auto [b1, b2] = getBasis(woh);
+    float3 nh = b1 * nhh.x + b2 * nhh.y + woh * nhh.z;
+
+    float3 wh = normalize(float3(mAlpha.x * nh.x, mAlpha.y * nh.y, std::max(0.0f, nh.z)));
+    if (!isSameHemisphere(wo, wh))
     {
-        auto [b1, b2] = getBasis(woh);
-        return b1 * v.x + b2 * v.y + woh * v.z;
-    };
-    float3 whh = toWorld(nhLocal);
-    float3 wh = normalize(float3(mAlpha.x * whh.x, mAlpha.y * whh.y, std::max(0.0f, whh.z)));
-    float3 wi = reflect(wo, whh);
+        wh = -wh;
+    }
 
-    float d = computeDistribution(wh);
-    float pdf = d / (4.0f * dot(wo, wh));
+    float3 wi = reflect(wo, wh);
 
-    float3 bsdf = evaluate(wo, wi, isectAttr);
+    if (isSameHemisphere(wo, wi))
+    {
+        float3 bc = getBaseColor(isectAttr.uv);
+        float g1 = 1.0f / (1.0f + lambda(wo));
+        float g2 = computeMaskingShadowing(wo, wi);
+        float3 estimator = bc * g2 / g1;
+
+        float d = computeDistribution(wh);
+        float pdf = g1 * std::max(0.0f, dot(wo, wh)) * d / wo.z;
+        pdf /= (4.0f * dot(wo, wh));
+
+        return { estimator, wi, pdf };
+    }
+    else
+    {
+        return { 0.0f, float3(0.0f), 0.0f };
+    }
+
 #else
-    auto [wiLocal, pdf] = sampleCosineWeightedHemisphere(u);
+    auto [wi, pdf] = sampleCosineWeightedHemisphere(u);
 
-    const auto toWorld = [&](const float3& v)
+    if (isSameHemisphere(wo, wi) && pdf > 0.0f)
     {
-        auto [b1, b2] = getBasis(isectAttr.ns);
-        return b1 * v.x + b2 * v.y + isectAttr.ns * v.z;
-    };
-    float3 wi = toWorld(wiLocal);
-    float3 bsdf = evaluate(wo, wi, isectAttr);
+        float3 estimator = evaluate(wo, wi, isectAttr) * std::abs(cosTheta(wi)) / pdf;
+        return { estimator, wi, pdf };
+    }
+    else
+    {
+        return { 0.0f, float3(0.0f), 0.0f };
+    }
 #endif
-
-    return { bsdf, wi, pdf };
 }
 
 float
@@ -85,5 +100,25 @@ Microfacet::computeDistribution(const float3& wh) const
     float invD = PI * mAlpha.x * mAlpha.y * cos4Theta * term * term;
 
     return invD != 0.0f ? 1.0f / invD : 0.0f;
+}
+
+float
+Microfacet::lambda(const float3& v) const
+{
+    float alpha = std::sqrt(cosPhi(v) * cosPhi(v) * mAlpha.x * mAlpha.x
+        + sinPhi(v) * sinPhi(v) * mAlpha.y * mAlpha.y);
+    return (-1.0f + std::sqrt(1.0f + alpha * alpha * tan2Theta(v))) / 2.0f;
+}
+
+float
+Microfacet::computeMaskingShadowing(const float3& wo, const float3& wi) const
+{
+    return 1.0f / (1.0f + lambda(wo) + lambda(wi));
+}
+
+float3
+Microfacet::getBaseColor(const float2& uv) const
+{
+    return mBaseColorTex ? mBaseColorTex->sample(uv).xyz() : mBaseColor;
 }
 }

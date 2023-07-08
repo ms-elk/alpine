@@ -15,7 +15,7 @@ public:
         const float3& wo, const float3& wi, const IntersectionAttributes& isectAttr) const = 0;
 
     struct Sample {
-        float3 bsdf;
+        float3 estimator;
         float3 wi;
         float pdf;
     };
