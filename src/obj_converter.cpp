@@ -2,6 +2,7 @@
 
 #include "lambertian.h"
 #include "mesh.h"
+#include "microfacet.h"
 #include "texture.h"
 
 #include <filesystem>
@@ -46,7 +47,7 @@ createMesh(const char* filename)
     std::vector<std::shared_ptr<Material>> materials;
     materials.reserve(objMaterials.size());
     for (const auto& om : objMaterials)
-    {
+{
         std::shared_ptr<Texture<float4>> diffuseTex = nullptr;
         if (!om.diffuse_texname.empty())
         {
@@ -71,7 +72,7 @@ createMesh(const char* filename)
         }
 
         const auto& d = om.diffuse;
-        materials.push_back(std::make_shared<Lambertian>(float3(d[0], d[1], d[2]), diffuseTex));
+        materials.push_back(std::make_shared<Microfacet>(float2(0.5f, 0.5f), float3(d[0], d[1], d[2]), diffuseTex));
     }
 
     Mesh::Data meshData;

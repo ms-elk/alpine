@@ -167,21 +167,22 @@ Alpine::render(uint32_t spp)
                             auto isectAttr
                                 = shape->getIntersectionAttributes(isect);
 
-                            float3 wo = -ray.dir;
+                            float3 wo = toLocal(- ray.dir, isectAttr.ss, isectAttr.ts, isectAttr.ns);
                             auto ms = isectAttr.material->sample(
                                 wo, sampler.get2D(), isectAttr);
-                            bool isReflect = dot(ms.wi, isect.ng) > 0.0f;
-                            float cosTerm = std::abs(dot(ms.wi, isectAttr.ns));
-                            if (ms.pdf == 0.0f || !isReflect || cosTerm == 0.0f)
+                            float3 wi = toWorld(ms.wi, isectAttr.ss, isectAttr.ts, isectAttr.ns);
+
+                            bool isReflect = dot(wi, isect.ng) > 0.0f;
+                            if (ms.pdf == 0.0f || !isReflect)
                             {
                                 break;
                             }
 
-                            throughput = throughput * ms.bsdf * cosTerm / ms.pdf;
+                            throughput = throughput * ms.estimator;
 
                             float3 rayOffset = isect.ng * 0.001f;
                             ray.org = ray.org + ray.dir * isect.t + rayOffset;
-                            ray.dir = ms.wi;
+                            ray.dir = wi;
                         }
 
                         mAccumBuffer[index] += radiance;
