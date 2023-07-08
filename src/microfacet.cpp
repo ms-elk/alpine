@@ -56,37 +56,32 @@ Microfacet::sample(
     }
 
     float3 wi = reflect(wo, wh);
-
-    if (isSameHemisphere(wo, wi))
-    {
-        float3 bc = getBaseColor(isectAttr.uv);
-        float g1 = 1.0f / (1.0f + lambda(wo));
-        float g2 = computeMaskingShadowing(wo, wi);
-        float3 estimator = bc * g2 / g1;
-
-        float d = computeDistribution(wh);
-        float pdf = g1 * std::max(0.0f, dot(wo, wh)) * d / wo.z;
-        pdf /= (4.0f * dot(wo, wh));
-
-        return { estimator, wi, pdf };
-    }
-    else
+    if (!isSameHemisphere(wo, wi))
     {
         return { 0.0f, float3(0.0f), 0.0f };
     }
+
+    float3 bc = getBaseColor(isectAttr.uv);
+    float g1 = 1.0f / (1.0f + lambda(wo));
+    float g2 = computeMaskingShadowing(wo, wi);
+    float d = computeDistribution(wh);
+
+    float3 estimator = bc * g2 / g1;
+    float pdf = d / (4.0f * dot(wo, wh));
+
+    return { estimator, wi, pdf };
 
 #else
     auto [wi, pdf] = sampleCosineWeightedHemisphere(u);
-
-    if (isSameHemisphere(wo, wi) && pdf > 0.0f)
-    {
-        float3 estimator = evaluate(wo, wi, isectAttr) * std::abs(cosTheta(wi)) / pdf;
-        return { estimator, wi, pdf };
-    }
-    else
+    if (!isSameHemisphere(wo, wi) || pdf == 0.0f)
     {
         return { 0.0f, float3(0.0f), 0.0f };
     }
+
+    float3 estimator = evaluate(wo, wi, isectAttr) * std::abs(cosTheta(wi)) / pdf;
+
+    return { estimator, wi, pdf };
+
 #endif
 }
 
