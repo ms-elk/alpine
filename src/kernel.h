@@ -31,5 +31,7 @@ struct Intersection
 
 };
 Intersection intersect(const Ray& ray);
+
+bool occluded(const Ray& ray, float far);
 }
 }

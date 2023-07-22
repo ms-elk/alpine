@@ -2,6 +2,7 @@
 
 #include "camera.h"
 #include "debug_scene.h"
+#include "disk_light.h"
 #include "image.h"
 #include "kernel.h"
 #include "material.h"
@@ -18,8 +19,9 @@
 #include <vector>
 
 namespace alpine {
-static constexpr uint32_t MAX_SHAPES = 10;
+static constexpr uint32_t MAX_SHAPES = 16;
 static constexpr uint32_t TILE_SIZE = 64;
+static constexpr float RAY_OFFSET = 0.001f;
 
 class Alpine
 {
@@ -46,6 +48,8 @@ public:
 
     bool loadObj(const char* filename);
 
+    void setLight(const float emission[3], const float position[3], float radius);
+
     void resetAccumulation();
 
     void render(uint32_t spp);
@@ -60,6 +64,9 @@ private:
         kernel::initialize();
     }
     ~Alpine() { kernel::finalize(); }
+
+    float3 estimateDirectIllumination(Sampler& sampler, const float3& hit,
+        const float3& wo, const IntersectionAttributes& isectAttr) const;
 
 private:
     uint32_t mWidth = 0;
@@ -77,7 +84,12 @@ private:
     uint32_t mTileHeight = 0;
     std::vector<std::future<void>> mTiles;
 
-    std::vector<std::shared_ptr<Shape>> mScene;
+    struct Scene
+    {
+        std::vector<std::shared_ptr<Shape>> shapes;
+        std::shared_ptr<Light> light;
+    };
+    Scene mScene;
 
     Camera mCamera;
 };
@@ -99,7 +111,7 @@ Alpine::initialize(uint32_t width, uint32_t height, uint32_t maxDepth)
     uint32_t tileCount = mTileWidth * mTileHeight;
     mTiles.resize(tileCount);
 
-    mScene.reserve(MAX_SHAPES);
+    mScene.shapes.reserve(MAX_SHAPES);
 
     resetAccumulation();
 }
@@ -107,16 +119,28 @@ Alpine::initialize(uint32_t width, uint32_t height, uint32_t maxDepth)
 bool
 Alpine::loadObj(const char* filename)
 {
-    mScene.push_back(createMesh(filename));
-    if (!mScene.back())
+    if (mScene.shapes.size() >= MAX_SHAPES)
     {
-        mScene.pop_back();
+        return false;
+    }
+
+    mScene.shapes.push_back(createMesh(filename));
+    if (!mScene.shapes.back())
+    {
+        mScene.shapes.pop_back();
         return false;
     }
 
     kernel::updateScene();
 
     return true;
+}
+
+void
+Alpine::setLight(const float emission[3], const float position[3], float radius)
+{
+    mScene.light = std::make_shared<DiskLight>(
+        float3(emission), float3(position), normalize(float3(0.0, -1.0f, 0.0f)), radius);
 }
 
 void
@@ -163,16 +187,19 @@ Alpine::render(uint32_t spp)
                                 break;
                             }
 
+                            float3 hit = ray.org + ray.dir * isect.t;
                             const auto* shape = static_cast<Shape*>(isect.shapePtr);
                             auto isectAttr
                                 = shape->getIntersectionAttributes(isect);
 
                             float3 wo = toLocal(- ray.dir, isectAttr.ss, isectAttr.ts, isectAttr.ns);
-                            auto ms = isectAttr.material->sample(
-                                wo, sampler.get2D(), isectAttr);
-                            float3 wi = toWorld(ms.wi, isectAttr.ss, isectAttr.ts, isectAttr.ns);
+                            radiance += throughput * estimateDirectIllumination(sampler, hit, wo, isectAttr);
 
-                            bool isReflect = dot(wi, isect.ng) > 0.0f;
+                            auto ms =
+                                isectAttr.material->sample(wo, sampler.get2D(), isectAttr);
+                            float3 wiWorld = toWorld(ms.wi, isectAttr.ss, isectAttr.ts, isectAttr.ns);
+
+                            bool isReflect = dot(wiWorld, isect.ng) > 0.0f;
                             if (ms.pdf == 0.0f || !isReflect)
                             {
                                 break;
@@ -180,9 +207,9 @@ Alpine::render(uint32_t spp)
 
                             throughput = throughput * ms.estimator;
 
-                            float3 rayOffset = isect.ng * 0.001f;
-                            ray.org = ray.org + ray.dir * isect.t + rayOffset;
-                            ray.dir = wi;
+                            float3 rayOffset = isect.ng * RAY_OFFSET;
+                            ray.org = hit + rayOffset;
+                            ray.dir = wiWorld;
                         }
 
                         mAccumBuffer[index] += radiance;
@@ -210,6 +237,67 @@ Alpine::render(uint32_t spp)
     }
 }
 
+namespace {
+float
+powerHeuristic(float a, float b)
+{
+    float a2 = a * a;
+    return a2 / (a2 + b * b);
+}
+
+bool
+isOccluded(const float3& position, const float3& normal, const float3& dir, float dist)
+{
+    float3 rayOffset = normal * RAY_OFFSET;
+    Ray shadowRay{ position + rayOffset, dir };
+    bool occluded = kernel::occluded(shadowRay, dist);
+    return occluded;
+}
+};
+
+float3
+Alpine::estimateDirectIllumination(
+    Sampler& sampler, const float3& hit, const float3& wo, const IntersectionAttributes& isectAttr) const
+{
+    float3 radiance(0.0f);
+
+    if (!mScene.light)
+    {
+        return radiance;
+    }
+
+    // Light sampling
+    auto ls = mScene.light->sample(sampler.get2D(), hit);
+    if (ls.pdf > 0.0f)
+    {
+        float3 wi = toLocal(ls.wiWorld, isectAttr.ss, isectAttr.ts, isectAttr.ns);
+        float bsdfPdf = isectAttr.material->computePdf(wo, wi);
+        if (bsdfPdf > 0.0f && !isOccluded(hit, isectAttr.ns, ls.wiWorld, ls.distance))
+        {
+            float3 bsdf = isectAttr.material->evaluate(wo, wi, isectAttr);
+            float cosTerm = std::max(0.0f, dot(ls.wiWorld, isectAttr.ns));
+            float misWeight = powerHeuristic(ls.pdf, bsdfPdf);
+            radiance += ls.emission * misWeight * bsdf * cosTerm / ls.pdf;
+        }
+    }
+
+    // BSDF sampling
+    auto ms = isectAttr.material->sample(wo, sampler.get2D(), isectAttr);
+    if (ms.pdf > 0.0f)
+    {
+        float3 lightDir = toWorld(ms.wi, isectAttr.ss, isectAttr.ts, isectAttr.ns);
+        auto [lightPdf, lightDist] = mScene.light->computePdf(hit, lightDir);
+        if (lightPdf > 0.0f && !isOccluded(hit, isectAttr.ns, lightDir, lightDist))
+        {
+            float3 emission = mScene.light->getEmission();
+            float misWeight = powerHeuristic(ms.pdf, lightPdf);
+            radiance += emission * misWeight * ms.estimator;
+        }
+    }
+
+    return radiance;
+}
+
 void
 Alpine::saveImage(const char* filename) const
 {
@@ -219,8 +307,8 @@ Alpine::saveImage(const char* filename) const
 void
 Alpine::addDebugScene()
 {
-    mScene.push_back(createDebugTriangle());
-    mScene.push_back(createDebugSphere());
+    mScene.shapes.push_back(createDebugTriangle());
+    mScene.shapes.push_back(createDebugSphere());
     kernel::updateScene();
 }
 
@@ -235,6 +323,12 @@ bool
 loadObj(const char* filename)
 {
     return Alpine::getInstance().loadObj(filename);
+}
+
+void
+setLight(const float emission[3], const float position[3], float radius)
+{
+    Alpine::getInstance().setLight(emission, position, radius);
 }
 
 void

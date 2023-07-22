@@ -115,26 +115,26 @@ intersect(const Ray& ray)
     RTCIntersectContext context;
     rtcInitIntersectContext(&context);
 
-    RTCRayHit rayhit;
-    rayhit.ray.org_x = ray.org.x;
-    rayhit.ray.org_y = ray.org.y;
-    rayhit.ray.org_z = ray.org.z;
-    rayhit.ray.dir_x = ray.dir.x;
-    rayhit.ray.dir_y = ray.dir.y;
-    rayhit.ray.dir_z = ray.dir.z;
-    rayhit.ray.tnear = 0;
-    rayhit.ray.tfar = std::numeric_limits<float>::infinity();
-    rayhit.ray.mask = -1;
-    rayhit.ray.flags = 0;
-    rayhit.hit.geomID = RTC_INVALID_GEOMETRY_ID;
-    rayhit.hit.instID[0] = RTC_INVALID_GEOMETRY_ID;
+    RTCRayHit rtcRayhit;
+    rtcRayhit.ray.org_x = ray.org.x;
+    rtcRayhit.ray.org_y = ray.org.y;
+    rtcRayhit.ray.org_z = ray.org.z;
+    rtcRayhit.ray.dir_x = ray.dir.x;
+    rtcRayhit.ray.dir_y = ray.dir.y;
+    rtcRayhit.ray.dir_z = ray.dir.z;
+    rtcRayhit.ray.tnear = 0;
+    rtcRayhit.ray.tfar = std::numeric_limits<float>::infinity();
+    rtcRayhit.ray.mask = -1;
+    rtcRayhit.ray.flags = 0;
+    rtcRayhit.hit.geomID = RTC_INVALID_GEOMETRY_ID;
+    rtcRayhit.hit.instID[0] = RTC_INVALID_GEOMETRY_ID;
 
-    rtcIntersect1(gScene, &context, &rayhit);
+    rtcIntersect1(gScene, &context, &rtcRayhit);
 
     Intersection isect;
-    if (rayhit.hit.geomID != RTC_INVALID_GEOMETRY_ID)
+    if (rtcRayhit.hit.geomID != RTC_INVALID_GEOMETRY_ID)
     {
-        auto geom = rtcGetGeometry(gScene, rayhit.hit.geomID);
+        auto geom = rtcGetGeometry(gScene, rtcRayhit.hit.geomID);
 
         // retrieve the pointer of the intersected shape
         isect.shapePtr = rtcGetGeometryUserData(geom);
@@ -143,12 +143,35 @@ intersect(const Ray& ray)
     {
         isect.shapePtr = nullptr;
     }
-    isect.primId = rayhit.hit.primID;
-    isect.ng = normalize(float3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z));
-    isect.barycentric.x = rayhit.hit.u;
-    isect.barycentric.y = rayhit.hit.v;
-    isect.t = rayhit.ray.tfar;
+    isect.primId = rtcRayhit.hit.primID;
+    isect.ng = normalize(float3(rtcRayhit.hit.Ng_x, rtcRayhit.hit.Ng_y, rtcRayhit.hit.Ng_z));
+    isect.barycentric.x = rtcRayhit.hit.u;
+    isect.barycentric.y = rtcRayhit.hit.v;
+    isect.t = rtcRayhit.ray.tfar;
 
     return isect;
+}
+
+bool
+occluded(const Ray& ray, float far)
+{
+    RTCIntersectContext context;
+    rtcInitIntersectContext(&context);
+
+    RTCRay rtcRay;
+    rtcRay.org_x = ray.org.x;
+    rtcRay.org_y = ray.org.y;
+    rtcRay.org_z = ray.org.z;
+    rtcRay.dir_x = ray.dir.x;
+    rtcRay.dir_y = ray.dir.y;
+    rtcRay.dir_z = ray.dir.z;
+    rtcRay.tnear = 0;
+    rtcRay.tfar = far;
+    rtcRay.mask = -1;
+    rtcRay.flags = 0;
+
+    rtcOccluded1(gScene, &context, &rtcRay);
+
+    return rtcRay.tfar < far;
 }
 }
