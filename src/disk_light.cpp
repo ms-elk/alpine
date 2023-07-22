@@ -17,8 +17,8 @@ DiskLight::sample(const float2& u, const float3& hit) const
     float2 diskSample = sampleConcentricDisk(u);
     float3 lightSample = mPosition + (mBinormal * diskSample.x + mTangent * diskSample.y) * mRadius;
     float3 wiWorld = lightSample - hit;
-    float distance = length(wiWorld);
 
+    float distance = length(wiWorld);
     if (distance == 0.0f)
     {
         return { float3(0.0f), float3(0.0f), 0.0f, 0.0f };
