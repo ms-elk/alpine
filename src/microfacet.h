@@ -16,11 +16,13 @@ public:
         , mBaseColorTex(baseColorTex) {};
     virtual ~Microfacet() = default;
 
+    virtual Sample sample(
+        const float3& wo, const float2& u, const IntersectionAttributes& isectAttr) const override;
+
     virtual float3 evaluate(
         const float3& wo, const float3& wi, const IntersectionAttributes& isectAttr) const override;
 
-    virtual Sample sample(
-        const float3& wo, const float2& u, const IntersectionAttributes& isectAttr) const override;
+    virtual float computePdf(const float3& wo, const float3& wi) const override;
 
 private:
     float computeDistribution(const float3& wh) const;
