@@ -23,6 +23,9 @@ private:
     float3 mPosition;
     float3 mNormal;
     float mRadius;
+
+    float3 mBinormal;
+    float3 mTangent;
     float mArea;
 };
 }

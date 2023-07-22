@@ -7,6 +7,7 @@ namespace alpine {
 DiskLight::DiskLight(const float3& emission, const float3& position, const float3& normal, float radius)
     : mEmission(emission), mPosition(position), mNormal(normal), mRadius(radius)
 {
+    std::tie(mBinormal, mTangent) = getBasis(mNormal);
     mArea = mRadius * mRadius * PI;
 }
 
@@ -14,7 +15,7 @@ DiskLight::Sample
 DiskLight::sample(const float2& u, const float3& hit) const
 {
     float2 diskSample = sampleConcentricDisk(u);
-    float3 lightSample = mPosition + float3(diskSample.x, 0.0f, diskSample.y) * mRadius;
+    float3 lightSample = mPosition + (mBinormal * diskSample.x + mTangent * diskSample.y) * mRadius;
     float3 wiWorld = lightSample - hit;
     float distance = length(wiWorld);
 
