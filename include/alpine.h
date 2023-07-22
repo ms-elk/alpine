@@ -7,6 +7,8 @@ void initialize(uint32_t width, uint32_t height, uint32_t maxDepth);
 
 bool loadObj(const char* filename);
 
+void setLight(const float emission[3], const float position[3], float radius);
+
 void setBackgroundColor(float r, float g, float b);
 
 class ICamera
@@ -31,6 +33,6 @@ void render(uint32_t spp);
 const void* getFrameBuffer();
 void saveImage(const char* filename);
 
-// debug
+// Debug
 void addDebugScene();
 }

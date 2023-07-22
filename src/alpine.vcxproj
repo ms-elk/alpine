@@ -101,10 +101,10 @@
     <ClCompile Include="alpine.cpp" />
     <ClCompile Include="camera.cpp" />
     <ClCompile Include="debug_scene.cpp" />
+    <ClCompile Include="disk_light.cpp" />
     <ClCompile Include="embree.cpp" />
     <ClCompile Include="image.cpp" />
     <ClCompile Include="lambertian.cpp" />
-    <ClCompile Include="light.cpp" />
     <ClCompile Include="mesh.cpp" />
     <ClCompile Include="microfacet.cpp" />
     <ClCompile Include="obj_converter.cpp" />
@@ -116,6 +116,7 @@
     <ClInclude Include="..\include\alpine.h" />
     <ClInclude Include="camera.h" />
     <ClInclude Include="debug_scene.h" />
+    <ClInclude Include="disk_light.h" />
     <ClInclude Include="image.h" />
     <ClInclude Include="kernel.h" />
     <ClInclude Include="lambertian.h" />

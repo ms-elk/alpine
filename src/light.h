@@ -8,27 +8,21 @@ struct IntersectionAttributes;
 class Light
 {
 public:
-    Light(const float3& emission, const float3& position, const float3& normal, float radius);
+    Light() = default;
+    virtual ~Light() = default;
 
     struct Sample {
         float3 emission;
-        float3 wi;
+        float3 wiWorld;
         float distance;
         float pdf;
     };
 
-    Sample sample(const float2& u, const float3& hit) const;
+    virtual Sample sample(const float2& u, const float3& hit) const = 0;
 
-    std::pair<float /* pdf */, float /* distance */>
-        computePdf(const float3& hit, const float3& wi) const;
+    virtual std::pair<float /* pdf */, float /* distance */>
+        computePdf(const float3& hit, const float3& wiWorld) const = 0;
 
-    float3 getEmission() const { return mEmission; }
-
-private:
-    float3 mEmission;
-    float3 mPosition;
-    float3 mNormal;
-    float mRadius;
-    float mArea;
+    virtual float3 getEmission() const = 0;
 };
 }
