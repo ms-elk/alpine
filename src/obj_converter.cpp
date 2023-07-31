@@ -1,8 +1,8 @@
 ﻿#include "obj_converter.h"
 
-#include "lambertian.h"
+#include "matte.h"
 #include "mesh.h"
-#include "microfacet.h"
+#include "metal.h"
 #include "texture.h"
 
 #include <filesystem>
@@ -72,7 +72,7 @@ createMesh(const char* filename)
         }
 
         const auto& d = om.diffuse;
-        materials.push_back(std::make_shared<Microfacet>(float2(0.5f, 0.5f), float3(d[0], d[1], d[2]), diffuseTex));
+        materials.push_back(std::make_shared<Metal>(float2(0.5f, 0.5f), float3(d[0], d[1], d[2]), diffuseTex));
     }
 
     Mesh::Data meshData;

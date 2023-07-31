@@ -14,6 +14,16 @@ public:
     Vector2(const Vector2<T>& v) : v{ v.x, v.y } {}
     Vector2(const T v[2]) : v{ v[0], v[1] } {}
 
+    T& operator[](uint32_t i)
+    {
+        return v[i];
+    }
+
+    const T& operator[](uint32_t i) const
+    {
+        return v[i];
+    }
+
     Vector2<T>& operator=(const Vector2<T>& rhs)
     {
         x = rhs.x;

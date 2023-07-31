@@ -237,24 +237,6 @@ Alpine::render(uint32_t spp)
     }
 }
 
-namespace {
-float
-powerHeuristic(float a, float b)
-{
-    float a2 = a * a;
-    return a2 / (a2 + b * b);
-}
-
-bool
-isOccluded(const float3& position, const float3& normal, const float3& dir, float dist)
-{
-    float3 rayOffset = normal * RAY_OFFSET;
-    Ray shadowRay{ position + rayOffset, dir };
-    bool occluded = kernel::occluded(shadowRay, dist);
-    return occluded;
-}
-};
-
 float3
 Alpine::estimateDirectIllumination(
     Sampler& sampler, const float3& hit, const float3& wo, const IntersectionAttributes& isectAttr) const
@@ -266,6 +248,14 @@ Alpine::estimateDirectIllumination(
         return radiance;
     }
 
+    const auto isOccluded = [](
+        const float3& position, const float3& normal, const float3& dir, float dist) {
+        float3 rayOffset = normal * RAY_OFFSET;
+        Ray shadowRay{ position + rayOffset, dir };
+        bool occluded = kernel::occluded(shadowRay, dist);
+        return occluded;
+    };
+
     // Light sampling
     auto ls = mScene.light->sample(sampler.get2D(), hit);
     if (ls.pdf > 0.0f)
@@ -274,9 +264,9 @@ Alpine::estimateDirectIllumination(
         float bsdfPdf = isectAttr.material->computePdf(wo, wi);
         if (bsdfPdf > 0.0f && !isOccluded(hit, isectAttr.ns, ls.wiWorld, ls.distance))
         {
-            float3 bsdf = isectAttr.material->evaluate(wo, wi, isectAttr);
+            float3 bsdf = isectAttr.material->computeBsdf(wo, wi, isectAttr);
             float cosTerm = std::max(0.0f, dot(ls.wiWorld, isectAttr.ns));
-            float misWeight = powerHeuristic(ls.pdf, bsdfPdf);
+            float misWeight = powerHeuristic(1, ls.pdf, 1, bsdfPdf);
             radiance += ls.emission * misWeight * bsdf * cosTerm / ls.pdf;
         }
     }
@@ -290,7 +280,7 @@ Alpine::estimateDirectIllumination(
         if (lightPdf > 0.0f && !isOccluded(hit, isectAttr.ns, lightDir, lightDist))
         {
             float3 emission = mScene.light->getEmission();
-            float misWeight = powerHeuristic(ms.pdf, lightPdf);
+            float misWeight = powerHeuristic(1, ms.pdf, 1, lightPdf);
             radiance += emission * misWeight * ms.estimator;
         }
     }
