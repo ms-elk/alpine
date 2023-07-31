@@ -6,10 +6,10 @@
 #include <memory>
 
 namespace alpine {
-class Lambertian : public Material
+class Matte : public Material
 {
 public:
-    Lambertian(const float3& baseColor, const std::shared_ptr<Texture<float4>>& baseColorTex)
+    Matte(const float3& baseColor, const std::shared_ptr<Texture<float4>>& baseColorTex)
         : mBaseColor(baseColor), mBaseColorTex(baseColorTex) {}
 
     Sample sample(

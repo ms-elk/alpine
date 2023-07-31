@@ -1,4 +1,4 @@
-﻿#include "lambertian.h"
+﻿#include "matte.h"
 
 #include "sampler.h"
 #include "shape.h"
@@ -6,7 +6,7 @@
 
 namespace alpine {
 Material::Sample
-Lambertian::sample(
+Matte::sample(
     const float3& wo, const float2& u, const IntersectionAttributes& isectAttr) const
 {
     auto [wi, pdf] = sampleCosineWeightedHemisphere(u);
@@ -17,7 +17,7 @@ Lambertian::sample(
 }
 
 float3
-Lambertian::computeBsdf(
+Matte::computeBsdf(
     const float3& wo, const float3& wi, const IntersectionAttributes& isectAttr) const
 {
     float3 bc = getBaseColor(isectAttr.uv);
@@ -27,13 +27,13 @@ Lambertian::computeBsdf(
 }
 
 float
-Lambertian::computePdf(const float3& wo, const float3& wi) const
+Matte::computePdf(const float3& wo, const float3& wi) const
 {
     return std::max(cosTheta(wi), 0.0f) / PI;
 }
 
 float3
-Lambertian::getBaseColor(const float2& uv) const
+Matte::getBaseColor(const float2& uv) const
 {
     return mBaseColorTex ? mBaseColorTex->sample(uv).xyz() : mBaseColor;
 }
