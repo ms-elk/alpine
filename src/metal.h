@@ -6,10 +6,10 @@
 #include <memory>
 
 namespace alpine {
-class Microfacet : public Material
+class Metal : public Material
 {
 public:
-    Microfacet(const float2& alpha, const float3& baseColor,
+    Metal(const float2& alpha, const float3& baseColor,
         const std::shared_ptr<Texture<float4>>& baseColorTex, bool useVndfSampling = true)
         : mAlpha({ std::max(0.001f, alpha.x), std::max(0.001f, alpha.y) })
         , mBaseColor(baseColor)

@@ -1,4 +1,4 @@
-#include "microfacet.h"
+#include "metal.h"
 
 #include "sampler.h"
 #include "shape.h"
@@ -6,7 +6,7 @@
 
 namespace alpine {
 Material::Sample
-Microfacet::sample(
+Metal::sample(
     const float3& wo, const float2& u, const IntersectionAttributes& isectAttr) const
 {
     if (mUseVndfSampling)
@@ -59,7 +59,7 @@ Microfacet::sample(
 }
 
 float3
-Microfacet::computeBsdf(
+Metal::computeBsdf(
     const float3& wo, const float3& wi, const IntersectionAttributes& isectAttr) const
 {
     float cosThetaWo = std::abs(cosTheta(wo));
@@ -87,7 +87,7 @@ Microfacet::computeBsdf(
 }
 
 float
-Microfacet::computePdf(const float3& wo, const float3& wi) const
+Metal::computePdf(const float3& wo, const float3& wi) const
 {
     if (mUseVndfSampling)
     {
@@ -111,7 +111,7 @@ Microfacet::computePdf(const float3& wo, const float3& wi) const
 }
 
 float
-Microfacet::computeDistribution(const float3& wh) const
+Metal::computeDistribution(const float3& wh) const
 {
     float cos4Theta = cos2Theta(wh) * cos2Theta(wh);
     float cos2Phi = cosPhi(wh) * cosPhi(wh);
@@ -123,7 +123,7 @@ Microfacet::computeDistribution(const float3& wh) const
 }
 
 float
-Microfacet::lambda(const float3& v) const
+Metal::lambda(const float3& v) const
 {
     float alpha = std::sqrt(cosPhi(v) * cosPhi(v) * mAlpha.x * mAlpha.x
         + sinPhi(v) * sinPhi(v) * mAlpha.y * mAlpha.y);
@@ -131,13 +131,13 @@ Microfacet::lambda(const float3& v) const
 }
 
 float
-Microfacet::computeMaskingShadowing(const float3& wo, const float3& wi) const
+Metal::computeMaskingShadowing(const float3& wo, const float3& wi) const
 {
     return 1.0f / (1.0f + lambda(wo) + lambda(wi));
 }
 
 float3
-Microfacet::getBaseColor(const float2& uv) const
+Metal::getBaseColor(const float2& uv) const
 {
     return mBaseColorTex ? mBaseColorTex->sample(uv).xyz() : mBaseColor;
 }
