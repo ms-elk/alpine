@@ -9,20 +9,20 @@ namespace alpine {
 class Microfacet : public Material
 {
 public:
-    Microfacet(const float2& alpha,
-        const float3& baseColor, const std::shared_ptr<Texture<float4>>& baseColorTex)
+    Microfacet(const float2& alpha, const float3& baseColor,
+        const std::shared_ptr<Texture<float4>>& baseColorTex, bool useVndfSampling = true)
         : mAlpha({ std::max(0.001f, alpha.x), std::max(0.001f, alpha.y) })
         , mBaseColor(baseColor)
-        , mBaseColorTex(baseColorTex) {};
-    virtual ~Microfacet() = default;
+        , mBaseColorTex(baseColorTex)
+        , mUseVndfSampling(useVndfSampling) {};
 
-    virtual Sample sample(
+    Sample sample(
         const float3& wo, const float2& u, const IntersectionAttributes& isectAttr) const override;
 
-    virtual float3 evaluate(
+    float3 computeBsdf(
         const float3& wo, const float3& wi, const IntersectionAttributes& isectAttr) const override;
 
-    virtual float computePdf(const float3& wo, const float3& wi) const override;
+    float computePdf(const float3& wo, const float3& wi) const override;
 
 private:
     float computeDistribution(const float3& wh) const;
@@ -37,5 +37,6 @@ private:
     float2 mAlpha;
     float3 mBaseColor;
     std::shared_ptr<Texture<float4>> mBaseColorTex;
+    bool mUseVndfSampling;
 };
 }

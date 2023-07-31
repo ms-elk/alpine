@@ -19,7 +19,4 @@ private:
 private:
     uint32_t mSeed[4];
 };
-
-float2 sampleConcentricDisk(const float2& u);
-float3 sampleCosineWeightedHemisphere(float& pdf, const float2& u);
 }
