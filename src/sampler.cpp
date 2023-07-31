@@ -4,6 +4,8 @@
 #include <algorithm>
 
 namespace alpine {
+static constexpr float ONE_MINUS_EPSILON = 1.0f - std::numeric_limits<float>::epsilon();
+
 void
 Sampler::reset(uint32_t seed)
 {
@@ -19,7 +21,7 @@ Sampler::get1D()
     uint32_t rng = next();
     double value = static_cast<double>(rng)
         / static_cast<double>(std::numeric_limits<uint32_t>::max());
-    return static_cast<float>(value);
+    return std::min(static_cast<float>(value), ONE_MINUS_EPSILON);
 }
 
 float2
