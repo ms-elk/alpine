@@ -40,6 +40,19 @@ inline float3 toWorld(const float3& v, const float3& s, const float3& t, const f
 
 inline bool isSameHemisphere(const float3& v0, const float3& v1) { return v0.z * v1.z > 0.0f; }
 
+inline float powerHeuristic(uint32_t na, float aPdf, uint32_t nb, float bPdf)
+{
+    float a = na * aPdf;
+    float b = nb * bPdf;
+    return (a * a) / (a * a + b * b);
+}
+
+inline float3 schlickFresnel(const float3& f0, const float3& wi, const float3& wh)
+{
+    float f = pow(1.0f - dot(wi, wh), 5.0f);
+    return float3(f) + f0 * (1.0f - f);
+}
+
 float2 sampleConcentricDisk(const float2& u);
 std::pair<float3 /* dir */, float /* pdf */> sampleCosineWeightedHemisphere(const float2& u);
 std::pair<float3 /* dir*/, float /* pdf */> sampleHemisphere(const float2& u);

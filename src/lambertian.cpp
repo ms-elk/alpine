@@ -17,7 +17,7 @@ Lambertian::sample(
 }
 
 float3
-Lambertian::evaluate(
+Lambertian::computeBsdf(
     const float3& wo, const float3& wi, const IntersectionAttributes& isectAttr) const
 {
     float3 bc = getBaseColor(isectAttr.uv);

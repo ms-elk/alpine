@@ -14,7 +14,7 @@ struct IntersectionAttributes
     float3 ss;
     float3 ts;
     float2 uv;
-    Material* material = nullptr;
+    const Material* material = nullptr;
 };
 
 class Shape
