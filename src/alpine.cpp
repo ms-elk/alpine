@@ -9,6 +9,7 @@
 #include "mesh.h"
 #include "obj_converter.h"
 #include "ray.h"
+#include "scene.h"
 #include "sampler.h"
 #include "sphere.h"
 #include "util.h"
@@ -19,7 +20,7 @@
 #include <vector>
 
 namespace alpine {
-static constexpr uint32_t MAX_SHAPES = 16;
+static constexpr uint32_t MAX_SHAPES = 1024;
 static constexpr uint32_t TILE_SIZE = 64;
 static constexpr float RAY_OFFSET = 0.001f;
 
@@ -84,11 +85,6 @@ private:
     uint32_t mTileHeight = 0;
     std::vector<std::future<void>> mTiles;
 
-    struct Scene
-    {
-        std::vector<std::shared_ptr<Shape>> shapes;
-        std::shared_ptr<Light> light;
-    };
     Scene mScene;
 
     Camera mCamera;
@@ -124,12 +120,13 @@ Alpine::loadObj(const char* filename)
         return false;
     }
 
-    mScene.shapes.push_back(createMesh(filename));
-    if (!mScene.shapes.back())
-    {
-        mScene.shapes.pop_back();
-        return false;
-    }
+    createMeshes(mScene, filename);
+    //mScene.shapes.push_back(createMesh(filename));
+    //if (!mScene.shapes.back())
+    //{
+    //    mScene.shapes.pop_back();
+    //    return false;
+    //}
 
     kernel::updateScene();
 

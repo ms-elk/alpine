@@ -229,6 +229,16 @@ public:
     Vector4(const Vector4<T>& v) : v{ v.x, v.y, v.z, v.w } {}
     Vector4(const T v[4]) : v{ v[0], v[1], v[2], v[3] } {}
 
+    T& operator[](uint32_t i)
+    {
+        return v[i];
+    }
+
+    const T& operator[](uint32_t i) const
+    {
+        return v[i];
+    }
+
     Vector4<T>& operator=(const Vector4<T>& rhs)
     {
         x = rhs.x;
