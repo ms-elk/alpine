@@ -103,11 +103,12 @@
     <ClCompile Include="debug_scene.cpp" />
     <ClCompile Include="disk_light.cpp" />
     <ClCompile Include="embree.cpp" />
+    <ClCompile Include="gltf_loader.cpp" />
     <ClCompile Include="image.cpp" />
     <ClCompile Include="matte.cpp" />
     <ClCompile Include="mesh.cpp" />
     <ClCompile Include="metal.cpp" />
-    <ClCompile Include="obj_converter.cpp" />
+    <ClCompile Include="obj_loader.cpp" />
     <ClCompile Include="sampler.cpp" />
     <ClCompile Include="sphere.cpp" />
     <ClCompile Include="util.cpp" />
@@ -125,7 +126,7 @@
     <ClInclude Include="matrix.h" />
     <ClInclude Include="mesh.h" />
     <ClInclude Include="metal.h" />
-    <ClInclude Include="obj_converter.h" />
+    <ClInclude Include="file_loader.h" />
     <ClInclude Include="ray.h" />
     <ClInclude Include="sampler.h" />
     <ClInclude Include="scene.h" />

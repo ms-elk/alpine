@@ -3,7 +3,7 @@
   <ItemGroup>
     <ClCompile Include="camera.cpp" />
     <ClCompile Include="mesh.cpp" />
-    <ClCompile Include="obj_converter.cpp" />
+    <ClCompile Include="obj_loader.cpp" />
     <ClCompile Include="matte.cpp" />
     <ClCompile Include="sampler.cpp" />
     <ClCompile Include="alpine.cpp" />
@@ -14,13 +14,14 @@
     <ClCompile Include="metal.cpp" />
     <ClCompile Include="util.cpp" />
     <ClCompile Include="disk_light.cpp" />
+    <ClCompile Include="gltf_loader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="vector.h" />
     <ClInclude Include="camera.h" />
     <ClInclude Include="mesh.h" />
     <ClInclude Include="ray.h" />
-    <ClInclude Include="obj_converter.h" />
+    <ClInclude Include="file_loader.h" />
     <ClInclude Include="material.h" />
     <ClInclude Include="matte.h" />
     <ClInclude Include="sampler.h" />

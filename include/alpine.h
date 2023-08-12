@@ -5,7 +5,11 @@
 namespace alpine {
 void initialize(uint32_t width, uint32_t height, uint32_t maxDepth);
 
-bool loadObj(const char* filename);
+enum class FileType {
+    GLTF,
+    OBJ,
+};
+bool load(const char* filename, FileType fileType);
 
 void setLight(const float emission[3], const float position[3], float radius);
 

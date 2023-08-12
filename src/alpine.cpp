@@ -3,11 +3,11 @@
 #include "camera.h"
 #include "debug_scene.h"
 #include "disk_light.h"
+#include "file_loader.h"
 #include "image.h"
 #include "kernel.h"
 #include "material.h"
 #include "mesh.h"
-#include "obj_converter.h"
 #include "ray.h"
 #include "scene.h"
 #include "sampler.h"
@@ -20,7 +20,6 @@
 #include <vector>
 
 namespace alpine {
-static constexpr uint32_t MAX_SHAPES = 1024;
 static constexpr uint32_t TILE_SIZE = 64;
 static constexpr float RAY_OFFSET = 0.001f;
 
@@ -47,7 +46,7 @@ public:
 
     void initialize(uint32_t width, uint32_t height, uint32_t maxDepth);
 
-    bool loadObj(const char* filename);
+    bool load(const char* filename, FileType fileType);
 
     void setLight(const float emission[3], const float position[3], float radius);
 
@@ -107,26 +106,28 @@ Alpine::initialize(uint32_t width, uint32_t height, uint32_t maxDepth)
     uint32_t tileCount = mTileWidth * mTileHeight;
     mTiles.resize(tileCount);
 
-    mScene.shapes.reserve(MAX_SHAPES);
-
     resetAccumulation();
 }
 
 bool
-Alpine::loadObj(const char* filename)
+Alpine::load(const char* filename, FileType fileType)
 {
-    if (mScene.shapes.size() >= MAX_SHAPES)
+    const auto load = [&]() {
+        switch (fileType)
+        {
+        case FileType::GLTF:
+            return loadGltf(&mScene, filename);
+        case FileType::OBJ:
+            return loadObj(&mScene, filename);
+        default:
+            return false;
+        }
+    };
+
+    if (!load())
     {
         return false;
     }
-
-    createMeshes(mScene, filename);
-    //mScene.shapes.push_back(createMesh(filename));
-    //if (!mScene.shapes.back())
-    //{
-    //    mScene.shapes.pop_back();
-    //    return false;
-    //}
 
     kernel::updateScene();
 
@@ -307,9 +308,9 @@ initialize(uint32_t width, uint32_t height, uint32_t maxDepth)
 }
 
 bool
-loadObj(const char* filename)
+load(const char* filename, FileType fileType)
 {
-    return Alpine::getInstance().loadObj(filename);
+    return Alpine::getInstance().load(filename, fileType);
 }
 
 void
