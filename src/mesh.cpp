@@ -25,7 +25,8 @@ Mesh::getIntersectionAttributes(const kernel::Intersection& isect) const
 
     if (!mData.normals.empty())
     {
-        isectAttr.ns = interpolate(mData.normals, mData.normalPrims);
+        isectAttr.ns = interpolate(
+            mData.normals, !mData.normalPrims.empty() ? mData.normalPrims : mData.prims);
     }
     else
     {
@@ -35,7 +36,8 @@ Mesh::getIntersectionAttributes(const kernel::Intersection& isect) const
 
     if (!mData.uvs.empty())
     {
-        isectAttr.uv = interpolate(mData.uvs, mData.uvPrims);
+        isectAttr.uv = interpolate(
+            mData.uvs, !mData.uvPrims.empty() ? mData.uvPrims : mData.prims);
     }
 
     if (isect.primId < mData.materials.size())

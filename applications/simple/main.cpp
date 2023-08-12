@@ -35,7 +35,7 @@ main(int argc, char* argv[])
 
     alpine::setLight(emisssion, lightPos, lightRadius);
 
-    bool loaded = alpine::loadObj(objFilename);
+    bool loaded = alpine::load(objFilename, alpine::FileType::OBJ);
     if (!loaded)
     {
         printf("ERROR: failed to load %s\n", objFilename);
