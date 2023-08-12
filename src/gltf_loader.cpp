@@ -7,8 +7,6 @@
 #include "scene.h"
 #include "texture.h"
 
-#include <filesystem>
-
 #pragma warning(push)
 #pragma warning(disable:4018)
 #pragma warning(disable:4267)
@@ -35,7 +33,7 @@ private:
     std::size_t appendVertexBuffer(
         std::vector<T>& dst, const std::string& name, const tinygltf::Primitive& srcPrim) const;
 
-    std::size_t appendIndexBuffer(std::vector<uint3>& dst, uint32_t attrIdx) const;
+    std::size_t appendIndexBuffer(std::vector<uint3>& dst, const tinygltf::Primitive& srcPrim) const;
 
 private:
     Scene* mScene = nullptr;
@@ -198,7 +196,7 @@ GltfLoader::traverse(float4x4 matrix, uint32_t nodeIdx)
             appendVertexBuffer(meshData.normals, "NORMAL", srcPrim);
             appendVertexBuffer(meshData.uvs, "TEXCOORD_0", srcPrim);
 
-            std::size_t primCount = appendIndexBuffer(meshData.prims, srcPrim.indices);
+            std::size_t primCount = appendIndexBuffer(meshData.prims, srcPrim);
             for (uint32_t i = 0; i < primCount; ++i)
             {
                 meshData.materials.push_back(mMaterials[srcPrim.material]);
@@ -250,9 +248,9 @@ GltfLoader::appendVertexBuffer(
 }
 
 std::size_t
-GltfLoader::appendIndexBuffer(std::vector<uint3>& dst, uint32_t attrIdx) const
+GltfLoader::appendIndexBuffer(std::vector<uint3>& dst, const tinygltf::Primitive& srcPrim) const
 {
-    const auto& acc = mSrcModel.accessors[attrIdx];
+    const auto& acc = mSrcModel.accessors[srcPrim.indices];
     const auto& bufView = mSrcModel.bufferViews[acc.bufferView];
     const auto& buf = mSrcModel.buffers[bufView.buffer];
     const auto* values = reinterpret_cast<const uint16_t*>(&buf.data[bufView.byteOffset + acc.byteOffset]);

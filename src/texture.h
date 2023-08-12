@@ -27,7 +27,6 @@ public:
         uint32_t y = static_cast<uint32_t>(v * mHeight);
         x = std::clamp(x, 0u, mWidth - 1);
         y = std::clamp(y, 0u, mHeight - 1);
-        //y = mHeight - 1 - y;
 
         uint32_t index = x + y * mWidth;
         T value = mData[index];
