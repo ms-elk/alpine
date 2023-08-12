@@ -39,7 +39,7 @@ Camera::orbit(float theta, float phi)
 
     toEye /= toEyeDist;
 
-    theta += std::atan2(toEye.x, toEye.z);
+    theta = std::atan2(toEye.x, toEye.z) - theta;
     phi = std::clamp(std::acos(toEye.y) - phi, 0.0f, PI);
 
     float sinTheta = std::sin(theta);
@@ -87,8 +87,8 @@ void
 Camera::updateViewMatrix()
 {
     float3 viewZ = normalize(mTarget - mEye);
-    float3 viewX = normalize(cross(mUp, viewZ));
-    float3 viewY = cross(viewZ, viewX);
+    float3 viewX = normalize(cross(viewZ, mUp));
+    float3 viewY = cross(viewX, viewZ);
     mViewMatrix.setColumn(0, viewX);
     mViewMatrix.setColumn(1, viewY);
     mViewMatrix.setColumn(2, viewZ);

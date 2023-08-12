@@ -1,21 +1,21 @@
-﻿#include "obj_converter.h"
+﻿#include "file_loader.h"
 
 #include "matte.h"
 #include "mesh.h"
 #include "metal.h"
+#include "scene.h"
 #include "texture.h"
 
 #include <filesystem>
 
-#define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tinyobjloader/tiny_obj_loader.h>
 
 namespace alpine {
-std::shared_ptr<Mesh>
-createMesh(const char* filename)
+bool
+loadObj(Scene* scene, const char* filename)
 {
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> objShapes;
@@ -30,7 +30,7 @@ createMesh(const char* filename)
     if (!err.empty())
     {
         printf("%s", err.c_str());
-        return nullptr;
+        return false;
     }
 
     if (!warn.empty())
@@ -40,15 +40,15 @@ createMesh(const char* filename)
 
     if (!loaded)
     {
-        return nullptr;
+        return false;
     }
 
     // extract materials from Obj
     std::vector<std::shared_ptr<Material>> materials;
     materials.reserve(objMaterials.size());
     for (const auto& om : objMaterials)
-{
-        std::shared_ptr<Texture<float4>> diffuseTex = nullptr;
+    {
+        std::shared_ptr<Texture<float4>> baseColorTex = nullptr;
         if (!om.diffuse_texname.empty())
         {
             int32_t w, h, channels;
@@ -63,7 +63,7 @@ createMesh(const char* filename)
                     const uint8_t* d = &data[4 * i];
                     texData[i] = float4(d[0], d[1], d[2], d[3]) / 255.0f;
                 }
-                diffuseTex = std::make_shared<Texture<float4>>(w, h, std::move(texData));
+                baseColorTex = std::make_shared<Texture<float4>>(w, h, std::move(texData));
             }
             else
             {
@@ -72,7 +72,7 @@ createMesh(const char* filename)
         }
 
         const auto& d = om.diffuse;
-        materials.push_back(std::make_shared<Metal>(float2(0.5f, 0.5f), float3(d[0], d[1], d[2]), diffuseTex));
+        materials.push_back(std::make_shared<Matte>(float3(d[0], d[1], d[2]), baseColorTex));
     }
 
     Mesh::Data meshData;
@@ -89,6 +89,12 @@ createMesh(const char* filename)
     size_t uvCount = attrib.texcoords.size() / 2;
     meshData.uvs.resize(uvCount);
     memcpy(meshData.uvs.data(), attrib.texcoords.data(), sizeof(float2) * uvCount);
+
+    // flip v coordinate
+    for (auto& uv : meshData.uvs)
+    {
+        uv.y = 1.0f - uv.y;
+    }
 
     // assign prim indices and material IDs
     for (const auto& shape : objShapes)
@@ -110,6 +116,8 @@ createMesh(const char* filename)
         }
     }
 
-    return std::make_shared<Mesh>(std::move(meshData));
+    scene->shapes.push_back(std::make_shared<Mesh>(std::move(meshData)));
+
+    return true;
 }
 }
