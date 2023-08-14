@@ -63,4 +63,10 @@ DiskLight::computePdf(const float3& hit, const float3& wiWorld) const
         return { 0.0f, 0.0f };
     }
 }
+
+float3
+DiskLight::getPower() const
+{
+    return mEmission * mArea * PI;
+}
 }
