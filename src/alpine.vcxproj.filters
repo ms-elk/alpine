@@ -15,6 +15,7 @@
     <ClCompile Include="util.cpp" />
     <ClCompile Include="disk_light.cpp" />
     <ClCompile Include="gltf_loader.cpp" />
+    <ClCompile Include="point_light.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="vector.h" />
@@ -38,5 +39,6 @@
     <ClInclude Include="light.h" />
     <ClInclude Include="disk_light.h" />
     <ClInclude Include="scene.h" />
+    <ClInclude Include="point_light.h" />
   </ItemGroup>
 </Project>

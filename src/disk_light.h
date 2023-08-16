@@ -18,6 +18,8 @@ public:
 
     float3 getEmission() const override { return mEmission; }
 
+    float3 getPower() const override;
+
 private:
     float3 mEmission;
     float3 mPosition;

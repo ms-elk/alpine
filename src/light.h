@@ -24,5 +24,7 @@ public:
         computePdf(const float3& hit, const float3& wiWorld) const = 0;
 
     virtual float3 getEmission() const = 0;
+
+    virtual float3 getPower() const = 0;
 };
 }
