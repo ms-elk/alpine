@@ -22,7 +22,7 @@ main(int argc, char* argv[])
     const uint32_t width = 256;
     const uint32_t height = 256;
     const uint32_t maxDepth = 8;
-    const float emisssion[] = { 5.0f, 5.0f, 5.0f };
+    const float emisssion[] = { 1.0f, 1.0f, 1.0f };
     const float lightPos[] = { 278.0f, 548.7f, 227.0f };
     const float lightRadius = 200.0f;
     const float eye[] = { 278.0f, 273.0f, -600.0f };

@@ -15,7 +15,7 @@
 
 namespace alpine {
 bool
-loadObj(Scene* scene, const char* filename)
+loadObj(Scene* scene, std::string_view filename)
 {
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> objShapes;
@@ -25,7 +25,7 @@ loadObj(Scene* scene, const char* filename)
     std::filesystem::path filepath(filename);
     filepath.remove_filename();
     bool loaded = tinyobj::LoadObj(&attrib, &objShapes, &objMaterials, &warn, &err,
-        filename, filepath.string().c_str(), true);
+        filename.data(), filepath.string().c_str(), true);
 
     if (!err.empty())
     {

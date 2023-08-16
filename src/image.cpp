@@ -5,9 +5,9 @@
 
 namespace alpine {
 bool
-writePPM(const char* filename, uint32_t width, uint32_t height, const byte3* image)
+writePPM(std::string_view filename, uint32_t width, uint32_t height, const byte3* image)
 {
-    std::ofstream ppm(filename);
+    std::ofstream ppm(filename.data());
     if (!ppm)
     {
         return false;

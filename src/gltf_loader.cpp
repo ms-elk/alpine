@@ -24,7 +24,7 @@ class GltfLoader
 public:
     GltfLoader(Scene* scene) : mScene(scene) {}
 
-    bool load(const char* filename);
+    bool load(std::string_view filename);
 
 private:
     void traverse(float4x4 matrix, uint32_t nodeIdx);
@@ -43,12 +43,12 @@ private:
 };
 
 bool
-GltfLoader::load(const char* filename)
+GltfLoader::load(std::string_view filename)
 {
     tinygltf::TinyGLTF loader;
     std::string warn;
     std::string err;
-    bool loaded = loader.LoadBinaryFromFile(&mSrcModel, &err, &warn, filename);
+    bool loaded = loader.LoadBinaryFromFile(&mSrcModel, &err, &warn, filename.data());
 
     if (!err.empty())
     {
@@ -267,7 +267,7 @@ GltfLoader::appendIndexBuffer(std::vector<uint3>& dst, const tinygltf::Primitive
 }
 
 bool
-loadGltf(Scene* scene, const char* filename)
+loadGltf(Scene* scene, std::string_view filename)
 {
     GltfLoader loader(scene);
     return loader.load(filename);
