@@ -8,6 +8,7 @@
 #include "kernel.h"
 #include "material.h"
 #include "mesh.h"
+#include "point_light.h"
 #include "ray.h"
 #include "scene.h"
 #include "sampler.h"
@@ -48,7 +49,9 @@ public:
 
     bool load(const char* filename, FileType fileType);
 
-    void setLight(const float emission[3], const float position[3], float radius);
+    void addPointLight(const float intensity[3], const float position[3]);
+
+    void addDiskLight(const float emission[3], const float position[3], float radius);
 
     void resetAccumulation();
 
@@ -67,6 +70,8 @@ private:
 
     float3 estimateDirectIllumination(Sampler& sampler, const float3& hit,
         const float3& wo, const IntersectionAttributes& isectAttr) const;
+
+    const Light* selectLight(float u) const;
 
 private:
     uint32_t mWidth = 0;
@@ -135,10 +140,16 @@ Alpine::load(const char* filename, FileType fileType)
 }
 
 void
-Alpine::setLight(const float emission[3], const float position[3], float radius)
+Alpine::addPointLight(const float intensity[3], const float position[3])
 {
-    mScene.light = std::make_shared<DiskLight>(
-        float3(emission), float3(position), normalize(float3(0.0, -1.0f, 0.0f)), radius);
+    mScene.lights.push_back(std::make_shared<PointLight>(float3(intensity), float3(position)));
+}
+
+void
+Alpine::addDiskLight(const float emission[3], const float position[3], float radius)
+{
+    mScene.lights.push_back(std::make_shared<DiskLight>(
+        float3(emission), float3(position), normalize(float3(0.0, -1.0f, 0.0f)), radius));
 }
 
 void
@@ -241,7 +252,9 @@ Alpine::estimateDirectIllumination(
 {
     float3 radiance(0.0f);
 
-    if (!mScene.light)
+    const auto* light = selectLight(sampler.get1D());
+
+    if (!light)
     {
         return radiance;
     }
@@ -255,7 +268,7 @@ Alpine::estimateDirectIllumination(
     };
 
     // Light sampling
-    auto ls = mScene.light->sample(sampler.get2D(), hit);
+    auto ls = light->sample(sampler.get2D(), hit);
     if (ls.pdf > 0.0f)
     {
         float3 wi = toLocal(ls.wiWorld, isectAttr.ss, isectAttr.ts, isectAttr.ns);
@@ -274,16 +287,30 @@ Alpine::estimateDirectIllumination(
     if (ms.pdf > 0.0f)
     {
         float3 lightDir = toWorld(ms.wi, isectAttr.ss, isectAttr.ts, isectAttr.ns);
-        auto [lightPdf, lightDist] = mScene.light->computePdf(hit, lightDir);
+        auto [lightPdf, lightDist] = light->computePdf(hit, lightDir);
         if (lightPdf > 0.0f && !isOccluded(hit, isectAttr.ns, lightDir, lightDist))
         {
-            float3 emission = mScene.light->getEmission();
+            float3 emission = light->getEmission();
             float misWeight = powerHeuristic(1, ms.pdf, 1, lightPdf);
             radiance += emission * misWeight * ms.estimator;
         }
     }
 
-    return radiance;
+    std::size_t lightCount = mScene.lights.size();
+    return radiance * static_cast<float>(lightCount);
+}
+
+const Light*
+Alpine::selectLight(float u) const
+{
+    if (mScene.lights.empty())
+    {
+        return nullptr;
+    }
+
+    std::size_t lightIdx = static_cast<std::size_t>(u * mScene.lights.size());
+    lightIdx = std::min(lightIdx, mScene.lights.size() - 1);
+    return mScene.lights[lightIdx].get();
 }
 
 void
@@ -313,10 +340,15 @@ load(const char* filename, FileType fileType)
     return Alpine::getInstance().load(filename, fileType);
 }
 
-void
-setLight(const float emission[3], const float position[3], float radius)
+void addPointLight(const float intensity[3], const float position[3])
 {
-    Alpine::getInstance().setLight(emission, position, radius);
+    Alpine::getInstance().addPointLight(intensity, position);
+}
+
+void
+addDiskLight(const float emission[3], const float position[3], float radius)
+{
+    Alpine::getInstance().addDiskLight(emission, position, radius);
 }
 
 void

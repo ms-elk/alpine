@@ -11,7 +11,9 @@ enum class FileType {
 };
 bool load(const char* filename, FileType fileType);
 
-void setLight(const float emission[3], const float position[3], float radius);
+void addPointLight(const float intensity[3], const float position[3]);
+
+void addDiskLight(const float emission[3], const float position[3], float radius);
 
 void setBackgroundColor(float r, float g, float b);
 

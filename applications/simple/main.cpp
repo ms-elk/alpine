@@ -33,7 +33,7 @@ main(int argc, char* argv[])
 
     alpine::initialize(width, height, maxDepth);
 
-    alpine::setLight(emisssion, lightPos, lightRadius);
+    alpine::addDiskLight(emisssion, lightPos, lightRadius);
 
     bool loaded = alpine::load(objFilename, alpine::FileType::OBJ);
     if (!loaded)
