@@ -296,7 +296,8 @@ Alpine::estimateDirectIllumination(
         }
     }
 
-    return radiance * static_cast<float>(mScene.lights.size());
+    std::size_t lightCount = mScene.lights.size();
+    return radiance * static_cast<float>(lightCount);
 }
 
 const Light*
@@ -307,8 +308,8 @@ Alpine::selectLight(float u) const
         return nullptr;
     }
 
-    uint32_t lightIdx = static_cast<uint32_t>(u * mScene.lights.size());
-    lightIdx = std::min(lightIdx, static_cast<uint32_t>(mScene.lights.size() - 1));
+    std::size_t lightIdx = static_cast<std::size_t>(u * mScene.lights.size());
+    lightIdx = std::min(lightIdx, mScene.lights.size() - 1);
     return mScene.lights[lightIdx].get();
 }
 

@@ -10,6 +10,6 @@ class Light;
 struct Scene
 {
     std::vector<std::shared_ptr<Shape>> shapes;
-    std::vector < std::shared_ptr<Light>> lights;
+    std::vector <std::shared_ptr<Light>> lights;
 };
 }
