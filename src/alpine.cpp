@@ -47,7 +47,7 @@ public:
 
     void initialize(uint32_t width, uint32_t height, uint32_t maxDepth);
 
-    bool load(const char* filename, FileType fileType);
+    bool load(std::string_view filename, FileType fileType);
 
     void addPointLight(const float intensity[3], const float position[3]);
 
@@ -57,7 +57,7 @@ public:
 
     void render(uint32_t spp);
 
-    void saveImage(const char* filename) const;
+    void saveImage(std::string_view filename) const;
 
     void addDebugScene();
 
@@ -115,7 +115,7 @@ Alpine::initialize(uint32_t width, uint32_t height, uint32_t maxDepth)
 }
 
 bool
-Alpine::load(const char* filename, FileType fileType)
+Alpine::load(std::string_view filename, FileType fileType)
 {
     const auto load = [&]() {
         switch (fileType)
@@ -314,7 +314,7 @@ Alpine::selectLight(float u) const
 }
 
 void
-Alpine::saveImage(const char* filename) const
+Alpine::saveImage(std::string_view filename) const
 {
     writePPM(filename, mWidth, mHeight, mFrameBuffer.data());
 }
@@ -335,7 +335,7 @@ initialize(uint32_t width, uint32_t height, uint32_t maxDepth)
 }
 
 bool
-load(const char* filename, FileType fileType)
+load(std::string_view filename, FileType fileType)
 {
     return Alpine::getInstance().load(filename, fileType);
 }
@@ -382,7 +382,7 @@ getFrameBuffer()
 }
 
 void
-saveImage(const char* filename)
+saveImage(std::string_view filename)
 {
     Alpine::getInstance().saveImage(filename);
 }

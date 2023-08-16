@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <stdint.h>
+#include <string_view>
 
 namespace alpine {
 void initialize(uint32_t width, uint32_t height, uint32_t maxDepth);
@@ -9,7 +10,7 @@ enum class FileType {
     GLTF,
     OBJ,
 };
-bool load(const char* filename, FileType fileType);
+bool load(std::string_view filename, FileType fileType);
 
 void addPointLight(const float intensity[3], const float position[3]);
 
@@ -37,7 +38,7 @@ void resetAccumulation();
 void render(uint32_t spp);
 
 const void* getFrameBuffer();
-void saveImage(const char* filename);
+void saveImage(std::string_view filename);
 
 // Debug
 void addDebugScene();

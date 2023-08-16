@@ -15,6 +15,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "viewer", "applications\view
 		{C9517D06-1C8D-4D3F-815E-DEE1BF5CFA0C} = {C9517D06-1C8D-4D3F-815E-DEE1BF5CFA0C}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "rtcamp9", "applications\rtcamp9\rtcamp9.vcxproj", "{270646D1-46DE-4063-8E35-3A1E87F82CFC}"
+	ProjectSection(ProjectDependencies) = postProject
+		{C9517D06-1C8D-4D3F-815E-DEE1BF5CFA0C} = {C9517D06-1C8D-4D3F-815E-DEE1BF5CFA0C}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -33,6 +38,10 @@ Global
 		{9A8AF945-57C9-459E-9FAC-F5339C5260A7}.Debug|x64.Build.0 = Debug|x64
 		{9A8AF945-57C9-459E-9FAC-F5339C5260A7}.Release|x64.ActiveCfg = Release|x64
 		{9A8AF945-57C9-459E-9FAC-F5339C5260A7}.Release|x64.Build.0 = Release|x64
+		{270646D1-46DE-4063-8E35-3A1E87F82CFC}.Debug|x64.ActiveCfg = Debug|x64
+		{270646D1-46DE-4063-8E35-3A1E87F82CFC}.Debug|x64.Build.0 = Debug|x64
+		{270646D1-46DE-4063-8E35-3A1E87F82CFC}.Release|x64.ActiveCfg = Release|x64
+		{270646D1-46DE-4063-8E35-3A1E87F82CFC}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
