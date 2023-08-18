@@ -1,5 +1,8 @@
 ﻿#pragma once
 
+#include <i_camera.h>
+#include <i_light.h>
+
 #include <stdint.h>
 #include <string_view>
 
@@ -12,25 +15,12 @@ enum class FileType {
 };
 bool load(std::string_view filename, FileType fileType);
 
-void addPointLight(const float intensity[3], const float position[3]);
+ILight* addPointLight(const float intensity[3], const float position[3]);
 
-void addDiskLight(const float emission[3], const float position[3], float radius);
+ILight* addDiskLight(const float emission[3], const float position[3], float radius);
 
 void setBackgroundColor(float r, float g, float b);
 
-class ICamera
-{
-public:
-    virtual void setLookAt(
-        const float eye[3],
-        const float target[3],
-        const float up[3],
-        float fovy,
-        float aspect) = 0;
-    virtual void orbit(float theta, float phi) = 0;
-    virtual void zoom(float z) = 0;
-    virtual void pan(float x, float y) = 0;
-};
 ICamera* getCamera();
 
 // Render

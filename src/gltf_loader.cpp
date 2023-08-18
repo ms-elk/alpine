@@ -102,7 +102,16 @@ GltfLoader::load(std::string_view filename)
 
         const auto& d = srcMat.pbrMetallicRoughness.baseColorFactor;
         float3 baseColor(static_cast<float>(d[0]), static_cast<float>(d[1]), static_cast<float>(d[2]));
-        mMaterials.push_back(std::make_shared<Matte>(baseColor, baseColorTex));
+
+        if (srcMat.pbrMetallicRoughness.metallicFactor > 0.0)
+        {
+            float roughness = static_cast<float>(srcMat.pbrMetallicRoughness.roughnessFactor);
+            mMaterials.push_back(std::make_shared<Metal>(float2(roughness), baseColor, baseColorTex));
+        }
+        else
+        {
+            mMaterials.push_back(std::make_shared<Matte>(baseColor, baseColorTex));
+        }
     }
 
     for (const auto& srcScene : mSrcModel.scenes)

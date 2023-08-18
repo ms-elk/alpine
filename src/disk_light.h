@@ -16,13 +16,12 @@ public:
     std::pair<float /* pdf */, float /* distance */>
         computePdf(const float3& hit, const float3& wiWorld) const override;
 
-    float3 getEmission() const override { return mEmission; }
+    float3 getEmission() const override { return mEmission * mScale; }
 
     float3 getPower() const override;
 
 private:
     float3 mEmission;
-    float3 mPosition;
     float3 mNormal;
     float mRadius;
 

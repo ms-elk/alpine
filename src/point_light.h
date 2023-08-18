@@ -25,6 +25,5 @@ public:
 
 private:
     float3 mIntensity;
-    float3 mPosition;
 };
 }
