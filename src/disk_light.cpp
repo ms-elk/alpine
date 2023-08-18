@@ -5,8 +5,9 @@
 
 namespace alpine {
 DiskLight::DiskLight(const float3& emission, const float3& position, const float3& normal, float radius)
-    : mEmission(emission), mPosition(position), mNormal(normal), mRadius(radius)
+    : mEmission(emission), mNormal(normal), mRadius(radius)
 {
+    mPosition = position;
     std::tie(mBinormal, mTangent) = getBasis(mNormal);
     mArea = mRadius * mRadius * PI;
 }
@@ -33,7 +34,7 @@ DiskLight::sample(const float2& u, const float3& hit) const
 
     float pdf = (distance * distance) / (mArea * cosTerm);
 
-    return { mEmission, wiWorld, distance, pdf };
+    return { mEmission * mScale, wiWorld, distance, pdf };
 }
 
 std::pair<float /* pdf */, float /* distance */>
@@ -67,6 +68,6 @@ DiskLight::computePdf(const float3& hit, const float3& wiWorld) const
 float3
 DiskLight::getPower() const
 {
-    return mEmission * mArea * PI;
+    return mEmission * mArea * PI * mScale;
 }
 }
