@@ -116,6 +116,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\alpine.h" />
+    <ClInclude Include="..\include\i_camera.h" />
+    <ClInclude Include="..\include\i_light.h" />
     <ClInclude Include="camera.h" />
     <ClInclude Include="debug_scene.h" />
     <ClInclude Include="disk_light.h" />

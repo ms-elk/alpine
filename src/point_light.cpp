@@ -4,8 +4,9 @@
 
 namespace alpine {
 PointLight::PointLight(const float3& intensity, const float3& position)
-    : mIntensity(intensity), mPosition(position)
+    : mIntensity(intensity)
 {
+    mPosition = position;
 }
 
 PointLight::Sample
@@ -21,7 +22,7 @@ PointLight::sample(const float2& u, const float3& hit) const
     float distance = std::sqrt(distance2);
     wiWorld /= distance;
 
-    float3 emission = mIntensity / distance2;
+    float3 emission = mIntensity / distance2 * mScale;
 
     return { emission, wiWorld, distance, 1.0f };
 }
@@ -29,6 +30,6 @@ PointLight::sample(const float2& u, const float3& hit) const
 float3
 PointLight::getPower() const
 {
-    return mIntensity * 4.0f * PI;
+    return mIntensity * 4.0f * PI * mScale;
 }
 }

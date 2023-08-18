@@ -3,7 +3,7 @@
 #include "matrix.h"
 #include "vector.h"
 
-#include <alpine.h>
+#include <i_camera.h>
 
 namespace alpine {
 struct Ray;

@@ -49,9 +49,9 @@ public:
 
     bool load(std::string_view filename, FileType fileType);
 
-    void addPointLight(const float intensity[3], const float position[3]);
+    ILight* addPointLight(const float intensity[3], const float position[3]);
 
-    void addDiskLight(const float emission[3], const float position[3], float radius);
+    ILight* addDiskLight(const float emission[3], const float position[3], float radius);
 
     void resetAccumulation();
 
@@ -71,7 +71,7 @@ private:
     float3 estimateDirectIllumination(Sampler& sampler, const float3& hit,
         const float3& wo, const IntersectionAttributes& isectAttr) const;
 
-    const Light* selectLight(float u) const;
+    const std::pair<Light*, std::size_t /* count */> selectLight(float u) const;
 
 private:
     uint32_t mWidth = 0;
@@ -139,17 +139,19 @@ Alpine::load(std::string_view filename, FileType fileType)
     return true;
 }
 
-void
+ILight*
 Alpine::addPointLight(const float intensity[3], const float position[3])
 {
     mScene.lights.push_back(std::make_shared<PointLight>(float3(intensity), float3(position)));
+    return mScene.lights.back().get();
 }
 
-void
+ILight*
 Alpine::addDiskLight(const float emission[3], const float position[3], float radius)
 {
     mScene.lights.push_back(std::make_shared<DiskLight>(
         float3(emission), float3(position), normalize(float3(0.0, -1.0f, 0.0f)), radius));
+    return mScene.lights.back().get();
 }
 
 void
@@ -252,9 +254,9 @@ Alpine::estimateDirectIllumination(
 {
     float3 radiance(0.0f);
 
-    const auto* light = selectLight(sampler.get1D());
+    const auto [light, lightCount] = selectLight(sampler.get1D());
 
-    if (!light)
+    if (lightCount == 0)
     {
         return radiance;
     }
@@ -296,21 +298,38 @@ Alpine::estimateDirectIllumination(
         }
     }
 
-    std::size_t lightCount = mScene.lights.size();
     return radiance * static_cast<float>(lightCount);
 }
 
-const Light*
+const std::pair<Light*, std::size_t /* count */>
 Alpine::selectLight(float u) const
 {
-    if (mScene.lights.empty())
+    std::size_t lightCount = std::count_if(mScene.lights.begin(), mScene.lights.end(),
+        [](const auto& l) { return l->isEnabled(); });
+    if (lightCount == 0)
     {
-        return nullptr;
+        return { nullptr, 0 };
     }
 
-    std::size_t lightIdx = static_cast<std::size_t>(u * mScene.lights.size());
-    lightIdx = std::min(lightIdx, mScene.lights.size() - 1);
-    return mScene.lights[lightIdx].get();
+    std::size_t lightIdx = static_cast<std::size_t>(u * lightCount);
+    lightIdx = std::min(lightIdx, lightCount - 1);
+
+    Light* light = nullptr;
+    std::size_t currentIdx = 0;
+    for (auto& l : mScene.lights)
+    {
+        if (l->isEnabled())
+        {
+            if (currentIdx == lightIdx)
+            {
+                light = l.get();
+            }
+            currentIdx++;
+        }
+    }
+
+    assert(light);
+    return { light, lightCount };
 }
 
 void
@@ -340,15 +359,16 @@ load(std::string_view filename, FileType fileType)
     return Alpine::getInstance().load(filename, fileType);
 }
 
-void addPointLight(const float intensity[3], const float position[3])
+ILight*
+addPointLight(const float intensity[3], const float position[3])
 {
-    Alpine::getInstance().addPointLight(intensity, position);
+    return Alpine::getInstance().addPointLight(intensity, position);
 }
 
-void
+ILight*
 addDiskLight(const float emission[3], const float position[3], float radius)
 {
-    Alpine::getInstance().addDiskLight(emission, position, radius);
+    return Alpine::getInstance().addDiskLight(emission, position, radius);
 }
 
 void
