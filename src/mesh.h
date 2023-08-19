@@ -16,6 +16,8 @@ public:
     {
         std::vector<float3> vertices;
         std::vector<float3> normals;
+        std::vector<float3> tangents;
+        std::vector<float3> bitangents;
         std::vector<float2> uvs;
         std::vector<uint3> prims;
         std::vector<uint3> normalPrims;

@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include "texture.h"
 #include "vector.h"
 
 namespace alpine {
@@ -24,5 +25,7 @@ public:
         const float3& wo, const float3& wi, const IntersectionAttributes& isectAttr) const = 0;
 
     virtual float computePdf(const float3& wo, const float3& wi) const = 0;
+
+    virtual const Texture4f* getNormalTex() const = 0;
 };
 }
