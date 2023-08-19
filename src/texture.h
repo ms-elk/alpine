@@ -16,7 +16,7 @@ public:
     {
     }
 
-    T sample(float2 uv)
+    T sample(float2 uv) const
     {
         // Clip to [0, 1]^2
         float u = uv.x - std::floor(uv.x);
@@ -39,4 +39,6 @@ private:
     uint32_t mHeight;
     std::vector<T> mData;
 };
+
+using Texture4f = Texture<float4>;
 }

@@ -48,7 +48,7 @@ loadObj(Scene* scene, std::string_view filename)
     materials.reserve(objMaterials.size());
     for (const auto& om : objMaterials)
     {
-        std::shared_ptr<Texture<float4>> baseColorTex = nullptr;
+        std::shared_ptr<Texture4f> baseColorTex = nullptr;
         if (!om.diffuse_texname.empty())
         {
             int32_t w, h, channels;
@@ -63,7 +63,7 @@ loadObj(Scene* scene, std::string_view filename)
                     const uint8_t* d = &data[4 * i];
                     texData[i] = float4(d[0], d[1], d[2], d[3]) / 255.0f;
                 }
-                baseColorTex = std::make_shared<Texture<float4>>(w, h, std::move(texData));
+                baseColorTex = std::make_shared<Texture4f>(w, h, std::move(texData));
             }
             else
             {
@@ -72,7 +72,7 @@ loadObj(Scene* scene, std::string_view filename)
         }
 
         const auto& d = om.diffuse;
-        materials.push_back(std::make_shared<Matte>(float3(d[0], d[1], d[2]), baseColorTex));
+        materials.push_back(std::make_shared<Matte>(float3(d[0], d[1], d[2]), baseColorTex, nullptr));
     }
 
     Mesh::Data meshData;
