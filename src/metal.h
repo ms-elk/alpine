@@ -10,10 +10,13 @@ class Metal : public Material
 {
 public:
     Metal(const float2& alpha, const float3& baseColor,
-        const std::shared_ptr<Texture<float4>>& baseColorTex, bool useVndfSampling = true)
+        const std::shared_ptr<Texture4f>& baseColorTex,
+        const std::shared_ptr<Texture4f>& normalTex,
+        bool useVndfSampling = true)
         : mAlpha({ std::max(0.001f, alpha.x), std::max(0.001f, alpha.y) })
         , mBaseColor(baseColor)
         , mBaseColorTex(baseColorTex)
+        , mNormalTex(normalTex)
         , mUseVndfSampling(useVndfSampling) {};
 
     Sample sample(
@@ -23,6 +26,8 @@ public:
         const float3& wo, const float3& wi, const IntersectionAttributes& isectAttr) const override;
 
     float computePdf(const float3& wo, const float3& wi) const override;
+
+    const Texture4f* getNormalTex() const override { return mNormalTex.get(); }
 
 private:
     float computeDistribution(const float3& wh) const;
@@ -36,7 +41,8 @@ private:
 private:
     float2 mAlpha;
     float3 mBaseColor;
-    std::shared_ptr<Texture<float4>> mBaseColorTex;
+    std::shared_ptr<Texture4f> mBaseColorTex;
+    std::shared_ptr<Texture4f> mNormalTex;
     bool mUseVndfSampling;
 };
 }
