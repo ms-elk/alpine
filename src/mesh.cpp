@@ -1,7 +1,11 @@
 ﻿#include "mesh.h"
 
 #include "kernel.h"
+#include "material.h"
 #include "ray.h"
+#include "texture.h"
+
+#include <assert.h>
 
 namespace alpine {
 Mesh::Mesh(Data&& data)
@@ -23,17 +27,6 @@ Mesh::getIntersectionAttributes(const kernel::Intersection& isect) const
         return values[idx[0]] * b0 + values[idx[1]] * b1 + values[idx[2]] * b2;
     };
 
-    if (!mData.normals.empty())
-    {
-        isectAttr.ns = interpolate(
-            mData.normals, !mData.normalPrims.empty() ? mData.normalPrims : mData.prims);
-    }
-    else
-    {
-        isectAttr.ns = isect.ng;
-    }
-    std::tie(isectAttr.ss, isectAttr.ts) = getBasis(isectAttr.ns);
-
     if (!mData.uvs.empty())
     {
         isectAttr.uv = interpolate(
@@ -44,6 +37,30 @@ Mesh::getIntersectionAttributes(const kernel::Intersection& isect) const
     {
         isectAttr.material = mData.materials[isect.primId].get();
     }
+
+    if (!mData.normals.empty())
+    {
+        isectAttr.ns = interpolate(
+            mData.normals, !mData.normalPrims.empty() ? mData.normalPrims : mData.prims);
+
+        const auto* normalTex = isectAttr.material ? isectAttr.material->getNormalTex() : nullptr;
+        if (normalTex && !mData.tangents.empty())
+        {
+            assert(!mData.bitangents.empty());
+            float3 tan = interpolate(
+                mData.tangents, !mData.normalPrims.empty() ? mData.normalPrims : mData.prims);
+            float3 bitan = interpolate(
+                mData.bitangents, !mData.normalPrims.empty() ? mData.normalPrims : mData.prims);
+
+            float4 v = normalTex->sample(isectAttr.uv);
+            isectAttr.ns = normalize(tan * v.x + bitan * v.y + isectAttr.ns * v.z);
+        }
+    }
+    else
+    {
+        isectAttr.ns = isect.ng;
+    }
+    std::tie(isectAttr.ss, isectAttr.ts) = getBasis(isectAttr.ns);
 
     return isectAttr;
 }

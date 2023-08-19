@@ -29,9 +29,17 @@ public:
 private:
     void traverse(float4x4 matrix, uint32_t nodeIdx);
 
+    std::shared_ptr<Texture4f> createTexture(uint32_t texIdx, bool isSigned);
+
     template <typename T>
     std::size_t appendVertexBuffer(
         std::vector<T>& dst, const std::string& name, const tinygltf::Primitive& srcPrim) const;
+
+    std::size_t appendTangentBuffer(
+        std::vector<float3>& tangents,
+        std::vector<float3>& bitangents,
+        const std::vector<float3>& normals,
+        const tinygltf::Primitive& srcPrim) const;
 
     std::size_t appendIndexBuffer(std::vector<uint3>& dst, const tinygltf::Primitive& srcPrim) const;
 
@@ -70,34 +78,16 @@ GltfLoader::load(std::string_view filename)
     mMaterials.reserve(mSrcModel.materials.size());
     for (const auto& srcMat : mSrcModel.materials)
     {
-        std::shared_ptr<Texture<float4>> baseColorTex = nullptr;
+        std::shared_ptr<Texture4f> baseColorTex = nullptr;
         if (int32_t texIdx = srcMat.pbrMetallicRoughness.baseColorTexture.index; texIdx >= 0)
         {
-            uint32_t imgIdx = mSrcModel.textures[texIdx].source;
-            const auto& image = mSrcModel.images[imgIdx];
+            baseColorTex = createTexture(texIdx, false);
+        }
 
-            if (image.component == 3 || image.component == 4)
-            {
-                std::vector<float4> texData(image.width * image.height);
-                for (uint32_t i = 0; i < texData.size(); ++i)
-                {
-                    if (image.component == 3)
-                    {
-                        const uint8_t* d = &image.image[3 * i];
-                        texData[i] = float4(d[0], d[1], d[2], 255) / 255.0f;
-                    }
-                    else
-                    {
-                        const uint8_t* d = &image.image[4 * i];
-                        texData[i] = float4(d[0], d[1], d[2], d[3]) / 255.0f;
-                    }
-                }
-                baseColorTex = std::make_shared<Texture<float4>>(image.width, image.height, std::move(texData));
-            }
-            else
-            {
-                printf("The channel count of %s is not valid\n", image.name.c_str());
-            }
+        std::shared_ptr<Texture4f> normalTex = nullptr;
+        if (int32_t texIdx = srcMat.normalTexture.index; texIdx >= 0)
+        {
+            normalTex = createTexture(texIdx, true);
         }
 
         const auto& d = srcMat.pbrMetallicRoughness.baseColorFactor;
@@ -106,11 +96,13 @@ GltfLoader::load(std::string_view filename)
         if (srcMat.pbrMetallicRoughness.metallicFactor > 0.0)
         {
             float roughness = static_cast<float>(srcMat.pbrMetallicRoughness.roughnessFactor);
-            mMaterials.push_back(std::make_shared<Metal>(float2(roughness), baseColor, baseColorTex));
+            mMaterials.push_back(std::make_shared<Metal>(
+                float2(roughness), baseColor, baseColorTex, normalTex));
         }
         else
         {
-            mMaterials.push_back(std::make_shared<Matte>(baseColor, baseColorTex));
+            mMaterials.push_back(std::make_shared<Matte>(
+                baseColor, baseColorTex, normalTex));
         }
     }
 
@@ -205,6 +197,9 @@ GltfLoader::traverse(float4x4 matrix, uint32_t nodeIdx)
             appendVertexBuffer(meshData.normals, "NORMAL", srcPrim);
             appendVertexBuffer(meshData.uvs, "TEXCOORD_0", srcPrim);
 
+            appendTangentBuffer(
+                meshData.tangents, meshData.bitangents, meshData.normals, srcPrim);
+
             std::size_t primCount = appendIndexBuffer(meshData.prims, srcPrim);
             for (uint32_t i = 0; i < primCount; ++i)
             {
@@ -213,6 +208,7 @@ GltfLoader::traverse(float4x4 matrix, uint32_t nodeIdx)
         }
 
         // transform
+        // TODO: fix matrix for normals
         assert(meshData.vertices.size() == meshData.normals.size());
         for (uint32_t i = 0; i < meshData.vertices.size(); ++i)
         {
@@ -221,6 +217,16 @@ GltfLoader::traverse(float4x4 matrix, uint32_t nodeIdx)
 
             auto& n = meshData.normals[i];
             n = mul(matrix, float4(n.x, n.y, n.z, 0.0f)).xyz();
+
+            if (!meshData.tangents.empty())
+            {
+                auto& t = meshData.tangents[i];
+                t = mul(matrix, float4(t.x, t.y, t.z, 0.0f)).xyz();
+
+                assert(!meshData.bitangents.empty());
+                auto& b = meshData.bitangents[i];
+                b = mul(matrix, float4(b.x, b.y, b.z, 0.0f)).xyz();
+            }
         }
 
         mScene->shapes.push_back(std::make_shared<Mesh>(std::move(meshData)));
@@ -229,6 +235,43 @@ GltfLoader::traverse(float4x4 matrix, uint32_t nodeIdx)
     for (uint32_t childIdx : srcNode.children)
     {
         traverse(matrix, childIdx);
+    }
+}
+
+std::shared_ptr<Texture4f>
+GltfLoader::createTexture(uint32_t texIdx, bool isSigned)
+{
+    uint32_t imgIdx = mSrcModel.textures[texIdx].source;
+    const auto& image = mSrcModel.images[imgIdx];
+
+    if (image.component == 3 || image.component == 4)
+    {
+        std::vector<float4> texData(image.width * image.height);
+        for (uint32_t i = 0; i < texData.size(); ++i)
+        {
+            if (image.component == 3)
+            {
+                const uint8_t* d = &image.image[3 * i];
+                texData[i] = float4(d[0], d[1], d[2], 255) / 255.0f;
+            }
+            else
+            {
+                const uint8_t* d = &image.image[4 * i];
+                texData[i] = float4(d[0], d[1], d[2], d[3]) / 255.0f;
+            }
+
+            if (isSigned)
+            {
+                texData[i] = texData[i] * 2.0f - 1.0f;
+            }
+        }
+
+        return std::make_shared<Texture4f>(image.width, image.height, std::move(texData));
+    }
+    else
+    {
+        printf("The channel count of %s is not valid\n", image.name.c_str());
+        return nullptr;
     }
 }
 
@@ -251,6 +294,39 @@ GltfLoader::appendVertexBuffer(
     for (uint32_t i = 0; i < acc.count; ++i)
     {
         dst.emplace_back(values[i]);
+    }
+
+    return acc.count;
+}
+
+std::size_t
+GltfLoader::appendTangentBuffer(
+    std::vector<float3>& tangents,
+    std::vector<float3>& bitangents,
+    const std::vector<float3>& normals,
+    const tinygltf::Primitive& srcPrim) const
+{
+    const auto itr = srcPrim.attributes.find("TANGENT");
+    if (itr == srcPrim.attributes.end())
+    {
+        return 0;
+    }
+
+    assert(!normals.empty());
+
+    const auto& acc = mSrcModel.accessors[itr->second];
+    const auto& bufView = mSrcModel.bufferViews[acc.bufferView];
+    const auto& buf = mSrcModel.buffers[bufView.buffer];
+    const auto* values = reinterpret_cast<const float4*>(&buf.data[bufView.byteOffset + acc.byteOffset]);
+
+    for (uint32_t i = 0; i < acc.count; ++i)
+    {
+        const float3& normal = normals[i];
+        float4 tangent = values[i];
+        float3 bitangent = cross(normal, tangent.xyz()) * tangent.w;
+
+        tangents.push_back(tangent.xyz());
+        bitangents.push_back(bitangent);
     }
 
     return acc.count;
