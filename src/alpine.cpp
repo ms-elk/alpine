@@ -94,7 +94,6 @@ private:
     std::vector<Sampler> mSamplers;
     std::vector<RenderTarget> mAccumBuffer;
     std::vector<RenderTarget> mResolvedBuffer;
-    std::vector<float3> mDenoisedBuffer;
     std::vector<byte3> mFrameBuffer;
     uint32_t mTotalSamples = 0;
 
@@ -120,7 +119,6 @@ Alpine::initialize(uint32_t width, uint32_t height, uint32_t maxDepth)
     mSamplers.resize(pixelCount);
     mAccumBuffer.resize(pixelCount);
     mResolvedBuffer.resize(pixelCount);
-    mDenoisedBuffer.resize(pixelCount);
     mFrameBuffer.resize(pixelCount);
 
     mTileWidth = (width - 1) / TILE_SIZE + 1;
@@ -379,7 +377,7 @@ Alpine::resolve(bool denoise)
         filter.setImage("color", mResolvedBuffer.data(), oidn::Format::Float3, mWidth, mHeight, 0, sizeof(RenderTarget));
         filter.setImage("albedo", mResolvedBuffer.data(), oidn::Format::Float3, mWidth, mHeight, sizeof(float3), sizeof(RenderTarget));
         filter.setImage("normal", mResolvedBuffer.data(), oidn::Format::Float3, mWidth, mHeight, 2 * sizeof(float3), sizeof(RenderTarget));
-        filter.setImage("output", mDenoisedBuffer.data(), oidn::Format::Float3, mWidth, mHeight, 0, sizeof(float3));
+        filter.setImage("output", mResolvedBuffer.data(), oidn::Format::Float3, mWidth, mHeight, 0, sizeof(RenderTarget));
         filter.set("hdr", true);
         filter.commit();
         filter.execute();
@@ -387,7 +385,7 @@ Alpine::resolve(bool denoise)
 
     for (uint32_t i = 0; i < mFrameBuffer.size(); ++i)
     {
-        auto pixel = denoise ? mDenoisedBuffer[i] : mResolvedBuffer[i].color;
+        auto pixel = mResolvedBuffer[i].color;
 
         auto& fb = mFrameBuffer[i];
         fb.x = static_cast<uint8_t>(std::clamp(pixel.x, 0.0f, 1.0f) * 255.0f + 0.5f);

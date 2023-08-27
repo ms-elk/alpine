@@ -182,7 +182,8 @@ int32_t main(int32_t argc, const char* argv[])
             for (uint32_t i = 0; i < lightGroup1.size(); ++i)
             {
                 float offset = static_cast<float>(i)* 2.0f * PI / static_cast<float>(lightGroup1.size());
-                float theta = static_cast<float>(frameIndex - lightAnimFrame) * deltaLightRot + offset;
+                float step = static_cast<float>(frameIndex - lightAnimFrame) / (static_cast<float>(fps) / 10.0f);
+                float theta = step * deltaLightRot + offset;
                 float p[] = { cosf(theta), 2.8f, sinf(theta) };
 
                 auto& l1 = lightGroup1[i];
