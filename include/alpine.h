@@ -27,6 +27,8 @@ ICamera* getCamera();
 void resetAccumulation();
 void render(uint32_t spp);
 
+void resolve(bool denoise);
+
 const void* getFrameBuffer();
 void saveImage(std::string_view filename);
 

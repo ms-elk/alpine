@@ -22,6 +22,10 @@ int32_t main(int32_t argc, const char* argv[])
     uint32_t startFrameIndex = 0;
     uint32_t endFrameIndex = 0;
     std::string_view gltfName = "";
+    uint32_t width = 0;
+    uint32_t height = 0;
+    uint32_t spp = 0;
+    uint32_t fps = 0;
     for (int argIdx = 1; argIdx < argc; ++argIdx)
     {
         std::string_view arg = argv[argIdx];
@@ -45,6 +49,42 @@ int32_t main(int32_t argc, const char* argv[])
             gltfName = argv[argIdx + 1];
             argIdx++;
         }
+        else if (arg == "--width")
+        {
+            if (argIdx + 1 >= argc)
+            {
+                return -1;
+            }
+            width = static_cast<uint32_t>(atoi(argv[argIdx + 1]));
+            argIdx++;
+        }
+        else if (arg == "--height")
+        {
+            if (argIdx + 1 >= argc)
+            {
+                return -1;
+            }
+            height = static_cast<uint32_t>(atoi(argv[argIdx + 1]));
+            argIdx++;
+        }
+        else if (arg == "--spp")
+        {
+            if (argIdx + 1 >= argc)
+            {
+                return -1;
+            }
+            spp = static_cast<uint32_t>(atoi(argv[argIdx + 1]));
+            argIdx++;
+        }
+        else if (arg == "--fps")
+        {
+            if (argIdx + 1 >= argc)
+            {
+                return -1;
+            }
+            fps = static_cast<uint32_t>(atoi(argv[argIdx + 1]));
+            argIdx++;
+        }
         else
         {
             printf("Unknown argument %s.\n", argv[argIdx]);
@@ -58,9 +98,6 @@ int32_t main(int32_t argc, const char* argv[])
         return -1;
     }
 
-    // constant values
-    const uint32_t width = 1920;
-    const uint32_t height = 1080;
     const uint32_t maxDepth = 8;
 
     alpine::initialize(width, height, maxDepth);
@@ -70,17 +107,16 @@ int32_t main(int32_t argc, const char* argv[])
     std::array<alpine::ILight*, 2> lightGroup0;
     {
         float emisssion[] = { 10.0f, 10.0f, 10.0f };
-        float lightPos[] = { 0.0f, 2.8f, 0.0f };
+        float lightPos[] = { 0.0f, 2.9f, 0.0f };
         float lightRadius = 1.0f;
         lightGroup0[0] = alpine::addDiskLight(emisssion, lightPos, lightRadius);
     }
 
     {
         float emisssion[] = { 30.0f, 20.0f, 5.0f };
-        float lightPos[] = { 0.0f, 2.8f, -4.0f };
+        float lightPos[] = { 0.0f, 2.5f, -4.0f };
         float lightRadius = 0.3f;
         lightGroup0[1] = alpine::addDiskLight(emisssion, lightPos, lightRadius);
-        lightGroup0[1]->enable(false);
     }
 
     std::array<alpine::ILight*, 3> lightGroup1;
@@ -109,7 +145,7 @@ int32_t main(int32_t argc, const char* argv[])
     const float target0[] = { 3.0f, 0.8f, 0.0f };
     const float up[] = { 0.0f, 1.0f, 0.0f };
 
-    const float eye1[] = { 3.0f, 1.8f, -1.6f };
+    const float eye1[] = { 2.5f, 1.8f, -1.6f };
     const float target1[] = { 0.18f, 0.8f, 0.2f };
 
     const float fovy = PI / 2.0f;
@@ -127,28 +163,39 @@ int32_t main(int32_t argc, const char* argv[])
 
     fpng::fpng_init();
 
+    uint32_t lightOffFrame = 3 * fps;
+    uint32_t lightAnimFrame = 4 * fps;
+
     for (uint32_t frameIndex = startFrameIndex; frameIndex <= endFrameIndex; ++frameIndex)
     {
         const clock::time_point frameStartTp = clock::now();
         printf("Frame %u ... ", frameIndex);
 
-        if (frameIndex >= 50)
+        if (frameIndex >= lightAnimFrame) // Use Light Group 1
         {
             lightGroup0[0]->enable(false);
             lightGroup0[1]->enable(false);
 
+            float scale = static_cast<float>(frameIndex - lightAnimFrame) / (0.3f * static_cast<float>(fps));
+            scale = std::min(scale, 1.0f);
+
             for (uint32_t i = 0; i < lightGroup1.size(); ++i)
             {
                 float offset = static_cast<float>(i)* 2.0f * PI / static_cast<float>(lightGroup1.size());
-                float theta = static_cast<float>(frameIndex - 50) * deltaLightRot + offset;
+                float theta = static_cast<float>(frameIndex - lightAnimFrame) * deltaLightRot + offset;
                 float p[] = { cosf(theta), 2.8f, sinf(theta) };
-                lightGroup1[i]->setPosition(p);
-                lightGroup1[i]->enable(true);
+
+                auto& l1 = lightGroup1[i];
+                l1->setPosition(p);
+                l1->enable(true);
+                l1->setScale(scale);
             }
         }
-        else
+        else // Use Light Group 0
         {
-            float scale = frameIndex >= 30 ? 1.0f - static_cast<float>(frameIndex - 30) / 19.0f : 1.0f;
+            // Light fade out
+            float scale = frameIndex >= lightOffFrame ?
+                1.0f - static_cast<float>(frameIndex - lightOffFrame) / static_cast<float>(lightAnimFrame - lightOffFrame - 1) : 1.0f;
  
             for (auto& l0 : lightGroup0)
             {
@@ -162,7 +209,7 @@ int32_t main(int32_t argc, const char* argv[])
             }
         }
 
-        float t = static_cast<float>(frameIndex) / 29.0f;
+        float t = static_cast<float>(frameIndex) / static_cast<float>(lightOffFrame - 1);
         t = std::min(t, 1.0f);
 
         float eye[3];
@@ -178,7 +225,8 @@ int32_t main(int32_t argc, const char* argv[])
         camera->setLookAt(eye, target, up, fovy, aspect);
 
         alpine::resetAccumulation();
-        alpine::render(1);
+        alpine::render(spp);
+        alpine::resolve(true);
 
         // 起動からの時刻とフレーム時間を計算。
         const clock::time_point now = clock::now();

@@ -64,12 +64,15 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>embree3.lib;tbb.lib;alpine.lib;glfw3dll.lib;OpenGL32.Lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)ext\embree\lib;$(TargetDir);$(SolutionDir)ext\glfw-3.3.8.bin.WIN64\lib-vc2022</AdditionalLibraryDirectories>
+      <AdditionalDependencies>embree3.lib;OpenImageDenoise.lib;tbb.lib;alpine.lib;glfw3dll.lib;OpenGL32.Lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)ext\embree\lib;$(SolutionDir)ext\oidn\lib;$(TargetDir);$(SolutionDir)ext\glfw-3.3.8.bin.WIN64\lib-vc2022</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>xcopy $(SolutionDir)ext\embree\bin\embree3.dll $(TargetDir) /Y
 xcopy $(SolutionDir)ext\embree\bin\tbb12.dll $(TargetDir) /Y
+xcopy $(SolutionDir)ext\oidn\bin\OpenImageDenoise.dll $(TargetDir) /Y
+xcopy $(SolutionDir)ext\oidn\bin\OpenImageDenoise_core.dll $(TargetDir) /Y
+xcopy $(SolutionDir)ext\oidn\bin\OpenImageDenoise_device_cpu.dll $(TargetDir) /Y
 xcopy $(SolutionDir)ext\glfw-3.3.8.bin.WIN64\lib-vc2022\glfw3.dll $(TargetDir) /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -90,12 +93,15 @@ xcopy $(SolutionDir)ext\glfw-3.3.8.bin.WIN64\lib-vc2022\glfw3.dll $(TargetDir) /
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>embree3.lib;tbb.lib;alpine.lib;glfw3dll.lib;OpenGL32.Lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)ext\embree\lib;$(TargetDir);$(SolutionDir)ext\glfw-3.3.8.bin.WIN64\lib-vc2022</AdditionalLibraryDirectories>
+      <AdditionalDependencies>embree3.lib;OpenImageDenoise.lib;tbb.lib;alpine.lib;glfw3dll.lib;OpenGL32.Lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)ext\embree\lib;$(SolutionDir)ext\oidn\lib;$(TargetDir);$(SolutionDir)ext\glfw-3.3.8.bin.WIN64\lib-vc2022</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>xcopy $(SolutionDir)ext\embree\bin\embree3.dll $(TargetDir) /Y
 xcopy $(SolutionDir)ext\embree\bin\tbb12.dll $(TargetDir) /Y
+xcopy $(SolutionDir)ext\oidn\bin\OpenImageDenoise.dll $(TargetDir) /Y
+xcopy $(SolutionDir)ext\oidn\bin\OpenImageDenoise_core.dll $(TargetDir) /Y
+xcopy $(SolutionDir)ext\oidn\bin\OpenImageDenoise_device_cpu.dll $(TargetDir) /Y
 xcopy $(SolutionDir)ext\glfw-3.3.8.bin.WIN64\lib-vc2022\glfw3.dll $(TargetDir) /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>

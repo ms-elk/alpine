@@ -53,7 +53,7 @@ Mesh::getIntersectionAttributes(const kernel::Intersection& isect) const
                 mData.bitangents, !mData.normalPrims.empty() ? mData.normalPrims : mData.prims);
 
             float4 v = normalTex->sample(isectAttr.uv);
-            isectAttr.ns = normalize(tan * v.x + bitan * v.y + isectAttr.ns * v.z);
+            isectAttr.ns = normalize(bitan * v.x + tan * v.y + isectAttr.ns * v.z);
         }
     }
     else

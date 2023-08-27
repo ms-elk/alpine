@@ -15,6 +15,8 @@
 #include "sphere.h"
 #include "util.h"
 
+#include <OpenImageDenoise/oidn.hpp>
+
 #include <algorithm>
 #include <future>
 #include <memory>
@@ -57,6 +59,8 @@ public:
 
     void render(uint32_t spp);
 
+    void resolve(bool denoise);
+
     void saveImage(std::string_view filename) const;
 
     void addDebugScene();
@@ -80,8 +84,17 @@ private:
 
     float3 mBackgroundColor = float3(1.0f);
 
+    struct RenderTarget
+    {
+        float3 color;
+        float3 albedo;
+        float3 normal;
+    };
+
     std::vector<Sampler> mSamplers;
-    std::vector<float3> mAccumBuffer;
+    std::vector<RenderTarget> mAccumBuffer;
+    std::vector<RenderTarget> mResolvedBuffer;
+    std::vector<float3> mDenoisedBuffer;
     std::vector<byte3> mFrameBuffer;
     uint32_t mTotalSamples = 0;
 
@@ -92,6 +105,8 @@ private:
     Scene mScene;
 
     Camera mCamera;
+
+    oidn::DeviceRef mDenoiser;
 };
 
 void
@@ -104,12 +119,17 @@ Alpine::initialize(uint32_t width, uint32_t height, uint32_t maxDepth)
     uint32_t pixelCount = mWidth * mHeight;
     mSamplers.resize(pixelCount);
     mAccumBuffer.resize(pixelCount);
+    mResolvedBuffer.resize(pixelCount);
+    mDenoisedBuffer.resize(pixelCount);
     mFrameBuffer.resize(pixelCount);
 
-    mTileWidth = width / TILE_SIZE;
-    mTileHeight = height / TILE_SIZE;
+    mTileWidth = (width - 1) / TILE_SIZE + 1;
+    mTileHeight = (height - 1) / TILE_SIZE + 1;
     uint32_t tileCount = mTileWidth * mTileHeight;
     mTiles.resize(tileCount);
+
+    mDenoiser = oidn::newDevice();
+    mDenoiser.commit();
 
     resetAccumulation();
 }
@@ -161,7 +181,7 @@ Alpine::resetAccumulation()
     {
         mSamplers[p].reset(p);
     }
-    std::fill(mAccumBuffer.begin(), mAccumBuffer.end(), float3(0.0f));
+    std::fill(mAccumBuffer.begin(), mAccumBuffer.end(), RenderTarget{float3(0.0f), float3(0.0f), float3(0.0f) });
     mTotalSamples = 0;
 }
 
@@ -178,16 +198,26 @@ Alpine::render(uint32_t spp)
 
                 for (uint32_t y = yBegin; y < yBegin + TILE_SIZE; ++y)
                 {
+                    if (y >= mHeight)
+                    {
+                        continue;
+                    }
+
                     for (uint32_t x = xBegin; x < xBegin + TILE_SIZE; ++x)
                     {
+                        if (x >= mWidth)
+                        {
+                            continue;
+                        }
+
                         uint32_t index = y * mWidth + x;
                         auto& sampler = mSamplers[index];
                         float2 jitter = sampler.get2D();
                         auto ray = mCamera.generateRay(
                             (x + jitter.x) / float(mWidth), (y + jitter.y) / float(mHeight));
 
-                        float3 throughput(1.0f, 1.0f, 1.0f);
-                        float3 radiance(0.0f, 0.0f, 0.0f);
+                        float3 throughput(1.0f);
+                        float3 radiance(0.0f);
                         for (uint32_t depth = 0; depth < mMaxDepth; ++depth)
                         {
                             auto isect = kernel::intersect(ray);
@@ -202,6 +232,17 @@ Alpine::render(uint32_t spp)
                             const auto* shape = static_cast<Shape*>(isect.shapePtr);
                             auto isectAttr
                                 = shape->getIntersectionAttributes(isect);
+
+                            if (depth == 0)
+                            {
+                                mAccumBuffer[index].albedo += isectAttr.material->getBaseColor(isectAttr.uv);
+                                mAccumBuffer[index].normal += isectAttr.ns;
+                            }
+
+                            //radiance = float3(abs(isectAttr.ns.x), abs(isectAttr.ns.y), abs(isectAttr.ns.z));
+                            //radiance = isectAttr.ns;
+                            //radiance = float3(isectAttr.uv.x, isectAttr.uv.y, 0.0f);
+                            //break;
 
                             float3 wo = toLocal(- ray.dir, isectAttr.ss, isectAttr.ts, isectAttr.ns);
                             radiance += throughput * estimateDirectIllumination(sampler, hit, wo, isectAttr);
@@ -223,7 +264,7 @@ Alpine::render(uint32_t spp)
                             ray.dir = wiWorld;
                         }
 
-                        mAccumBuffer[index] += radiance;
+                        mAccumBuffer[index].color += radiance;
                     }
                 }
                 });
@@ -235,17 +276,6 @@ Alpine::render(uint32_t spp)
         }
     }
     mTotalSamples += spp;
-
-    for (uint32_t i = 0; i < mFrameBuffer.size(); ++i)
-    {
-        auto pixel = mAccumBuffer[i];
-        pixel /= float(mTotalSamples);
-
-        auto& fb = mFrameBuffer[i];
-        fb.x = static_cast<uint8_t>(std::clamp(pixel.x, 0.0f, 1.0f) * 255.0f + 0.5f);
-        fb.y = static_cast<uint8_t>(std::clamp(pixel.y, 0.0f, 1.0f) * 255.0f + 0.5f);
-        fb.z = static_cast<uint8_t>(std::clamp(pixel.z, 0.0f, 1.0f) * 255.0f + 0.5f);
-    }
 }
 
 float3
@@ -333,6 +363,40 @@ Alpine::selectLight(float u) const
 }
 
 void
+Alpine::resolve(bool denoise)
+{
+    for (uint32_t i = 0; i < mResolvedBuffer.size(); ++i)
+    {
+        auto pixel = mAccumBuffer[i];
+        mResolvedBuffer[i].color = pixel.color / float(mTotalSamples);
+        mResolvedBuffer[i].albedo = pixel.albedo / float(mTotalSamples);
+        mResolvedBuffer[i].normal = pixel.normal / float(mTotalSamples);
+    }
+
+    if (denoise)
+    {
+        oidn::FilterRef filter = mDenoiser.newFilter("RT");
+        filter.setImage("color", mResolvedBuffer.data(), oidn::Format::Float3, mWidth, mHeight, 0, sizeof(RenderTarget));
+        filter.setImage("albedo", mResolvedBuffer.data(), oidn::Format::Float3, mWidth, mHeight, sizeof(float3), sizeof(RenderTarget));
+        filter.setImage("normal", mResolvedBuffer.data(), oidn::Format::Float3, mWidth, mHeight, 2 * sizeof(float3), sizeof(RenderTarget));
+        filter.setImage("output", mDenoisedBuffer.data(), oidn::Format::Float3, mWidth, mHeight, 0, sizeof(float3));
+        filter.set("hdr", true);
+        filter.commit();
+        filter.execute();
+    }
+
+    for (uint32_t i = 0; i < mFrameBuffer.size(); ++i)
+    {
+        auto pixel = denoise ? mDenoisedBuffer[i] : mResolvedBuffer[i].color;
+
+        auto& fb = mFrameBuffer[i];
+        fb.x = static_cast<uint8_t>(std::clamp(pixel.x, 0.0f, 1.0f) * 255.0f + 0.5f);
+        fb.y = static_cast<uint8_t>(std::clamp(pixel.y, 0.0f, 1.0f) * 255.0f + 0.5f);
+        fb.z = static_cast<uint8_t>(std::clamp(pixel.z, 0.0f, 1.0f) * 255.0f + 0.5f);
+    }
+}
+
+void
 Alpine::saveImage(std::string_view filename) const
 {
     writePPM(filename, mWidth, mHeight, mFrameBuffer.data());
@@ -393,6 +457,12 @@ void
 render(uint32_t spp)
 {
     Alpine::getInstance().render(spp);
+}
+
+void
+resolve(bool denoise)
+{
+    Alpine::getInstance().resolve(denoise);
 }
 
 const void*

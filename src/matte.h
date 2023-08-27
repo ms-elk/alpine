@@ -24,8 +24,7 @@ public:
 
     const Texture4f* getNormalTex() const override { return mNormalTex.get(); }
 
-private:
-    float3 getBaseColor(const float2& uv) const;
+    float3 getBaseColor(const float2& uv) const override;
 
 private:
     float3 mBaseColor;
