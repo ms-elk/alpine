@@ -88,18 +88,16 @@ GltfLoader::load(std::string_view filename)
         if (int32_t texIdx = srcMat.normalTexture.index; texIdx >= 0)
         {
             normalTex = createTexture(texIdx, true);
-            //printf("%s, normal map\n", srcMat.name.c_str());
         }
 
         const auto& d = srcMat.pbrMetallicRoughness.baseColorFactor;
         float3 baseColor(static_cast<float>(d[0]), static_cast<float>(d[1]), static_cast<float>(d[2]));
 
-        if (srcMat.pbrMetallicRoughness.metallicFactor > 0.0 || srcMat.name == "M_table") //srcMat.name == "M_Room")
+        if (srcMat.pbrMetallicRoughness.metallicFactor > 0.0)
         {
-            float roughness = 0.3f;// static_cast<float>(srcMat.pbrMetallicRoughness.roughnessFactor);
+            float roughness = static_cast<float>(srcMat.pbrMetallicRoughness.roughnessFactor);
             mMaterials.push_back(std::make_shared<Metal>(
                 float2(roughness), baseColor, baseColorTex, normalTex));
-            //printf("%s, %f\n", srcMat.name.c_str(), roughness);
         }
         else
         {
