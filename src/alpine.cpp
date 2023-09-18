@@ -237,11 +237,6 @@ Alpine::render(uint32_t spp)
                                 mAccumBuffer[index].normal += isectAttr.ns;
                             }
 
-                            //radiance = float3(abs(isectAttr.ns.x), abs(isectAttr.ns.y), abs(isectAttr.ns.z));
-                            //radiance = isectAttr.ns;
-                            //radiance = float3(isectAttr.uv.x, isectAttr.uv.y, 0.0f);
-                            //break;
-
                             float3 wo = toLocal(- ray.dir, isectAttr.ss, isectAttr.ts, isectAttr.ns);
                             radiance += throughput * estimateDirectIllumination(sampler, hit, wo, isectAttr);
 

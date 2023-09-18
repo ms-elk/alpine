@@ -43,8 +43,7 @@ Mesh::getIntersectionAttributes(const kernel::Intersection& isect) const
         isectAttr.ns = interpolate(
             mData.normals, !mData.normalPrims.empty() ? mData.normalPrims : mData.prims);
 
-        const auto* normalTex = isectAttr.material ? isectAttr.material->getNormalTex() : nullptr;
-        if (normalTex && !mData.tangents.empty())
+        if (isectAttr.material && !mData.tangents.empty())
         {
             assert(!mData.bitangents.empty());
             float3 tan = interpolate(
@@ -52,7 +51,7 @@ Mesh::getIntersectionAttributes(const kernel::Intersection& isect) const
             float3 bitan = interpolate(
                 mData.bitangents, !mData.normalPrims.empty() ? mData.normalPrims : mData.prims);
 
-            float4 v = normalTex->sample(isectAttr.uv);
+            float3 v = isectAttr.material->getNormal(isectAttr.uv);
             isectAttr.ns = normalize(bitan * v.x + tan * v.y + isectAttr.ns * v.z);
         }
     }

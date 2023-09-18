@@ -26,8 +26,8 @@ public:
 
     virtual float computePdf(const float3& wo, const float3& wi) const = 0;
 
-    virtual const Texture4f* getNormalTex() const = 0;
-
     virtual float3 getBaseColor(const float2& uv) const = 0;
+
+    virtual float3 getNormal(const float2& uv) const = 0;
 };
 }

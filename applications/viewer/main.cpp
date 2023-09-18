@@ -9,7 +9,7 @@ static constexpr uint32_t WIDTH = 512;
 static constexpr uint32_t HEIGHT = 512;
 
 static constexpr float PAN_SPEED = 0.01f;
-static constexpr float ZOOM_SPEED =0.5f;
+static constexpr float ZOOM_SPEED = 0.5f;
 
 enum class MouseAction
 {
@@ -104,7 +104,6 @@ int main(int argc, char* argv[])
 
     const uint32_t maxDepth = 8;
     alpine::initialize(WIDTH, HEIGHT, maxDepth);
-
     gCamera = alpine::getCamera();
 
     const float eye[] = { 0.0f, 0.0f, -5.0f };
@@ -123,7 +122,7 @@ int main(int argc, char* argv[])
         glfwPollEvents();
 
         alpine::render(1);
-        alpine::resolve(false);
+        alpine::resolve(true);
 
         glRasterPos2i(-1, 1);
         glPixelZoom(1.0f, -1.0f);
