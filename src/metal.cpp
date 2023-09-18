@@ -141,4 +141,10 @@ Metal::getBaseColor(const float2& uv) const
 {
     return mBaseColorTex ? mBaseColorTex->sample(uv).xyz() : mBaseColor;
 }
+
+float3
+Metal::getNormal(const float2& uv) const
+{
+    return mNormalTex ? mNormalTex->sample(uv).xyz() : float3(0.0f, 0.0f, 1.0f);
+}
 }

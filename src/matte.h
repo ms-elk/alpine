@@ -22,10 +22,9 @@ public:
 
     float computePdf(const float3& wo, const float3& wi) const override;
 
-    const Texture4f* getNormalTex() const override { return mNormalTex.get(); }
+    float3 getBaseColor(const float2& uv) const override;
 
-private:
-    float3 getBaseColor(const float2& uv) const;
+    float3 getNormal(const float2& uv) const override;
 
 private:
     float3 mBaseColor;

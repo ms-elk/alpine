@@ -8,7 +8,8 @@ static constexpr float PI = 3.14159265358979323846f;
 static constexpr uint32_t WIDTH = 512;
 static constexpr uint32_t HEIGHT = 512;
 
-static constexpr float ZOOM_SPEED = 10.0f;
+static constexpr float PAN_SPEED = 0.01f;
+static constexpr float ZOOM_SPEED = 0.5f;
 
 enum class MouseAction
 {
@@ -63,7 +64,7 @@ void cursorPositionCallback(GLFWwindow* window, double xpos, double ypos)
         }
         else if (gMouseAction == MouseAction::MiddlePressed)
         {
-            gCamera->pan(deltaX, deltaY);
+            gCamera->pan(deltaX * PAN_SPEED, deltaY * PAN_SPEED);
         }
 
         alpine::resetAccumulation();
@@ -121,6 +122,7 @@ int main(int argc, char* argv[])
         glfwPollEvents();
 
         alpine::render(1);
+        alpine::resolve(false);
 
         glRasterPos2i(-1, 1);
         glPixelZoom(1.0f, -1.0f);
