@@ -291,6 +291,8 @@ GltfLoader::appendVertexBuffer(
     const auto& buf = mSrcModel.buffers[bufView.buffer];
     const auto* values = reinterpret_cast<const T*>(&buf.data[bufView.byteOffset + acc.byteOffset]);
 
+    assert(acc.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
+
     for (uint32_t i = 0; i < acc.count; ++i)
     {
         dst.emplace_back(values[i]);
@@ -335,16 +337,32 @@ GltfLoader::appendTangentBuffer(
 std::size_t
 GltfLoader::appendIndexBuffer(std::vector<uint3>& dst, const tinygltf::Primitive& srcPrim) const
 {
+    const auto append = [&](const auto& values, std::size_t primCount) {
+        for (uint32_t i = 0; i < primCount; ++i)
+        {
+            const auto* v = &values[3 * i];
+            dst.emplace_back(uint3(v[0], v[1], v[2]));
+        }
+    };
+
     const auto& acc = mSrcModel.accessors[srcPrim.indices];
     const auto& bufView = mSrcModel.bufferViews[acc.bufferView];
     const auto& buf = mSrcModel.buffers[bufView.buffer];
-    const auto* values = reinterpret_cast<const uint16_t*>(&buf.data[bufView.byteOffset + acc.byteOffset]);
 
     std::size_t primCount = acc.count / 3;
-    for (uint32_t i = 0; i < primCount; ++i)
+
+    if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
     {
-        const auto* v = &values[3 * i];
-        dst.emplace_back(uint3(v[0], v[1], v[2]));
+        const auto* values =
+            reinterpret_cast<const uint32_t*>(&buf.data[bufView.byteOffset + acc.byteOffset]);
+        append(values, primCount);
+    }
+    else
+    {
+        assert(acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT);
+        const auto* values =
+            reinterpret_cast<const uint16_t*>(&buf.data[bufView.byteOffset + acc.byteOffset]);
+        append(values, primCount);
     }
 
     return primCount;
