@@ -68,10 +68,6 @@
       <AdditionalLibraryDirectories>$(TargetDir)</AdditionalLibraryDirectories>
       <AdditionalDependencies>alpine.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <PostBuildEvent>
-      <Command>
-      </Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -93,10 +89,6 @@
       <AdditionalLibraryDirectories>$(TargetDir)</AdditionalLibraryDirectories>
       <AdditionalDependencies>alpine.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <PostBuildEvent>
-      <Command>
-      </Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
