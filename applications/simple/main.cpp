@@ -46,6 +46,7 @@ main(int argc, char* argv[])
     camera->setLookAt(eye, target, up, fovy, aspect);
 
     alpine::render(spp);
+    alpine::resolve(false);
 
     alpine::saveImage(imageFilename);
 

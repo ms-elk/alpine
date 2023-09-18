@@ -122,7 +122,7 @@ int main(int argc, char* argv[])
         glfwPollEvents();
 
         alpine::render(1);
-        alpine::resolve(true);
+        alpine::resolve(false);
 
         glRasterPos2i(-1, 1);
         glPixelZoom(1.0f, -1.0f);
