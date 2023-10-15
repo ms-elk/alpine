@@ -31,11 +31,7 @@
 *.out
 *.app
 
-# VS
-*.user
-
 # Folders
-.vs/
 bin/
 build/
 ext/
