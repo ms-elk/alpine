@@ -7,6 +7,3 @@
 [submodule "ext/tinygltf"]
 	path = ext/tinygltf
 	url = https://github.com/syoyo/tinygltf.git
-[submodule "ext/fpng"]
-	path = ext/fpng
-	url = git@github.com:richgel999/fpng.git

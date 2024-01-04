@@ -25,6 +25,5 @@ add_compile_options(/WX)
 add_subdirectory(src)
 
 # applications
-add_subdirectory(applications/rtcamp9)
 add_subdirectory(applications/simple)
 add_subdirectory(applications/viewer)
