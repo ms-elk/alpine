@@ -80,7 +80,7 @@ void scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 
 int main(int argc, char* argv[])
 {
-    if (!glfwInit())
+    if (argc < 2 || !glfwInit())
     {
         return 1;
     }
