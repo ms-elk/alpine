@@ -1,11 +1,11 @@
 add_executable(viewer main.cpp)
 
 target_include_directories(viewer PRIVATE
-  ${PROJECT_SOURCE_DIR}/ext/glfw/include
+  ../../ext/glfw/include
 )
 
 target_link_directories(viewer PRIVATE
-  ${PROJECT_SOURCE_DIR}/ext/glfw/lib-vc2022
+  ../../ext/glfw/lib-vc2022
 )
 
 target_link_libraries(viewer
