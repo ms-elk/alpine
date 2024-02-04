@@ -11,7 +11,7 @@ set(CMAKE_SUPPRESS_REGENERATION true)
 
 add_compile_options(/WX)
 
-option(ALPINE_BUILD_APPS "build applications of alpine" ON)
+option(ALPINE_BUILD_APPS "build applications of alpine" OFF)
 
 if (ALPINE_BUILD_APPS)
   # set directory for output executables
