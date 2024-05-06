@@ -80,8 +80,15 @@ void scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 
 int main(int argc, char* argv[])
 {
-    if (argc < 2 || !glfwInit())
+    if (argc < 2)
     {
+        printf("ERROR: invalid input parameters\n");
+        return 1;
+    }
+
+    if (!glfwInit())
+    {
+        printf("ERROR: failed to initialize GLFW\n");
         return 1;
     }
 
@@ -104,15 +111,21 @@ int main(int argc, char* argv[])
 
     const uint32_t maxDepth = 8;
     alpine::initialize(WIDTH, HEIGHT, maxDepth);
-    gCamera = alpine::getCamera();
 
-    const float eye[] = { 0.0f, 0.0f, -5.0f };
+    const float eye[] = { 0.0f, 0.0f, -3.0f };
     const float target[] = { 0.0f, 0.0f, 0.0f };
     const float up[] = { 0.0f, 1.0f, 0.0f };
-    alpine::addDebugScene();
+
+    bool loaded = alpine::load(argv[1], alpine::FileType::GLTF);
+    if (!loaded)
+    {
+        printf("ERROR: failed to load %s\n", argv[1]);
+        return 1;
+    }
 
     const float fovy = PI / 2.0f;
     float aspect = float(WIDTH) / float(HEIGHT);
+    gCamera = alpine::getCamera();
     gCamera->setLookAt(eye, target, up, fovy, aspect);
 
     const void* pixels = alpine::getFrameBuffer();
