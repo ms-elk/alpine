@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include "shape.h"
-#include "vector.h"
+#include "math/vector.h"
 
 #include <memory>
 #include <vector>

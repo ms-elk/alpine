@@ -1,10 +1,10 @@
 #include "file_loader.h"
 
-#include "matrix.h"
-#include "matte.h"
-#include "mesh.h"
-#include "metal.h"
-#include "scene.h"
+#include "materials/matte.h"
+#include "materials/metal.h"
+#include "math/matrix.h"
+#include "scenes/scene.h"
+#include "shapes/mesh.h"
 #include "texture.h"
 
 #pragma warning(push)

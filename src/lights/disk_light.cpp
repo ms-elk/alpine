@@ -1,6 +1,6 @@
 #include "disk_light.h"
 
-#include "shape.h"
+#include "shapes/shape.h"
 #include "util.h"
 
 namespace alpine {

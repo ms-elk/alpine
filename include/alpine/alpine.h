@@ -1,7 +1,7 @@
 ﻿#pragma once
 
-#include <i_camera.h>
-#include <i_light.h>
+#include <alpine/camera.h>
+#include <alpine/light.h>
 
 #include <stdint.h>
 #include <string_view>
@@ -15,13 +15,13 @@ enum class FileType {
 };
 bool load(std::string_view filename, FileType fileType);
 
-ILight* addPointLight(const float intensity[3], const float position[3]);
+api::Light* addPointLight(const float intensity[3], const float position[3]);
 
-ILight* addDiskLight(const float emission[3], const float position[3], float radius);
+api::Light* addDiskLight(const float emission[3], const float position[3], float radius);
 
 void setBackgroundColor(float r, float g, float b);
 
-ICamera* getCamera();
+api::Camera* getCamera();
 
 // Render
 void resetAccumulation();

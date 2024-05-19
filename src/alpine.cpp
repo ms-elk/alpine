@@ -1,18 +1,18 @@
-﻿#include <alpine.h>
+﻿#include <alpine/alpine.h>
 
 #include "camera.h"
-#include "debug_scene.h"
-#include "disk_light.h"
-#include "file_loader.h"
 #include "image.h"
-#include "kernel.h"
-#include "material.h"
-#include "mesh.h"
-#include "point_light.h"
+#include "kernel/kernel.h"
+#include "lights/disk_light.h"
+#include "lights/point_light.h"
+#include "loaders/file_loader.h"
+#include "materials/material.h"
 #include "ray.h"
-#include "scene.h"
 #include "sampler.h"
-#include "sphere.h"
+#include "scenes/debug_scene.h"
+#include "scenes/scene.h"
+#include "shapes/mesh.h"
+#include "shapes/sphere.h"
 #include "util.h"
 
 #include <OpenImageDenoise/oidn.hpp>
@@ -43,7 +43,7 @@ public:
         mBackgroundColor = float3(r, g, b);
     }
 
-    inline ICamera* getCamera() { return &mCamera; }
+    inline api::Camera* getCamera() { return &mCamera; }
 
     inline const void* getFrameBuffer() const { return mFrameBuffer.data(); }
 
@@ -51,9 +51,9 @@ public:
 
     bool load(std::string_view filename, FileType fileType);
 
-    ILight* addPointLight(const float intensity[3], const float position[3]);
+    api::Light* addPointLight(const float intensity[3], const float position[3]);
 
-    ILight* addDiskLight(const float emission[3], const float position[3], float radius);
+    api::Light* addDiskLight(const float emission[3], const float position[3], float radius);
 
     void resetAccumulation();
 
@@ -157,14 +157,14 @@ Alpine::load(std::string_view filename, FileType fileType)
     return true;
 }
 
-ILight*
+api::Light*
 Alpine::addPointLight(const float intensity[3], const float position[3])
 {
     mScene.lights.push_back(std::make_shared<PointLight>(float3(intensity), float3(position)));
     return mScene.lights.back().get();
 }
 
-ILight*
+api::Light*
 Alpine::addDiskLight(const float emission[3], const float position[3], float radius)
 {
     mScene.lights.push_back(std::make_shared<DiskLight>(
@@ -416,13 +416,13 @@ load(std::string_view filename, FileType fileType)
     return Alpine::getInstance().load(filename, fileType);
 }
 
-ILight*
+api::Light*
 addPointLight(const float intensity[3], const float position[3])
 {
     return Alpine::getInstance().addPointLight(intensity, position);
 }
 
-ILight*
+api::Light*
 addDiskLight(const float emission[3], const float position[3], float radius)
 {
     return Alpine::getInstance().addDiskLight(emission, position, radius);
@@ -434,7 +434,7 @@ setBackgroundColor(float r, float g, float b)
     Alpine::getInstance().setBackgroundColor(r, g, b);
 }
 
-ICamera*
+api::Camera*
 getCamera()
 {
     return Alpine::getInstance().getCamera();

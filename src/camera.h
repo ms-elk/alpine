@@ -1,14 +1,14 @@
 ﻿#pragma once
 
-#include "matrix.h"
-#include "vector.h"
+#include "math/matrix.h"
+#include "math/vector.h"
 
-#include <i_camera.h>
+#include <alpine/camera.h>
 
 namespace alpine {
 struct Ray;
 
-class Camera : public ICamera
+class Camera : public api::Camera
 {
 public:
     Camera() {};

@@ -1,4 +1,4 @@
-﻿#include <alpine.h>
+﻿#include <alpine/alpine.h>
 
 #include <GLFW/glfw3.h>
 #include <GL/gl.h>
@@ -19,7 +19,7 @@ enum class MouseAction
 } gMouseAction = MouseAction::Released;
 float gMousePos[2] = { 0.0f };
 
-alpine::ICamera* gCamera = nullptr;
+alpine::api::Camera* gCamera = nullptr;
 
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 {

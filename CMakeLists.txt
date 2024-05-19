@@ -25,43 +25,85 @@ if (ALPINE_BUILD_APPS)
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/bin/Release)
 endif()
 
-add_library(alpine STATIC
+set(SOURCES
   src/alpine.cpp
   src/camera.cpp
   src/camera.h
-  src/debug_scene.cpp
-  src/debug_scene.h
-  src/disk_light.cpp
-  src/disk_light.h
-  src/embree.cpp
-  src/file_loader.h
-  src/gltf_loader.cpp
-  src/image.cpp
-  src/image.h
-  src/kernel.h
-  src/light.h
-  src/material.h
-  src/matrix.h
-  src/matte.cpp
-  src/matte.h
-  src/mesh.cpp
-  src/mesh.h
-  src/metal.cpp
-  src/metal.h
-  src/obj_loader.cpp
-  src/point_light.cpp
-  src/point_light.h
-  src/ray.h
   src/sampler.cpp
   src/sampler.h
-  src/scene.h
-  src/shape.h
-  src/sphere.cpp
-  src/sphere.h
+  src/image.cpp
+  src/image.h
+  src/ray.h
   src/texture.h
   src/util.cpp
   src/util.h
-  src/vector.h
+)
+
+set(KERNEL
+  src/kernel/kernel.h
+  src/kernel/embree.cpp
+)
+
+set(LIGHTS
+  src/lights/disk_light.cpp
+  src/lights/disk_light.h
+  src/lights/light.h
+  src/lights/point_light.cpp
+  src/lights/point_light.h
+)
+
+set(LOADERS
+  src/loaders/file_loader.h
+  src/loaders/gltf_loader.cpp
+  src/loaders/obj_loader.cpp
+)
+
+set(MATERIALS
+  src/materials/matte.cpp
+  src/materials/matte.h
+  src/materials/material.h
+  src/materials/metal.cpp
+  src/materials/metal.h
+)
+
+set(MATH
+  src/math/matrix.h
+  src/math/vector.h
+)
+
+set(SCENE
+  src/scenes/debug_scene.cpp
+  src/scenes/debug_scene.h
+  src/scenes/scene.h
+)
+
+set(SHAPES
+  src/shapes/mesh.cpp
+  src/shapes/mesh.h
+  src/shapes/shape.h
+  src/shapes/sphere.cpp
+  src/shapes/sphere.h
+)
+
+source_group("" FILES ${SOURCES})
+source_group("kernel" FILES ${KERNEL})
+source_group("lights" FILES ${LIGHTS})
+source_group("loaders" FILES ${LOADERS})
+source_group("materials" FILES ${MATERIALS})
+source_group("math" FILES ${MATH})
+source_group("scene" FILES ${SCENE})
+source_group("shapes" FILES ${SHAPES})
+
+add_library(alpine STATIC
+  ${SOURCES}
+  ${KERNEL}
+  ${LIGHTS}
+  ${LOADERS}
+  ${MATERIALS}
+  ${MATH}
+  ${SCENE}
+  ${SHAPES}
+  ${UTILS}
 )
 
 target_include_directories(alpine
@@ -71,6 +113,7 @@ target_include_directories(alpine
   PRIVATE
     ext/embree/include
     ext/oidn/include
+    src
 )
 
 target_link_directories(alpine PUBLIC

@@ -1,7 +1,7 @@
 #pragma once
 
-namespace alpine {
-class ILight
+namespace alpine::api {
+class Light
 {
 public:
     virtual void enable(bool enabled) = 0;
