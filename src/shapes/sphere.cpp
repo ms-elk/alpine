@@ -1,6 +1,6 @@
 ﻿#include "sphere.h"
 
-#include "kernel.h"
+#include "kernel/kernel.h"
 #include "ray.h"
 
 namespace alpine {
