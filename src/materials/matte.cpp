@@ -1,7 +1,7 @@
 ﻿#include "matte.h"
 
 #include "sampler.h"
-#include "shape.h"
+#include "shapes/shape.h"
 #include "util.h"
 
 namespace alpine {

@@ -1,13 +1,13 @@
 #pragma once
 
-#include "vector.h"
+#include "math/vector.h"
 
-#include <i_light.h>
+#include <alpine/light.h>
 
 namespace alpine {
 struct IntersectionAttributes;
 
-class Light : public ILight
+class Light : public api::Light
 {
 public:
     Light() = default;

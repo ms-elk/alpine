@@ -7,7 +7,6 @@
 - CMake 3.26
 - OpenGL 4.6 (optional for [viewer](#viewer))
 
-
 ## Build
 1. Download the libraries below, and put them into the `ext` directory
     - [Intel Embree 3.13.5](https://www.embree.org/)
@@ -39,4 +38,4 @@ viewer input.glb
 The camera can be manipulated by a mouse.  
 `Left Drag`: Rotate  
 `Middle Drag`: Pan  
-`Middle Wheel`: Zoom
+`Middle Wheel`: Zoom  

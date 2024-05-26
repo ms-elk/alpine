@@ -1,7 +1,7 @@
 ﻿#include "mesh.h"
 
-#include "kernel.h"
-#include "material.h"
+#include "kernel/kernel.h"
+#include "materials/material.h"
 #include "ray.h"
 #include "texture.h"
 

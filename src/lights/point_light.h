@@ -1,7 +1,7 @@
 #pragma once
 
 #include "light.h"
-#include "vector.h"
+#include "math/vector.h"
 
 namespace alpine {
 struct IntersectionAttributes;
