@@ -103,7 +103,6 @@ add_library(alpine STATIC
   ${MATH}
   ${SCENE}
   ${SHAPES}
-  ${UTILS}
 )
 
 target_include_directories(alpine
