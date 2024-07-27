@@ -37,6 +37,8 @@ public:
 
     virtual float3 getPower() const = 0;
 
+    float3 getPosition() const { return mPosition; }
+
 protected:
     bool mEnabled = true;
     float3 mPosition;

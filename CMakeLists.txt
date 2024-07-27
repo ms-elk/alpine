@@ -48,6 +48,8 @@ set(LIGHTS
   src/lights/disk_light.cpp
   src/lights/disk_light.h
   src/lights/light.h
+  src/lights/lightcuts.cpp
+  src/lights/lightcuts.h
   src/lights/point_light.cpp
   src/lights/point_light.h
 )
