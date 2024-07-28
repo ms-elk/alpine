@@ -41,7 +41,8 @@ splitLightCluster(const std::vector<PointLight*>& lightCluster, const BoundingBo
         for (uint8_t splitIdx = 0; splitIdx < SPLITS_PER_DIM; ++splitIdx)
         {
             static constexpr float normalizer = 1.0f / static_cast<float>(SPLITS_PER_DIM + 1);
-            float splitPoint = bbox.min[dim] + bbox.max[dim] * static_cast<float>(splitIdx + 1) * normalizer;
+            float t = static_cast<float>(splitIdx + 1) * normalizer;
+            float splitPoint = bbox.min[dim] * (1.0f - t) + bbox.max[dim] * t;
 
             struct Metric
             {
