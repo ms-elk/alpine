@@ -2,8 +2,6 @@
 
 #include "vector.h"
 
-#include <cassert>
-
 namespace alpine {
 template <typename T>
 class Matrix3x3

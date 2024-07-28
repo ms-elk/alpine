@@ -4,10 +4,12 @@
 #include "point_light.h"
 
 #include <algorithm>
+#include <assert.h>
 #include <memory>
 #include <vector>
 
 namespace alpine {
+static constexpr uint8_t SPLITS_PER_DIM = 4;
 struct BoundingBox
 {
     float3 min = std::numeric_limits<float>::max();
@@ -24,104 +26,96 @@ struct LightNode
 
 struct Split
 {
-    uint32_t idx = 0;
-    float intensity[2] = { 0.0f, 0.0f };
-    BoundingBox bbox[2];
+    uint8_t dim = 0;
+    float point = 0.0f;
 };
 
 Split
-splitLightCluster(std::vector<PointLight*>* lightCluster, const BoundingBox& bbox)
+splitLightCluster(const std::vector<PointLight*>& lightCluster, const BoundingBox& bbox)
 {
-    uint8_t major = [&]() {
-        float3 length = bbox.max - bbox.min;
-        if (length.x >= length.y)
-        {
-            return length.x >= length.z ? 0 : 2;
-        }
-        else
-        {
-            return length.y >= length.z ? 1 : 2;
-        }
-    }();
-
-    std::sort(lightCluster->begin(), lightCluster->end(), [major](const auto* l0, const auto* l1) {
-        return l0->getPosition()[major] < l1->getPosition()[major];
-     });
-
-    struct Metric
-    {
-        float intensity = 0.0f;
-        BoundingBox bbox;
-
-        float evaluate() const { return intensity + dot(bbox.max-bbox.min, bbox.max - bbox.min); };
-    };
-
-    Split s;
+    Split split;
     float minMetric = std::numeric_limits<float>::max();
-    for (uint32_t idx = 1; idx < lightCluster->size() - 1; ++idx)
-    {
-        const auto computeMetric = [&](size_t begin, size_t end) {
-            Metric m;
 
-            for (size_t i = begin; i < end; ++i)
+    for (uint8_t dim = 0; dim < 3; ++dim)
+    {
+        for (uint8_t splitIdx = 0; splitIdx < SPLITS_PER_DIM; ++splitIdx)
+        {
+            static constexpr float normalizer = 1.0f / static_cast<float>(SPLITS_PER_DIM + 1);
+            float splitPoint = bbox.min[dim] + bbox.max[dim] * static_cast<float>(splitIdx + 1) * normalizer;
+
+            struct Metric
             {
-                const auto* l = (*lightCluster)[i];
+                float intensity = 0.0f;
+                BoundingBox bbox;
+
+                float evaluate() const {
+                    return intensity + dot(bbox.max - bbox.min, bbox.max - bbox.min); };
+            };
+            Metric metric[2];
+
+            for (const auto* l : lightCluster)
+            {
+                float3 p = l->getPosition();
+                uint8_t metricIdx = p[dim] < splitPoint ? 0 : 1;
+                auto& m = metric[metricIdx];
 
                 // TODO: use power?
                 m.intensity += length(l->getPower());
-
-                float3 position = l->getPosition();
-                m.bbox.min = min(position, m.bbox.min);
-                m.bbox.max = max(position, m.bbox.max);
+                m.bbox.min = min(p, m.bbox.min);
+                m.bbox.max = max(p, m.bbox.max);
             }
 
-            return m;
-        };
-
-        Metric m[2] = { computeMetric(0, idx), computeMetric(idx, lightCluster->size()) };
-        float metricValue = m[0].evaluate() + m[1].evaluate();
-
-        if (metricValue < minMetric)
-        {
-            minMetric = metricValue;
-
-            s.idx = idx;
-            for (int i = 0; i < 2; ++i)
+            float metricValue = metric[0].evaluate() + metric[1].evaluate();
+            if (metricValue < minMetric)
             {
-                s.intensity[i] = m[i].intensity;
-                s.bbox[i] = m[i].bbox;
+                minMetric = metricValue;
+                split.dim = dim;
+                split.point = splitPoint;
             }
         }
     }
 
-    return s;
+    return split;
 }
 
 std::shared_ptr<LightNode>
-createLightNode(std::vector<PointLight*>* lightCluster, float intensity, const BoundingBox& bbox)
+createLightNode(const std::vector<PointLight*>& lightCluster)
 {
     auto lightNode = std::make_shared<LightNode>();
-    lightNode->intensity = intensity;
-    lightNode->bbox = bbox;
-
-    if (lightCluster->size() == 1)
+    for (const auto* l : lightCluster)
     {
-        lightNode->point = (*lightCluster)[0];
+        // TODO: use power?
+        lightNode->intensity += length(l->getPower());
+
+        float3 position = l->getPosition();
+        lightNode->bbox.min = min(position, lightNode->bbox.min);
+        lightNode->bbox.max = max(position, lightNode->bbox.max);
+    }
+
+    if (lightCluster.size() == 1)
+    {
+        lightNode->point = lightCluster[0];
     }
     else
     {
-        auto split = splitLightCluster(lightCluster, bbox);
+        auto split = splitLightCluster(lightCluster, lightNode->bbox);
 
-        std::vector<PointLight*> clusters[2] = {
-            std::vector<PointLight*>(lightCluster->begin(), lightCluster->begin() + split.idx),
-            std::vector<PointLight*>(lightCluster->begin() + split.idx, lightCluster->end())
-        };
+        std::vector<PointLight*> subClusters[2];
+        subClusters[0].reserve(lightCluster.size());
+        subClusters[1].reserve(lightCluster.size());
 
-        for (uint32_t i = 0; i < 2; ++i)
+        for (auto* l : lightCluster)
         {
-            lightNode->children[i] = createLightNode(
-                &clusters[i], split.intensity[i], split.bbox[i]);
+            float3 p = l->getPosition();
+            uint8_t scIdx = p[split.dim] < split.point ? 0 : 1;
+            subClusters[scIdx].push_back(l);
         }
+
+        assert(!subClusters[0].empty());
+        assert(!subClusters[1].empty());
+
+        lightNode->children[0] = createLightNode(subClusters[0]);
+        lightNode->children[1] = createLightNode(subClusters[1]);
     }
 
     return lightNode;
@@ -135,20 +129,6 @@ buildLightTree(const std::vector<PointLight*>& lights)
         return nullptr;
     }
 
-    std::vector<PointLight*> lightCluster = lights;
-
-    float intensity = 0;
-    BoundingBox bbox;
-    for (const auto* l : lightCluster)
-    {
-        // TODO: use power?
-        intensity += length(l->getPower());
-
-        float3 position = l->getPosition();
-        bbox.min = min(position, bbox.min);
-        bbox.max = max(position, bbox.max);
-    }
-
-    return createLightNode(&lightCluster, intensity, bbox);
+    return createLightNode(lights);
 }
 }
