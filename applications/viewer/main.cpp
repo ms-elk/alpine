@@ -73,7 +73,7 @@ void cursorPositionCallback(GLFWwindow* window, double xpos, double ypos)
 
 void scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
-    float zoom = static_cast<float>(yoffset) * ZOOM_SPEED;
+    float zoom = -static_cast<float>(yoffset) * ZOOM_SPEED;
     gCamera->zoom(zoom);
     alpine::resetAccumulation();
 }
