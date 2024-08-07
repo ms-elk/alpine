@@ -35,12 +35,14 @@ main(int argc, char* argv[])
     alpine::setBackgroundColor(0.0f, 0.0f, 0.0f);
     alpine::addDiskLight(emisssion, lightPos, lightRadius);
 
-    bool loaded = alpine::load(objFilename, alpine::FileType::OBJ);
+    bool loaded = alpine::load(objFilename, alpine::FileType::Obj);
     if (!loaded)
     {
         printf("ERROR: failed to load %s\n", objFilename);
         return 1;
     }
+
+    alpine::buildLightSampler(alpine::LightSamplerType::Uniform);
 
     auto* camera = alpine::getCamera();
     camera->setLookAt(eye, target, up, fovy, aspect);

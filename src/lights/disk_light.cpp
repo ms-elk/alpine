@@ -1,7 +1,7 @@
 #include "disk_light.h"
 
 #include "shapes/shape.h"
-#include "util.h"
+#include "utils/util.h"
 
 namespace alpine {
 DiskLight::DiskLight(const float3& emission, const float3& position, const float3& normal, float radius)

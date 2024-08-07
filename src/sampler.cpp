@@ -1,11 +1,9 @@
 ﻿#include "sampler.h"
 
-#include "util.h"
+#include "utils/util.h"
 #include <algorithm>
 
 namespace alpine {
-static constexpr float ONE_MINUS_EPSILON = 1.0f - std::numeric_limits<float>::epsilon();
-
 void
 Sampler::reset(uint32_t seed)
 {

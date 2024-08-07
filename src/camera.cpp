@@ -2,7 +2,7 @@
 
 #include "math/vector.h"
 #include "ray.h"
-#include "util.h"
+#include "utils/util.h"
 
 #include <algorithm>
 
