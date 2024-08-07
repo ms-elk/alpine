@@ -3,6 +3,9 @@
 #include "camera.h"
 #include "image.h"
 #include "kernel/kernel.h"
+#include "light_samplers/light_sampler.h"
+#include "light_samplers/power_light_sampler.h"
+#include "light_samplers/uniform_light_sampler.h"
 #include "lights/disk_light.h"
 #include "lights/point_light.h"
 #include "loaders/file_loader.h"
@@ -13,7 +16,7 @@
 #include "scenes/scene.h"
 #include "shapes/mesh.h"
 #include "shapes/sphere.h"
-#include "util.h"
+#include "utils/util.h"
 
 #include <OpenImageDenoise/oidn.hpp>
 
@@ -55,6 +58,8 @@ public:
 
     api::Light* addDiskLight(const float emission[3], const float position[3], float radius);
 
+    void buildLightSampler(LightSamplerType lightSamplerType);
+
     void resetAccumulation();
 
     void render(uint32_t spp);
@@ -74,8 +79,6 @@ private:
 
     float3 estimateDirectIllumination(Sampler& sampler, const float3& hit,
         const float3& wo, const IntersectionAttributes& isectAttr) const;
-
-    const std::pair<Light*, std::size_t /* count */> selectLight(float u) const;
 
 private:
     uint32_t mWidth = 0;
@@ -104,6 +107,8 @@ private:
     Scene mScene;
 
     Camera mCamera;
+
+    std::unique_ptr<LightSampler> mLightSampler;
 
     oidn::DeviceRef mDenoiser;
 };
@@ -138,9 +143,9 @@ Alpine::load(std::string_view filename, FileType fileType)
     const auto load = [&]() {
         switch (fileType)
         {
-        case FileType::GLTF:
+        case FileType::Gltf:
             return loadGltf(&mScene, filename);
-        case FileType::OBJ:
+        case FileType::Obj:
             return loadObj(&mScene, filename);
         default:
             return false;
@@ -170,6 +175,21 @@ Alpine::addDiskLight(const float emission[3], const float position[3], float rad
     mScene.lights.push_back(std::make_shared<DiskLight>(
         float3(emission), float3(position), normalize(float3(0.0, -1.0f, 0.0f)), radius));
     return mScene.lights.back().get();
+}
+
+void
+Alpine::buildLightSampler(LightSamplerType lightSamplerType)
+{
+    switch (lightSamplerType)
+    {
+    case LightSamplerType::Power:
+        mLightSampler = std::make_unique<PowerLightSampler>(mScene.lights);
+        break;
+    case LightSamplerType::Uniform:
+    default:
+        mLightSampler = std::make_unique<UniformLightSampler>(mScene.lights);
+        break;
+    }
 }
 
 void
@@ -277,9 +297,14 @@ Alpine::estimateDirectIllumination(
 {
     float3 radiance(0.0f);
 
-    const auto [light, lightCount] = selectLight(sampler.get1D());
+    if (!mLightSampler)
+    {
+        return radiance;
+    }
 
-    if (lightCount == 0)
+    const auto lss = mLightSampler->sample(sampler.get1D());
+
+    if (lss.pdf == 0.0)
     {
         return radiance;
     }
@@ -293,7 +318,7 @@ Alpine::estimateDirectIllumination(
     };
 
     // Light sampling
-    auto ls = light->sample(sampler.get2D(), hit);
+    auto ls = lss.light->sample(sampler.get2D(), hit);
     if (ls.pdf > 0.0f)
     {
         float3 wi = toLocal(ls.wiWorld, isectAttr.ss, isectAttr.ts, isectAttr.ns);
@@ -312,47 +337,16 @@ Alpine::estimateDirectIllumination(
     if (ms.pdf > 0.0f)
     {
         float3 lightDir = toWorld(ms.wi, isectAttr.ss, isectAttr.ts, isectAttr.ns);
-        auto [lightPdf, lightDist] = light->computePdf(hit, lightDir);
+        auto [lightPdf, lightDist] = lss.light->computePdf(hit, lightDir);
         if (lightPdf > 0.0f && !isOccluded(hit, isectAttr.ns, lightDir, lightDist))
         {
-            float3 emission = light->getEmission();
+            float3 emission = lss.light->getEmission();
             float misWeight = powerHeuristic(1, ms.pdf, 1, lightPdf);
             radiance += emission * misWeight * ms.estimator;
         }
     }
 
-    return radiance * static_cast<float>(lightCount);
-}
-
-const std::pair<Light*, std::size_t /* count */>
-Alpine::selectLight(float u) const
-{
-    std::size_t lightCount = std::count_if(mScene.lights.begin(), mScene.lights.end(),
-        [](const auto& l) { return l->isEnabled(); });
-    if (lightCount == 0)
-    {
-        return { nullptr, 0 };
-    }
-
-    std::size_t lightIdx = static_cast<std::size_t>(u * lightCount);
-    lightIdx = std::min(lightIdx, lightCount - 1);
-
-    Light* light = nullptr;
-    std::size_t currentIdx = 0;
-    for (auto& l : mScene.lights)
-    {
-        if (l->isEnabled())
-        {
-            if (currentIdx == lightIdx)
-            {
-                light = l.get();
-            }
-            currentIdx++;
-        }
-    }
-
-    assert(light);
-    return { light, lightCount };
+    return radiance / lss.pdf;
 }
 
 void
@@ -426,6 +420,12 @@ api::Light*
 addDiskLight(const float emission[3], const float position[3], float radius)
 {
     return Alpine::getInstance().addDiskLight(emission, position, radius);
+}
+
+void
+buildLightSampler(LightSamplerType lightSamplerType)
+{
+    Alpine::getInstance().buildLightSampler(lightSamplerType);
 }
 
 void

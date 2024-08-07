@@ -35,13 +35,19 @@ set(SOURCES
   src/image.h
   src/ray.h
   src/texture.h
-  src/util.cpp
-  src/util.h
 )
 
 set(KERNEL
   src/kernel/kernel.h
   src/kernel/embree.cpp
+)
+
+set(LIGHT_SAMPLERS
+  src/light_samplers/light_sampler.h
+  src/light_samplers/power_light_sampler.cpp
+  src/light_samplers/power_light_sampler.h
+  src/light_samplers/uniform_light_sampler.cpp
+  src/light_samplers/uniform_light_sampler.h
 )
 
 set(LIGHTS
@@ -85,24 +91,35 @@ set(SHAPES
   src/shapes/sphere.h
 )
 
+set(UTILS
+  src/utils/alias_table.cpp
+  src/utils/alias_table.h
+  src/utils/util.cpp
+  src/utils/util.h
+)
+
 source_group("" FILES ${SOURCES})
 source_group("kernel" FILES ${KERNEL})
+source_group("light_samplers" FILES ${LIGHT_SAMPLERS})
 source_group("lights" FILES ${LIGHTS})
 source_group("loaders" FILES ${LOADERS})
 source_group("materials" FILES ${MATERIALS})
 source_group("math" FILES ${MATH})
 source_group("scene" FILES ${SCENE})
 source_group("shapes" FILES ${SHAPES})
+source_group("utils" FILES ${UTILS})
 
 add_library(alpine STATIC
   ${SOURCES}
   ${KERNEL}
+  ${LIGHT_SAMPLERS}
   ${LIGHTS}
   ${LOADERS}
   ${MATERIALS}
   ${MATH}
   ${SCENE}
   ${SHAPES}
+  ${UTILS}
 )
 
 target_include_directories(alpine

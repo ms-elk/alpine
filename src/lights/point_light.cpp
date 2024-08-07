@@ -1,6 +1,6 @@
 #include "point_light.h"
 
-#include "util.h"
+#include "utils/util.h"
 
 namespace alpine {
 PointLight::PointLight(const float3& intensity, const float3& position)

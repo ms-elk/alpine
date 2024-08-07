@@ -1,4 +1,4 @@
-﻿#include <alpine/alpine.h>
+#include <alpine/alpine.h>
 
 #include <GLFW/glfw3.h>
 #include <GL/gl.h>
@@ -116,12 +116,14 @@ int main(int argc, char* argv[])
     const float target[] = { 0.0f, 0.0f, 0.0f };
     const float up[] = { 0.0f, 1.0f, 0.0f };
 
-    bool loaded = alpine::load(argv[1], alpine::FileType::GLTF);
+    bool loaded = alpine::load(argv[1], alpine::FileType::Gltf);
     if (!loaded)
     {
         printf("ERROR: failed to load %s\n", argv[1]);
         return 1;
     }
+
+    alpine::buildLightSampler(alpine::LightSamplerType::Power);
 
     const float fovy = PI / 2.0f;
     float aspect = float(WIDTH) / float(HEIGHT);
