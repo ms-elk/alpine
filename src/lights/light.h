@@ -18,7 +18,7 @@ public:
     void setScale(float scale) override { mScale = scale; }
 
     struct Sample {
-        float3 emission;
+        float3 emittedRadiance;
         float3 wiWorld;
         float distance;
         float pdf;
@@ -29,9 +29,11 @@ public:
     virtual std::pair<float /* pdf */, float /* distance */>
         computePdf(const float3& hit, const float3& wiWorld) const = 0;
 
-    virtual float3 getEmission() const = 0;
+    virtual float3 getEmittedRadiance() const = 0;
 
     virtual float3 getPower() const = 0;
+
+    virtual bool isDelta() const = 0;
 
 protected:
     float3 mPosition;

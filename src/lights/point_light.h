@@ -10,6 +10,7 @@ class PointLight : public Light
 {
 public:
     PointLight(const float3& intensity, const float3& position);
+    PointLight(float power, const float3& color, const float3& position);
 
     Sample sample(const float2& u, const float3& hit) const override;
 
@@ -19,11 +20,14 @@ public:
         return { 0.0f, 0.0f };
     }
 
-    float3 getEmission() const override { return 0.0f; }
+    float3 getEmittedRadiance() const override { return 0.0f; }
 
-    float3 getPower() const override;
+    float3 getPower() const override { return mPower * mScale; }
+
+    bool isDelta() const override { return true; }
 
 private:
     float3 mIntensity;
+    float3 mPower;
 };
 }
