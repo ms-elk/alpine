@@ -12,7 +12,8 @@ public:
     LightSampler() = default;
     virtual ~LightSampler() = default;
 
-    struct Sample {
+    struct Sample
+    {
         Light* light = nullptr;
         float pdf;
     };

@@ -4,15 +4,17 @@
 #include "utils/util.h"
 
 namespace alpine {
-DiskLight::DiskLight(const float3& emission, const float3& position, const float3& normal, float radius)
-    : mEmission(emission), mNormal(normal), mRadius(radius)
+DiskLight::DiskLight(
+    float power, const float3& color, const float3& position, const float3& normal, float radius)
+    : mPower(color * power), mNormal(normal), mRadius(radius)
 {
     mPosition = position;
     std::tie(mBinormal, mTangent) = getBasis(mNormal);
     mArea = mRadius * mRadius * PI;
+    mEmittedRadiance = mPower / (mArea * PI);
 }
 
-DiskLight::Sample
+Light::Sample
 DiskLight::sample(const float2& u, const float3& hit) const
 {
     float2 diskSample = sampleConcentricDisk(u);
@@ -34,7 +36,7 @@ DiskLight::sample(const float2& u, const float3& hit) const
 
     float pdf = (distance * distance) / (mArea * cosTerm);
 
-    return { mEmission * mScale, wiWorld, distance, pdf };
+    return { mEmittedRadiance * mScale, wiWorld, distance, pdf };
 }
 
 std::pair<float /* pdf */, float /* distance */>
@@ -63,11 +65,5 @@ DiskLight::computePdf(const float3& hit, const float3& wiWorld) const
     {
         return { 0.0f, 0.0f };
     }
-}
-
-float3
-DiskLight::getPower() const
-{
-    return mEmission * mArea * PI * mScale;
 }
 }

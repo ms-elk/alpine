@@ -22,7 +22,8 @@ main(int argc, char* argv[])
     const uint32_t width = 256;
     const uint32_t height = 256;
     const uint32_t maxDepth = 8;
-    const float emisssion[] = { 5.0f, 5.0f, 5.0f };
+    const float lightPower = 100.0f;
+    const float lightColor[] = { 1.0f, 1.0f, 1.0f };
     const float lightPos[] = { 0.0f, 10.0f, 0.0f };
     const float lightRadius = 5.0f;
     const float eye[] = { 0.0f, 0.0f, -3.0f };
@@ -33,7 +34,7 @@ main(int argc, char* argv[])
 
     alpine::initialize(width, height, maxDepth);
     alpine::setBackgroundColor(0.0f, 0.0f, 0.0f);
-    alpine::addDiskLight(emisssion, lightPos, lightRadius);
+    alpine::addDiskLight(lightPower, lightColor, lightPos, lightRadius);
 
     bool loaded = alpine::load(objFilename, alpine::FileType::Obj);
     if (!loaded)

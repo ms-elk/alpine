@@ -15,9 +15,9 @@ enum class FileType {
 };
 bool load(std::string_view filename, FileType fileType);
 
-api::Light* addPointLight(const float intensity[3], const float position[3]);
+api::Light* addPointLight(float power, const float color[3], const float position[3]);
 
-api::Light* addDiskLight(const float emission[3], const float position[3], float radius);
+api::Light* addDiskLight(float power, const float color[3], const float position[3], float radius);
 
 enum class LightSamplerType {
     Uniform,

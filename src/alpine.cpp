@@ -54,9 +54,9 @@ public:
 
     bool load(std::string_view filename, FileType fileType);
 
-    api::Light* addPointLight(const float intensity[3], const float position[3]);
+    api::Light* addPointLight(float power, const float color[3], const float position[3]);
 
-    api::Light* addDiskLight(const float emission[3], const float position[3], float radius);
+    api::Light* addDiskLight(float power, const float color[3], const float position[3], float radius);
 
     void buildLightSampler(LightSamplerType lightSamplerType);
 
@@ -163,17 +163,17 @@ Alpine::load(std::string_view filename, FileType fileType)
 }
 
 api::Light*
-Alpine::addPointLight(const float intensity[3], const float position[3])
+Alpine::addPointLight(float power, const float color[3], const float position[3])
 {
-    mScene.lights.push_back(std::make_shared<PointLight>(float3(intensity), float3(position)));
+    mScene.lights.push_back(std::make_shared<PointLight>(power, float3(color), float3(position)));
     return mScene.lights.back().get();
 }
 
 api::Light*
-Alpine::addDiskLight(const float emission[3], const float position[3], float radius)
+Alpine::addDiskLight(float power, const float color[3], const float position[3], float radius)
 {
     mScene.lights.push_back(std::make_shared<DiskLight>(
-        float3(emission), float3(position), normalize(float3(0.0, -1.0f, 0.0f)), radius));
+        power, float3(color), float3(position), normalize(float3(0.0, -1.0f, 0.0f)), radius));
     return mScene.lights.back().get();
 }
 
@@ -327,22 +327,25 @@ Alpine::estimateDirectIllumination(
         {
             float3 bsdf = isectAttr.material->computeBsdf(wo, wi, isectAttr);
             float cosTerm = std::max(0.0f, dot(ls.wiWorld, isectAttr.ns));
-            float misWeight = powerHeuristic(1, ls.pdf, 1, bsdfPdf);
-            radiance += ls.emission * misWeight * bsdf * cosTerm / ls.pdf;
+            float misWeight = !lss.light->isDelta() ? powerHeuristic(1, ls.pdf, 1, bsdfPdf) : 1.0f;
+            radiance += ls.emittedRadiance * misWeight * bsdf * cosTerm / ls.pdf;
         }
     }
 
     // BSDF sampling
-    auto ms = isectAttr.material->sample(wo, sampler.get2D(), isectAttr);
-    if (ms.pdf > 0.0f)
+    if (!lss.light->isDelta())
     {
-        float3 lightDir = toWorld(ms.wi, isectAttr.ss, isectAttr.ts, isectAttr.ns);
-        auto [lightPdf, lightDist] = lss.light->computePdf(hit, lightDir);
-        if (lightPdf > 0.0f && !isOccluded(hit, isectAttr.ns, lightDir, lightDist))
+        auto ms = isectAttr.material->sample(wo, sampler.get2D(), isectAttr);
+        if (ms.pdf > 0.0f)
         {
-            float3 emission = lss.light->getEmission();
-            float misWeight = powerHeuristic(1, ms.pdf, 1, lightPdf);
-            radiance += emission * misWeight * ms.estimator;
+            float3 lightDir = toWorld(ms.wi, isectAttr.ss, isectAttr.ts, isectAttr.ns);
+            auto [lightPdf, lightDist] = lss.light->computePdf(hit, lightDir);
+            if (lightPdf > 0.0f && !isOccluded(hit, isectAttr.ns, lightDir, lightDist))
+            {
+                float3 emission = lss.light->getEmittedRadiance();
+                float misWeight = powerHeuristic(1, ms.pdf, 1, lightPdf);
+                radiance += emission * misWeight * ms.estimator;
+            }
         }
     }
 
@@ -411,15 +414,15 @@ load(std::string_view filename, FileType fileType)
 }
 
 api::Light*
-addPointLight(const float intensity[3], const float position[3])
+addPointLight(float power, const float color[3], const float position[3])
 {
-    return Alpine::getInstance().addPointLight(intensity, position);
+    return Alpine::getInstance().addPointLight(power, color, position);
 }
 
 api::Light*
-addDiskLight(const float emission[3], const float position[3], float radius)
+addDiskLight(float power, const float color[3], const float position[3], float radius)
 {
-    return Alpine::getInstance().addDiskLight(emission, position, radius);
+    return Alpine::getInstance().addDiskLight(power, color, position, radius);
 }
 
 void

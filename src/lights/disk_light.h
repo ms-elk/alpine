@@ -9,19 +9,23 @@ struct IntersectionAttributes;
 class DiskLight : public Light
 {
 public:
-    DiskLight(const float3& emission, const float3& position, const float3& normal, float radius);
+    DiskLight(
+        float power, const float3& color, const float3& position, const float3& normal, float radius);
 
     Sample sample(const float2& u, const float3& hit) const override;
 
     std::pair<float /* pdf */, float /* distance */>
         computePdf(const float3& hit, const float3& wiWorld) const override;
 
-    float3 getEmission() const override { return mEmission * mScale; }
+    float3 getEmittedRadiance() const override { return mEmittedRadiance * mScale; }
 
-    float3 getPower() const override;
+    float3 getPower() const override { return mPower * mScale; }
+
+    bool isDelta() const override { return false; }
 
 private:
-    float3 mEmission;
+    float3 mEmittedRadiance;
+    float3 mPower;
     float3 mNormal;
     float mRadius;
 
