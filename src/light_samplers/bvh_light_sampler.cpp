@@ -17,13 +17,29 @@ struct LightNode
     std::unique_ptr<LightNode> children[2] = { nullptr, nullptr };
     Light* light = nullptr;
 
-    float importance(float3 p) const
+    float importance(const float3& p, const float3& n) const
     {
-        float3 toBbox = bbox.getCenter() - p;
-        float distance2 = dot(toBbox, toBbox);
-        distance2 = std::max(distance2, 0.5f * length(bbox.getDiagonal()));
+        float3 wiWorld = bbox.getCenter() - p;
+        float distance2 = dot(wiWorld, wiWorld);
+        float importance = power / std::max(distance2, 0.5f * length(bbox.getDiagonal()));
+        
+        // importance between normal and direction to bounding box
+        float boundRadius = 0.5f * length(bbox.getDiagonal());
+        float boundRadius2 = boundRadius * boundRadius;
+        if (distance2 > 0.0f && distance2 > boundRadius2)
+        {
+            float sinB2 = boundRadius2 / distance2;
+            float sinB = std::sqrt(sinB2);
+            float cosB = std::sqrt(1.0f - sinB2);
+        
+            wiWorld = normalize(wiWorld);
+            float cosI = std::abs(dot(wiWorld, n));
+            float sinI = std::sqrt(1 - cosI * cosI);
+        
+            importance *= cosI <= cosB ? cosI * cosB + sinI * sinB : 1.0f;
+        }
 
-        return power / distance2;
+        return importance;
     }
 };
 
@@ -151,7 +167,7 @@ BvhLightSampler::BvhLightSampler(const std::vector<std::shared_ptr<Light>>& ligh
 }
 
 LightSampler::Sample
-BvhLightSampler::sample(float u, const float3& hit) const
+BvhLightSampler::sample(float u, const float3& hit, const float3& ns) const
 {
     if (!bvh->root)
     {
@@ -166,7 +182,8 @@ BvhLightSampler::sample(float u, const float3& hit) const
         if (node->children[0] && node->children[1])
         {
             float w[2] = {
-                node->children[0]->importance(hit), node->children[1]->importance(hit) };
+                node->children[0]->importance(hit, ns),
+                node->children[1]->importance(hit, ns) };
 
             if (w[0] == 0.0f && w[1] == 0.0f)
             {
@@ -191,7 +208,7 @@ BvhLightSampler::sample(float u, const float3& hit) const
         }
         else
         {
-            if (node->light && node->importance(hit) > 0.0f)
+            if (node->light && node->importance(hit, ns) > 0.0f)
             {
                 return { node->light, pdf };
             }

@@ -13,9 +13,16 @@ DiskLight::DiskLight(
     mArea = mRadius * mRadius * PI;
     mEmittedRadiance = mPower / (mArea * PI);
 
-    // TODO: tighten bounding box
-    mBbox.min = mPosition - float3(mRadius);
-    mBbox.max = mPosition + float3(mRadius);
+    float3 corners[4];
+    corners[0] = mPosition + mBinormal * mRadius;
+    corners[1] = mPosition - mBinormal * mRadius;
+    corners[2] = mPosition + mTangent * mRadius;
+    corners[3] = mPosition - mTangent * mRadius;
+
+    for (const float3& c : corners)
+    {
+        mBbox = merge(mBbox, { c, c });
+    }
 }
 
 Light::Sample

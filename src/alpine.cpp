@@ -306,7 +306,7 @@ Alpine::estimateDirectIllumination(
         return radiance;
     }
 
-    const auto lss = mLightSampler->sample(sampler.get1D(), hit);
+    const auto lss = mLightSampler->sample(sampler.get1D(), hit, isectAttr.ns);
 
     if (lss.pdf == 0.0)
     {

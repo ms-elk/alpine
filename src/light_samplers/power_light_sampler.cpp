@@ -22,7 +22,7 @@ PowerLightSampler::PowerLightSampler(const std::vector<std::shared_ptr<Light>>& 
 }
 
 LightSampler::Sample
-PowerLightSampler::sample(float u, const float3& hit) const
+PowerLightSampler::sample(float u, const float3& hit, const float3& ns) const
 {
     if (mLights.empty())
     {
