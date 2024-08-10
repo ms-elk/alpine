@@ -20,6 +20,6 @@ public:
         float pdf;
     };
 
-    virtual Sample sample(float u, const float3& hit) const = 0;
+    virtual Sample sample(float u, const float3& hit, const float3& ns) const = 0;
 };
 }

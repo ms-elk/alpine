@@ -13,7 +13,7 @@ UniformLightSampler::UniformLightSampler(const std::vector<std::shared_ptr<Light
 }
 
 LightSampler::Sample
-UniformLightSampler::sample(float u, const float3& hit) const
+UniformLightSampler::sample(float u, const float3& hit, const float3& ns) const
 {
     if (mLights.empty())
     {
