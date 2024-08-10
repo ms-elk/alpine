@@ -1,6 +1,7 @@
 #pragma once
 
 #include "math/vector.h"
+#include "utils/bounding_box.h"
 
 #include <alpine/light.h>
 
@@ -34,6 +35,8 @@ public:
     virtual float3 getPower() const = 0;
 
     virtual bool isDelta() const = 0;
+
+    virtual BoundingBox getBound() const = 0;
 
 protected:
     float3 mPosition;

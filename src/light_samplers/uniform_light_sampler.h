@@ -8,10 +8,10 @@ class UniformLightSampler : public LightSampler
 public:
     UniformLightSampler(const std::vector<std::shared_ptr<Light>>& lights);
 
-    Sample sample(float u) const override;
+    Sample sample(float u, const float3& hit) const override;
 
 private:
-    std::vector<std::shared_ptr<Light>> mLights;
+    std::vector<Light*> mLights;
     float mPdf = 0.0f;
 };
 }

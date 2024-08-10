@@ -22,7 +22,7 @@ PointLight::sample(const float2& u, const float3& hit) const
 {
     float3 wiWorld = mPosition - hit;
     float distance2 = dot(wiWorld, wiWorld);
-    if (distance2 < 0.001f)
+    if (distance2 == 0.0f)
     {
         return { float3(0.0f), float3(0.0f), 0.0f, 0.0f };
     }

@@ -4,20 +4,25 @@
 
 namespace alpine {
 PowerLightSampler::PowerLightSampler(const std::vector<std::shared_ptr<Light>>& lights)
-    : mLights(lights)
 {
-    std::vector<float> weights(lights.size());
-
+    mLights.resize(lights.size());
     for (uint32_t i = 0; i < lights.size(); ++i)
     {
-        weights[i] = length(lights[i]->getPower());
+        mLights[i] = lights[i].get();
+    }
+
+    std::vector<float> weights(mLights.size());
+
+    for (uint32_t i = 0; i < mLights.size(); ++i)
+    {
+        weights[i] = length(mLights[i]->getPower());
     }
 
     mAliasTable = AliasTable(weights);
 }
 
 LightSampler::Sample
-PowerLightSampler::sample(float u) const
+PowerLightSampler::sample(float u, const float3& hit) const
 {
     if (mLights.empty())
     {
@@ -26,6 +31,6 @@ PowerLightSampler::sample(float u) const
 
     auto ats = mAliasTable.sample(u);
 
-    return { mLights[ats.idx].get(), ats.pdf };
+    return { mLights[ats.idx], ats.pdf };
 }
 }

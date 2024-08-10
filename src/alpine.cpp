@@ -4,6 +4,7 @@
 #include "image.h"
 #include "kernel/kernel.h"
 #include "light_samplers/light_sampler.h"
+#include "light_samplers/bvh_light_sampler.h"
 #include "light_samplers/power_light_sampler.h"
 #include "light_samplers/uniform_light_sampler.h"
 #include "lights/disk_light.h"
@@ -185,6 +186,9 @@ Alpine::buildLightSampler(LightSamplerType lightSamplerType)
     case LightSamplerType::Power:
         mLightSampler = std::make_unique<PowerLightSampler>(mScene.lights);
         break;
+    case LightSamplerType::Bvh:
+        mLightSampler = std::make_unique<BvhLightSampler>(mScene.lights);
+        break;
     case LightSamplerType::Uniform:
     default:
         mLightSampler = std::make_unique<UniformLightSampler>(mScene.lights);
@@ -302,7 +306,7 @@ Alpine::estimateDirectIllumination(
         return radiance;
     }
 
-    const auto lss = mLightSampler->sample(sampler.get1D());
+    const auto lss = mLightSampler->sample(sampler.get1D(), hit);
 
     if (lss.pdf == 0.0)
     {

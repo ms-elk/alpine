@@ -1,5 +1,7 @@
 #pragma once
 
+#include "math/vector.h"
+
 #include <memory>
 #include <vector>
 
@@ -18,6 +20,6 @@ public:
         float pdf;
     };
 
-    virtual Sample sample(float u) const = 0;
+    virtual Sample sample(float u, const float3& hit) const = 0;
 };
 }

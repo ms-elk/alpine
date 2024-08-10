@@ -26,6 +26,8 @@ public:
 
     bool isDelta() const override { return true; }
 
+    BoundingBox getBound() const override { return{ mPosition, mPosition }; }
+
 private:
     float3 mIntensity;
     float3 mPower;
