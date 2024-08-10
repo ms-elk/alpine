@@ -9,10 +9,10 @@ class PowerLightSampler : public LightSampler
 public:
     PowerLightSampler(const std::vector<std::shared_ptr<Light>>& lights);
 
-    Sample sample(float u) const override;
+    Sample sample(float u, const float3& hit) const override;
 
 private:
-    std::vector<std::shared_ptr<Light>> mLights;
+    std::vector<Light*> mLights;
     AliasTable mAliasTable;
 };
 }

@@ -22,6 +22,7 @@ api::Light* addDiskLight(float power, const float color[3], const float position
 enum class LightSamplerType {
     Uniform,
     Power,
+    Bvh,
 };
 void buildLightSampler(LightSamplerType lightSamplerType);
 

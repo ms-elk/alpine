@@ -215,6 +215,32 @@ std::tuple<Vector3<T>, Vector3<T>> getBasis(const Vector3<T>& v)
     return { v1, v2 };
 }
 
+template <typename T>
+Vector3<T> min(const Vector3<T>& v0, const Vector3<T>& v1)
+{
+    float x = std::min(v0.x, v1.x);
+    float y = std::min(v0.y, v1.y);
+    float z = std::min(v0.z, v1.z);
+
+    return { x, y, z };
+}
+
+template <typename T>
+Vector3<T> max(const Vector3<T>& v0, const Vector3<T>& v1)
+{
+    float x = std::max(v0.x, v1.x);
+    float y = std::max(v0.y, v1.y);
+    float z = std::max(v0.z, v1.z);
+
+    return { x, y, z };
+}
+
+template <typename T>
+T maxComponent(const Vector3<T>& v)
+{
+    return std::max(v.x, std::max(v.y, v.z));
+}
+
 using float3 = Vector3<float>;
 using uint3 = Vector3<uint32_t>;
 using byte3 = Vector3<uint8_t>;

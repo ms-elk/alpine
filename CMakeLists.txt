@@ -44,6 +44,8 @@ set(KERNEL
 
 set(LIGHT_SAMPLERS
   src/light_samplers/light_sampler.h
+  src/light_samplers/bvh_light_sampler.cpp
+  src/light_samplers/bvh_light_sampler.h
   src/light_samplers/power_light_sampler.cpp
   src/light_samplers/power_light_sampler.h
   src/light_samplers/uniform_light_sampler.cpp
@@ -94,6 +96,7 @@ set(SHAPES
 set(UTILS
   src/utils/alias_table.cpp
   src/utils/alias_table.h
+  src/utils/bounding_box.h
   src/utils/util.cpp
   src/utils/util.h
 )

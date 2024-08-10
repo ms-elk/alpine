@@ -12,6 +12,10 @@ DiskLight::DiskLight(
     std::tie(mBinormal, mTangent) = getBasis(mNormal);
     mArea = mRadius * mRadius * PI;
     mEmittedRadiance = mPower / (mArea * PI);
+
+    // TODO: tighten bounding box
+    mBbox.min = mPosition - float3(mRadius);
+    mBbox.max = mPosition + float3(mRadius);
 }
 
 Light::Sample

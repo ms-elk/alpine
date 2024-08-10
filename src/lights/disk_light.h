@@ -23,6 +23,8 @@ public:
 
     bool isDelta() const override { return false; }
 
+    BoundingBox getBound() const override { return mBbox; }
+
 private:
     float3 mEmittedRadiance;
     float3 mPower;
@@ -32,5 +34,6 @@ private:
     float3 mBinormal;
     float3 mTangent;
     float mArea;
+    BoundingBox mBbox;
 };
 }

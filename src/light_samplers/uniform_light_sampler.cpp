@@ -2,13 +2,18 @@
 
 namespace alpine {
 UniformLightSampler::UniformLightSampler(const std::vector<std::shared_ptr<Light>>& lights)
-    : mLights(lights)
 {
+    mLights.resize(lights.size());
+    for (uint32_t i = 0; i < lights.size(); ++i)
+    {
+        mLights[i] = lights[i].get();
+    }
+
     mPdf = !mLights.empty() ? 1.0f / mLights.size() : 0.0f;
 }
 
 LightSampler::Sample
-UniformLightSampler::sample(float u) const
+UniformLightSampler::sample(float u, const float3& hit) const
 {
     if (mLights.empty())
     {
@@ -18,6 +23,6 @@ UniformLightSampler::sample(float u) const
     std::size_t lightIdx = static_cast<std::size_t>(u * mLights.size());
     lightIdx = std::min(lightIdx, mLights.size() - 1);
 
-    return { mLights[lightIdx].get(), mPdf };
+    return { mLights[lightIdx], mPdf };
 }
 }
