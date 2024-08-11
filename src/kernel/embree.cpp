@@ -1,7 +1,7 @@
 ﻿#include "kernel.h"
 
 #include "ray.h"
-#include <embree3/rtcore.h>
+#include <embree4/rtcore.h>
 #include <stdio.h>
 
 namespace alpine::kernel {
@@ -112,9 +112,6 @@ updateScene()
 Intersection
 intersect(const Ray& ray)
 {
-    RTCIntersectContext context;
-    rtcInitIntersectContext(&context);
-
     RTCRayHit rtcRayhit;
     rtcRayhit.ray.org_x = ray.org.x;
     rtcRayhit.ray.org_y = ray.org.y;
@@ -129,7 +126,7 @@ intersect(const Ray& ray)
     rtcRayhit.hit.geomID = RTC_INVALID_GEOMETRY_ID;
     rtcRayhit.hit.instID[0] = RTC_INVALID_GEOMETRY_ID;
 
-    rtcIntersect1(gScene, &context, &rtcRayhit);
+    rtcIntersect1(gScene, &rtcRayhit);
 
     Intersection isect;
     if (rtcRayhit.hit.geomID != RTC_INVALID_GEOMETRY_ID)
@@ -155,9 +152,6 @@ intersect(const Ray& ray)
 bool
 occluded(const Ray& ray, float far)
 {
-    RTCIntersectContext context;
-    rtcInitIntersectContext(&context);
-
     RTCRay rtcRay;
     rtcRay.org_x = ray.org.x;
     rtcRay.org_y = ray.org.y;
@@ -170,7 +164,7 @@ occluded(const Ray& ray, float far)
     rtcRay.mask = -1;
     rtcRay.flags = 0;
 
-    rtcOccluded1(gScene, &context, &rtcRay);
+    rtcOccluded1(gScene, &rtcRay);
 
     return rtcRay.tfar < far;
 }

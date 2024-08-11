@@ -141,14 +141,14 @@ target_link_directories(alpine PUBLIC
 )
 
 target_link_libraries(alpine PUBLIC
-  embree3
+  embree4
   OpenImageDenoise
-  tbb
+  tbb12
 )
 
 add_custom_command(TARGET alpine POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
-  ${CMAKE_CURRENT_SOURCE_DIR}/ext/embree/bin/embree3.dll
+  ${CMAKE_CURRENT_SOURCE_DIR}/ext/embree/bin/embree4.dll
   $<TARGET_FILE_DIR:alpine>
 
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
