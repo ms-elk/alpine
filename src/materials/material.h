@@ -3,6 +3,8 @@
 #include "math/vector.h"
 #include "texture.h"
 
+#include <optional>
+
 namespace alpine {
 struct IntersectionAttributes;
 
@@ -18,7 +20,7 @@ public:
         float pdf;
     };
 
-    virtual Sample sample(
+    virtual std::optional<Sample> sample(
         const float3& wo, const float2& u, const IntersectionAttributes& isectAttr) const = 0;
 
     virtual float3 computeBsdf(

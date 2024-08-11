@@ -14,7 +14,7 @@ public:
         const std::shared_ptr<Texture4f>& normalTex)
         : mBaseColor(baseColor), mBaseColorTex(baseColorTex), mNormalTex(normalTex) {}
 
-    Sample sample(
+    std::optional<Sample> sample(
         const float3& wo, const float2& u, const IntersectionAttributes& isectAttr) const override;
 
     float3 computeBsdf(

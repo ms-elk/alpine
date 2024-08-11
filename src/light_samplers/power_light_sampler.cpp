@@ -21,16 +21,16 @@ PowerLightSampler::PowerLightSampler(const std::vector<std::shared_ptr<Light>>& 
     mAliasTable = AliasTable(weights);
 }
 
-LightSampler::Sample
+std::optional<LightSampler::Sample>
 PowerLightSampler::sample(float u, const float3& hit, const float3& ns) const
 {
     if (mLights.empty())
     {
-        return { nullptr, 0.0f };
+        return {};
     }
 
     auto ats = mAliasTable.sample(u);
 
-    return { mLights[ats.idx], ats.pdf };
+    return Sample{ mLights[ats.idx], ats.pdf };
 }
 }

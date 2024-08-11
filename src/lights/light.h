@@ -5,6 +5,8 @@
 
 #include <alpine/light.h>
 
+#include <optional>
+
 namespace alpine {
 struct IntersectionAttributes;
 
@@ -25,7 +27,7 @@ public:
         float pdf;
     };
 
-    virtual Sample sample(const float2& u, const float3& hit) const = 0;
+    virtual std::optional<Sample> sample(const float2& u, const float3& hit) const = 0;
 
     virtual std::pair<float /* pdf */, float /* distance */>
         computePdf(const float3& hit, const float3& wiWorld) const = 0;
@@ -36,7 +38,7 @@ public:
 
     virtual bool isDelta() const = 0;
 
-    virtual BoundingBox getBound() const = 0;
+    virtual BoundingBox getBoundingBox() const = 0;
 
 protected:
     float3 mPosition;

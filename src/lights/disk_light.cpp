@@ -25,7 +25,7 @@ DiskLight::DiskLight(
     }
 }
 
-Light::Sample
+std::optional<Light::Sample>
 DiskLight::sample(const float2& u, const float3& hit) const
 {
     float2 diskSample = sampleConcentricDisk(u);
@@ -35,19 +35,19 @@ DiskLight::sample(const float2& u, const float3& hit) const
     float distance = length(wiWorld);
     if (distance == 0.0f)
     {
-        return { float3(0.0f), float3(0.0f), 0.0f, 0.0f };
+        return {};
     }
 
     wiWorld /= distance;
     float cosTerm = std::max(0.0f, dot(-wiWorld, mNormal));
     if (cosTerm == 0.0f)
     {
-        return { float3(0.0f), float3(0.0f), 0.0f, 0.0f };
+        return {};
     }
 
     float pdf = (distance * distance) / (mArea * cosTerm);
 
-    return { mEmittedRadiance * mScale, wiWorld, distance, pdf };
+    return Sample{ mEmittedRadiance * mScale, wiWorld, distance, pdf };
 }
 
 std::pair<float /* pdf */, float /* distance */>

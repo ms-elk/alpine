@@ -3,6 +3,7 @@
 #include "math/vector.h"
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace alpine {
@@ -20,6 +21,6 @@ public:
         float pdf;
     };
 
-    virtual Sample sample(float u, const float3& hit, const float3& ns) const = 0;
+    virtual std::optional<Sample> sample(float u, const float3& hit, const float3& ns) const = 0;
 };
 }

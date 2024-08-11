@@ -5,7 +5,7 @@
 #include "utils/util.h"
 
 namespace alpine {
-Material::Sample
+std::optional<Material::Sample>
 Metal::sample(
     const float3& wo, const float2& u, const IntersectionAttributes& isectAttr) const
 {
@@ -30,7 +30,7 @@ Metal::sample(
         float3 wi = reflect(wo, wh);
         if (!isSameHemisphere(wo, wi))
         {
-            return { 0.0f, float3(0.0f), 0.0f };
+            return {};
         }
 
         float3 bc = getBaseColor(isectAttr.uv);
@@ -42,19 +42,19 @@ Metal::sample(
         float3 estimator = f * g2 / g1;
         float pdf = d / (4.0f * dot(wo, wh));
 
-        return { estimator, wi, pdf };
+        return Sample{ estimator, wi, pdf };
     }
     else
     {
         auto [wi, pdf] = sampleCosineWeightedHemisphere(u);
         if (!isSameHemisphere(wo, wi) || pdf == 0.0f)
         {
-            return { 0.0f, float3(0.0f), 0.0f };
+            return {};
         }
 
         float3 estimator = computeBsdf(wo, wi, isectAttr) * std::abs(cosTheta(wi)) / pdf;
 
-        return { estimator, wi, pdf };
+        return Sample{ estimator, wi, pdf };
     }
 }
 
