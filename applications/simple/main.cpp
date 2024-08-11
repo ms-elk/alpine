@@ -1,8 +1,32 @@
-﻿#include <alpine/alpine.h>
+#include <alpine/alpine.h>
 
+#include <chrono>
 #include <string>
 
 static constexpr float PI = 3.14159265358979323846f;
+
+class Timer
+{
+public:
+    Timer(const char* name)
+        : name(name)
+    {
+        start = clock::now();
+    }
+
+    ~Timer()
+    {
+        clock::time_point end = clock::now();
+        clock::duration time = end - start;
+        printf("%s: %.3f [ms]\n", name,
+            std::chrono::duration_cast<std::chrono::microseconds>(time).count() * 1e-3f);
+    }
+
+private:
+    using clock = std::chrono::high_resolution_clock;
+    const char* name;
+    clock::time_point start;
+};
 
 int
 main(int argc, char* argv[])
@@ -43,12 +67,19 @@ main(int argc, char* argv[])
         return 1;
     }
 
-    alpine::buildLightSampler(alpine::LightSamplerType::Uniform);
+    {
+        Timer timer("Light Sampler Build");
+        alpine::buildLightSampler(alpine::LightSamplerType::Bvh);
+    }
 
     auto* camera = alpine::getCamera();
     camera->setLookAt(eye, target, up, fovy, aspect);
 
-    alpine::render(spp);
+    {
+        Timer timer("Render");
+        alpine::render(spp);
+    }
+
     alpine::resolve(false);
 
     alpine::saveImage(imageFilename);
