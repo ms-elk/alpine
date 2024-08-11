@@ -19,7 +19,7 @@ public:
         , mNormalTex(normalTex)
         , mUseVndfSampling(useVndfSampling) {};
 
-    Sample sample(
+    std::optional<Sample> sample(
         const float3& wo, const float2& u, const IntersectionAttributes& isectAttr) const override;
 
     float3 computeBsdf(

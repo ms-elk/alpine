@@ -12,7 +12,7 @@ public:
     PointLight(const float3& intensity, const float3& position);
     PointLight(float power, const float3& color, const float3& position);
 
-    Sample sample(const float2& u, const float3& hit) const override;
+    std::optional<Sample> sample(const float2& u, const float3& hit) const override;
 
     std::pair<float /* pdf */, float /* distance */>
         computePdf(const float3& hit, const float3& wiWorld) const override
@@ -26,7 +26,7 @@ public:
 
     bool isDelta() const override { return true; }
 
-    BoundingBox getBound() const override { return{ mPosition, mPosition }; }
+    BoundingBox getBoundingBox() const override { return{ mPosition, mPosition }; }
 
 private:
     float3 mIntensity;

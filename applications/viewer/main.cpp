@@ -123,7 +123,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    alpine::buildLightSampler(alpine::LightSamplerType::Power);
+    alpine::buildLightSampler(alpine::LightSamplerType::Bvh);
 
     const float fovy = PI / 2.0f;
     float aspect = float(WIDTH) / float(HEIGHT);

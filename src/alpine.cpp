@@ -264,12 +264,17 @@ Alpine::render(uint32_t spp)
                             float3 wo = toLocal(- ray.dir, isectAttr.ss, isectAttr.ts, isectAttr.ns);
                             radiance += throughput * estimateDirectIllumination(sampler, hit, wo, isectAttr);
 
-                            auto ms =
+                            auto oms =
                                 isectAttr.material->sample(wo, sampler.get2D(), isectAttr);
-                            float3 wiWorld = toWorld(ms.wi, isectAttr.ss, isectAttr.ts, isectAttr.ns);
+                            if (!oms.has_value())
+                            {
+                                break;
+                            }
 
+                            const auto& ms = oms.value();
+                            float3 wiWorld = toWorld(ms.wi, isectAttr.ss, isectAttr.ts, isectAttr.ns);
                             bool isReflect = dot(wiWorld, isect.ng) > 0.0f;
-                            if (ms.pdf == 0.0f || !isReflect)
+                            if (!isReflect)
                             {
                                 break;
                             }
@@ -306,12 +311,13 @@ Alpine::estimateDirectIllumination(
         return radiance;
     }
 
-    const auto lss = mLightSampler->sample(sampler.get1D(), hit, isectAttr.ns);
-
-    if (lss.pdf == 0.0)
+    auto olss = mLightSampler->sample(sampler.get1D(), hit, isectAttr.ns);
+    if (!olss.has_value())
     {
         return radiance;
     }
+
+    const auto& lss = olss.value();
 
     const auto isOccluded = [](
         const float3& position, const float3& normal, const float3& dir, float dist) {
@@ -322,9 +328,10 @@ Alpine::estimateDirectIllumination(
     };
 
     // Light sampling
-    auto ls = lss.light->sample(sampler.get2D(), hit);
-    if (ls.pdf > 0.0f)
+    auto ols = lss.light->sample(sampler.get2D(), hit);
+    if (ols.has_value())
     {
+        const auto& ls = ols.value();
         float3 wi = toLocal(ls.wiWorld, isectAttr.ss, isectAttr.ts, isectAttr.ns);
         float bsdfPdf = isectAttr.material->computePdf(wo, wi);
         if (bsdfPdf > 0.0f && !isOccluded(hit, isectAttr.ns, ls.wiWorld, ls.distance))
@@ -339,9 +346,10 @@ Alpine::estimateDirectIllumination(
     // BSDF sampling
     if (!lss.light->isDelta())
     {
-        auto ms = isectAttr.material->sample(wo, sampler.get2D(), isectAttr);
-        if (ms.pdf > 0.0f)
+        auto oms = isectAttr.material->sample(wo, sampler.get2D(), isectAttr);
+        if (oms.has_value())
         {
+            const auto& ms = oms.value();
             float3 lightDir = toWorld(ms.wi, isectAttr.ss, isectAttr.ts, isectAttr.ns);
             auto [lightPdf, lightDist] = lss.light->computePdf(hit, lightDir);
             if (lightPdf > 0.0f && !isOccluded(hit, isectAttr.ns, lightDir, lightDist))

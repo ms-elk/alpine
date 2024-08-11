@@ -24,6 +24,8 @@ enum class LightSamplerType {
     Power,
     Bvh,
 };
+
+// call this function after all of the lights have benn added to the scene
 void buildLightSampler(LightSamplerType lightSamplerType);
 
 void setBackgroundColor(float r, float g, float b);

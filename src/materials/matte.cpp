@@ -5,15 +5,20 @@
 #include "utils/util.h"
 
 namespace alpine {
-Material::Sample
+std::optional<Material::Sample>
 Matte::sample(
     const float3& wo, const float2& u, const IntersectionAttributes& isectAttr) const
 {
     auto [wi, pdf] = sampleCosineWeightedHemisphere(u);
+    if (pdf == 0.0f)
+    {
+        return {};
+    }
+
     float3 bc = getBaseColor(isectAttr.uv);
     float3 estimator = bc; // bsdf * cosTheta / pdf
 
-    return { estimator, wi, pdf };
+    return Sample{ estimator, wi, pdf };
 }
 
 float3

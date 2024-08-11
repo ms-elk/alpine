@@ -12,7 +12,7 @@ public:
     DiskLight(
         float power, const float3& color, const float3& position, const float3& normal, float radius);
 
-    Sample sample(const float2& u, const float3& hit) const override;
+    std::optional<Sample> sample(const float2& u, const float3& hit) const override;
 
     std::pair<float /* pdf */, float /* distance */>
         computePdf(const float3& hit, const float3& wiWorld) const override;
@@ -23,7 +23,7 @@ public:
 
     bool isDelta() const override { return false; }
 
-    BoundingBox getBound() const override { return mBbox; }
+    BoundingBox getBoundingBox() const override { return mBbox; }
 
 private:
     float3 mEmittedRadiance;

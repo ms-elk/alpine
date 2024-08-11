@@ -35,8 +35,12 @@ struct LightNode
             wiWorld = normalize(wiWorld);
             float cosI = std::abs(dot(wiWorld, n));
             float sinI = std::sqrt(1 - cosI * cosI);
+
+            const auto cosAsubB = [](float cosA, float sinA, float cosB, float sinB) {
+                return cosA <= cosB ? cosA * cosB + sinA * sinB : 1.0f;
+            };
         
-            importance *= cosI <= cosB ? cosI * cosB + sinI * sinB : 1.0f;
+            importance *= cosAsubB(cosI, sinI, cosB, sinB);
         }
 
         return importance;
@@ -81,7 +85,7 @@ splitLightCluster(const std::vector<Light*>& lightCluster, const BoundingBox& bb
 
             for (const auto* l : lightCluster)
             {
-                auto bbox = l->getBound();
+                auto bbox = l->getBoundingBox();
                 uint8_t metricIdx = bbox.getCenter()[dim] < splitPoint ? 0 : 1;
                 auto& m = metric[metricIdx];
 
@@ -110,7 +114,7 @@ createLightNode(const std::vector<Light*>& lightCluster)
     {
         lightNode->power += length(l->getPower());
 
-        auto bbox = l->getBound();
+        auto bbox = l->getBoundingBox();
         lightNode->bbox = merge(bbox, lightNode->bbox);
     }
 
@@ -128,7 +132,7 @@ createLightNode(const std::vector<Light*>& lightCluster)
 
         for (auto* l : lightCluster)
         {
-            auto bbox = l->getBound();
+            auto bbox = l->getBoundingBox();
             uint8_t scIdx = bbox.getCenter()[split.dim] < split.point ? 0 : 1;
             subClusters[scIdx].push_back(l);
         }
@@ -166,12 +170,12 @@ BvhLightSampler::BvhLightSampler(const std::vector<std::shared_ptr<Light>>& ligh
     bvh->root = createLightNode(lightCluster);
 }
 
-LightSampler::Sample
+std::optional<LightSampler::Sample>
 BvhLightSampler::sample(float u, const float3& hit, const float3& ns) const
 {
     if (!bvh->root)
     {
-        return { nullptr, 0.0f };
+        return {};
     }
 
     LightNode* node = bvh->root.get();
@@ -187,7 +191,7 @@ BvhLightSampler::sample(float u, const float3& hit, const float3& ns) const
 
             if (w[0] == 0.0f && w[1] == 0.0f)
             {
-                return { nullptr, 0.0f };
+                return {};
             }
 
             float up = (w[0] + w[1]) * u;
@@ -210,11 +214,11 @@ BvhLightSampler::sample(float u, const float3& hit, const float3& ns) const
         {
             if (node->light && node->importance(hit, ns) > 0.0f)
             {
-                return { node->light, pdf };
+                return Sample{ node->light, pdf };
             }
             else
             {
-                return { nullptr, 0.0f };
+                return {};
             }
         }
     }
