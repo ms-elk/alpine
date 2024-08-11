@@ -9,7 +9,7 @@
 
 ## Build
 1. Download the libraries below, and put them into the `ext` directory
-    - [Intel Embree 3.13.5](https://www.embree.org/)
+    - [Intel Embree 4.3.3](https://www.embree.org/)
     - [Intel Open Image Denoise 2.0.1](https://www.openimagedenoise.org/)
     - [GLFW 3.3.8](https://www.glfw.org/) (optional for [viewer](#viewer))
 2. Fetch git submodules
