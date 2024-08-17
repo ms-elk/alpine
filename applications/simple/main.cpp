@@ -1,6 +1,7 @@
 #include <alpine/alpine.h>
 
 #include <chrono>
+#include <filesystem>
 #include <string>
 
 static constexpr float PI = 3.14159265358979323846f;
@@ -31,7 +32,7 @@ private:
 int
 main(int argc, char* argv[])
 {
-    if (argc != 4)
+    if (argc != 5)
     {
         printf("ERROR: invalid input parameters\n");
         return 1;
@@ -39,8 +40,9 @@ main(int argc, char* argv[])
 
     // input parameters
     uint32_t spp = std::atoi(argv[1]);
-    const char* objFilename = argv[2];
-    const char* imageFilename = argv[3];
+    std::string lightSamplerType = argv[2];
+    std::filesystem::path filePath = argv[3];
+    const char* imageFilename = argv[4];
 
     // constant values
     const uint32_t width = 256;
@@ -60,16 +62,51 @@ main(int argc, char* argv[])
     alpine::setBackgroundColor(0.0f, 0.0f, 0.0f);
     alpine::addDiskLight(lightPower, lightColor, lightPos, lightRadius);
 
-    bool loaded = alpine::load(objFilename, alpine::FileType::Obj);
+    std::string extension = filePath.extension().string();
+    alpine::FileType fileType;
+    if (extension == ".obj")
+    {
+        fileType = alpine::FileType::Obj;
+    }
+    else if (extension == ".glb")
+    {
+        fileType = alpine::FileType::Gltf;
+    }
+    else
+    {
+        printf("ERROR: invalid file format: %s\n", filePath.filename().string().c_str());
+        return 1;
+    }
+
+    bool loaded = alpine::load(filePath.string(), fileType);
     if (!loaded)
     {
-        printf("ERROR: failed to load %s\n", objFilename);
+        printf("ERROR: failed to load %s\n", filePath.string().c_str());
+        return 1;
+    }
+
+    alpine::LightSamplerType lsType;
+    if (lightSamplerType == "uniform")
+    {
+        lsType = alpine::LightSamplerType::Uniform;
+    }
+    else if (lightSamplerType == "power")
+    {
+        lsType = alpine::LightSamplerType::Power;
+    }
+    else if (lightSamplerType == "bvh")
+    {
+        lsType = alpine::LightSamplerType::Bvh;
+    }
+    else
+    {
+        printf("ERROR: invalid light sampler type: %s\n", lightSamplerType.c_str());
         return 1;
     }
 
     {
         Timer timer("Light Sampler Build");
-        alpine::buildLightSampler(alpine::LightSamplerType::Bvh);
+        alpine::buildLightSampler(lsType);
     }
 
     auto* camera = alpine::getCamera();
