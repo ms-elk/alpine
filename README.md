@@ -24,11 +24,12 @@
 
 ## Sample Applications
 ### simple
-*simple* is an application which generates an image using path tracing. It takes an obj file as input, and outputs a ppm file.
+*simple* is an application which generates an image using path tracing. It takes either an obj file or a glb file as input, and outputs a ppm file.
 ```
-simple spp input.obj output.ppm
+simple spp lightSamplerType input.(obj|glb) output.ppm
 ```
-`spp` specifies the number of samples per pixel.
+`spp` specifies the number of samples per pixel.  
+`lightSamplerType` selects a light sampler type from "uniform", "power", or "bvh".
 
 ### viewer
 *viewer* is a progressive path tracer, and takes a glb file as input.
