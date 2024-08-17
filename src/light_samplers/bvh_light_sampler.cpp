@@ -5,10 +5,12 @@
 #include "utils/util.h"
 
 #include <assert.h>
+#include <future>
 
 namespace alpine {
 namespace {
 static constexpr uint8_t SPLITS_PER_DIM = 4;
+static constexpr uint8_t MAX_DEPTH_FOR_PARALLELIZATION = 0;
 
 struct LightNode
 {
@@ -107,7 +109,7 @@ splitLightCluster(const std::vector<Light*>& lightCluster, const BoundingBox& bb
 }
 
 std::unique_ptr<LightNode>
-createLightNode(const std::vector<Light*>& lightCluster)
+createLightNode(const std::vector<Light*>& lightCluster, uint32_t depth = 0)
 {
     auto lightNode = std::make_unique<LightNode>();
     for (const auto* l : lightCluster)
@@ -140,8 +142,28 @@ createLightNode(const std::vector<Light*>& lightCluster)
         assert(!subClusters[0].empty());
         assert(!subClusters[1].empty());
 
-        lightNode->children[0] = createLightNode(subClusters[0]);
-        lightNode->children[1] = createLightNode(subClusters[1]);
+        if (depth < MAX_DEPTH_FOR_PARALLELIZATION)
+        {
+            std::future<std::unique_ptr<LightNode>> children[2];
+            for (uint8_t i = 0; i < 2; ++i)
+            {
+                children[i] = std::async([&, i]() {
+                    return createLightNode(subClusters[i], depth + 1);
+                 });
+            }
+
+            for (uint8_t i = 0; i < 2; ++i)
+            {
+                lightNode->children[i] = children[i].get();
+            }
+        }
+        else
+        {
+            for (uint8_t i = 0; i < 2; ++i)
+            {
+                lightNode->children[i] = createLightNode(subClusters[i], depth + 1);
+            }
+        }
     }
 
     return lightNode;
