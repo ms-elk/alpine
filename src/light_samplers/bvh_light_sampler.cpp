@@ -6,11 +6,12 @@
 
 #include <assert.h>
 #include <future>
+#include <optional>
 
 namespace alpine {
 namespace {
 static constexpr uint8_t SPLITS_PER_DIM = 4;
-static constexpr uint8_t MAX_DEPTH_FOR_PARALLELIZATION = 0;
+static constexpr uint32_t MIN_LIGHTS_FOR_PARALLELIZATION = 512;
 
 struct LightNode
 {
@@ -55,52 +56,116 @@ struct Split
     float point = 0.0f;
 };
 
-Split
-splitLightCluster(const std::vector<Light*>& lightCluster, const BoundingBox& bbox)
+std::optional<Split>
+splitLightCluster(const std::vector<Light*>& lightCluster, const float3& diagonal)
 {
+    if (lightCluster.size() <= 2)
+    {
+        return {};
+    }
+
+    auto centroidBox = [&]() {
+        BoundingBox cb;
+        for (const auto* l : lightCluster)
+        {
+            float3 c = l->getBoundingBox().getCenter();
+            cb = merge(cb, BoundingBox{c, c});
+        }
+        
+        return cb;
+    }();
+
+    float cbDiagonalMax = maxComponent(centroidBox.getDiagonal());
+    if (cbDiagonalMax == 0.0f)
+    {
+        return {};
+    }
+
     Split split;
-    float minMetric = std::numeric_limits<float>::max();
-    float3 bboxDiagonal = bbox.getDiagonal();
+    float minCost = std::numeric_limits<float>::max();
+
+    struct Bin
+    {
+        float power = 0.0f;
+        BoundingBox bbox;
+
+        void clear()
+        {
+            power = 0.0f;
+            bbox = BoundingBox();
+        }
+    };
+    static constexpr uint8_t BIN_COUNT = SPLITS_PER_DIM + 1;
+    Bin bins[BIN_COUNT];
 
     for (uint8_t dim = 0; dim < 3; ++dim)
     {
-        float kr = maxComponent(bboxDiagonal) / std::max(bboxDiagonal[dim], 0.001f);
+        if (centroidBox.min[dim] == centroidBox.max[dim])
+        {
+            continue;
+        }
 
+        float kr = maxComponent(diagonal) / std::max(diagonal[dim], 0.001f);
+
+        for (auto& bin : bins)
+        {
+            bin.clear();
+        }
+
+        // binning
+        for (const auto* l : lightCluster)
+        {
+            auto bbox = l->getBoundingBox();
+            float c = bbox.getCenter()[dim];
+            uint8_t binIdx = static_cast<uint8_t>(BIN_COUNT
+                * (c - centroidBox.min[dim]) / (centroidBox.max[dim] - centroidBox.min[dim]));
+            binIdx = std::min(binIdx, static_cast<uint8_t>(BIN_COUNT - 1));
+
+            auto& bin = bins[binIdx];
+            bin.power += length(l->getPower());
+            bin.bbox = merge(bin.bbox, bbox);
+        }
+
+        float costs[SPLITS_PER_DIM] = { 0.0f };
+
+        const auto accumulateCosts = [&](uint8_t binIdx, uint8_t splitIdx, Bin& binAccum) {
+            const auto& bin = bins[binIdx];
+            binAccum.power += bin.power;
+            binAccum.bbox = merge(binAccum.bbox, bin.bbox);
+
+            float sa =
+                binAccum.bbox.min.x < std::numeric_limits<float>::max() /* is initialized or not */
+                ? binAccum.bbox.computeSurfaceArea() : 0.0f;
+            costs[splitIdx] += binAccum.power * sa;
+        };
+
+        Bin binBelow;
         for (uint8_t splitIdx = 0; splitIdx < SPLITS_PER_DIM; ++splitIdx)
         {
-            static constexpr float normalizer = 1.0f / static_cast<float>(SPLITS_PER_DIM + 1);
-            float t = static_cast<float>(splitIdx + 1) * normalizer;
-            float splitPoint = bbox.min[dim] * (1.0f - t) + bbox.max[dim] * t;
+            uint8_t binIdx = splitIdx;
+            accumulateCosts(binIdx, splitIdx, binBelow);
+        }
 
-            struct Metric
+        Bin binAbove;
+        for (int8_t splitIdx = SPLITS_PER_DIM - 1; splitIdx >= 0 ; --splitIdx)
+        {
+            uint8_t binIdx = splitIdx + 1;
+            accumulateCosts(binIdx, splitIdx, binAbove);
+        }
+
+        // find the split which has the minimum cost
+        for (uint8_t splitIdx = 0; splitIdx < SPLITS_PER_DIM; ++splitIdx)
+        {
+            auto& cost = costs[splitIdx];
+            cost *= kr;
+            if (cost < minCost)
             {
-                float power = 0.0f;
-                BoundingBox bbox;
-
-                float evaluate() const {
-                    float sa = bbox.min.x < std::numeric_limits<float>::max() /* is initialized or not */
-                        ? bbox.computeSurfaceArea() : 0.0f;
-                    return power * sa;
-                };
-            };
-            Metric metric[2];
-
-            for (const auto* l : lightCluster)
-            {
-                auto bbox = l->getBoundingBox();
-                uint8_t metricIdx = bbox.getCenter()[dim] < splitPoint ? 0 : 1;
-                auto& m = metric[metricIdx];
-
-                m.power += length(l->getPower());
-                m.bbox = merge(bbox, m.bbox);
-            }
-
-            float metricValue = kr * (metric[0].evaluate() + metric[1].evaluate());
-            if (metricValue < minMetric)
-            {
-                minMetric = metricValue;
+                minCost = cost;
                 split.dim = dim;
-                split.point = splitPoint;
+
+                static constexpr float normalizer = 1.0f / static_cast<float>(SPLITS_PER_DIM + 1);
+                float t = static_cast<float>(splitIdx + 1) * normalizer;
+                split.point = centroidBox.min[dim] * (1.0f - t) + centroidBox.max[dim] * t;
             }
         }
     }
@@ -109,7 +174,7 @@ splitLightCluster(const std::vector<Light*>& lightCluster, const BoundingBox& bb
 }
 
 std::unique_ptr<LightNode>
-createLightNode(const std::vector<Light*>& lightCluster, uint32_t depth = 0)
+createLightNode(const std::vector<Light*>& lightCluster)
 {
     auto lightNode = std::make_unique<LightNode>();
     for (const auto* l : lightCluster)
@@ -126,29 +191,43 @@ createLightNode(const std::vector<Light*>& lightCluster, uint32_t depth = 0)
     }
     else
     {
-        auto split = splitLightCluster(lightCluster, lightNode->bbox);
+        auto split = splitLightCluster(lightCluster, lightNode->bbox.getDiagonal());
 
         std::vector<Light*> subClusters[2];
         subClusters[0].reserve(lightCluster.size());
         subClusters[1].reserve(lightCluster.size());
 
-        for (auto* l : lightCluster)
+        if (split.has_value())
         {
-            auto bbox = l->getBoundingBox();
-            uint8_t scIdx = bbox.getCenter()[split.dim] < split.point ? 0 : 1;
-            subClusters[scIdx].push_back(l);
+            const auto& s = split.value();
+            for (auto* l : lightCluster)
+            {
+                auto bbox = l->getBoundingBox();
+                uint8_t scIdx = bbox.getCenter()[s.dim] < s.point ? 0 : 1;
+                subClusters[scIdx].push_back(l);
+            }
+        }
+        else
+        {
+            // split the light cluster by the middle index
+            uint32_t midIdx = static_cast<uint32_t>(lightCluster.size() / 2);
+            for (uint32_t i = 0; i < lightCluster.size(); ++i)
+            {
+                uint8_t scIdx = i < midIdx ? 0 : 1;
+                subClusters[scIdx].push_back(lightCluster[i]);
+            }
         }
 
         assert(!subClusters[0].empty());
         assert(!subClusters[1].empty());
 
-        if (depth < MAX_DEPTH_FOR_PARALLELIZATION)
+        if (lightCluster.size() >= MIN_LIGHTS_FOR_PARALLELIZATION)
         {
             std::future<std::unique_ptr<LightNode>> children[2];
             for (uint8_t i = 0; i < 2; ++i)
             {
                 children[i] = std::async([&, i]() {
-                    return createLightNode(subClusters[i], depth + 1);
+                    return createLightNode(subClusters[i]);
                  });
             }
 
@@ -161,7 +240,7 @@ createLightNode(const std::vector<Light*>& lightCluster, uint32_t depth = 0)
         {
             for (uint8_t i = 0; i < 2; ++i)
             {
-                lightNode->children[i] = createLightNode(subClusters[i], depth + 1);
+                lightNode->children[i] = createLightNode(subClusters[i]);
             }
         }
     }
