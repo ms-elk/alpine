@@ -3,6 +3,8 @@
 #include "shapes/shape.h"
 #include "utils/util.h"
 
+#include <numbers>
+
 namespace alpine {
 DiskLight::DiskLight(
     float power, const float3& color, const float3& position, const float3& normal, float radius)
@@ -10,8 +12,8 @@ DiskLight::DiskLight(
 {
     mPosition = position;
     std::tie(mBinormal, mTangent) = getBasis(mNormal);
-    mArea = mRadius * mRadius * PI;
-    mEmittedRadiance = mPower / (mArea * PI);
+    mArea = mRadius * mRadius * std::numbers::pi_v<float>;
+    mEmittedRadiance = mPower / (mArea * std::numbers::pi_v<float>);
 
     float3 corners[4];
     corners[0] = mPosition + mBinormal * mRadius;

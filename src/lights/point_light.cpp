@@ -2,19 +2,21 @@
 
 #include "utils/util.h"
 
+#include <numbers>
+
 namespace alpine {
 PointLight::PointLight(const float3& intensity, const float3& position)
     : mIntensity(intensity)
 {
     mPosition = position;
-    mPower = mIntensity * 4.0f * PI;
+    mPower = mIntensity * 4.0f * std::numbers::pi_v<float>;
 }
 
 PointLight::PointLight(float power, const float3& color, const float3& position)
     : mPower(color * power)
 {
     mPosition = position;
-    mIntensity = mPower / (4.0f * PI);
+    mIntensity = mPower / (4.0f * std::numbers::pi_v<float>);
 }
 
 std::optional<Light::Sample>

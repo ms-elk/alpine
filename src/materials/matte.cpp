@@ -4,6 +4,8 @@
 #include "shapes/shape.h"
 #include "utils/util.h"
 
+#include <numbers>
+
 namespace alpine {
 std::optional<Material::Sample>
 Matte::sample(
@@ -26,7 +28,7 @@ Matte::computeBsdf(
     const float3& wo, const float3& wi, const IntersectionAttributes& isectAttr) const
 {
     float3 bc = getBaseColor(isectAttr.uv);
-    float3 bsdf = bc / PI;
+    float3 bsdf = bc / std::numbers::pi_v<float>;
 
     return bsdf;
 }
@@ -34,7 +36,7 @@ Matte::computeBsdf(
 float
 Matte::computePdf(const float3& wo, const float3& wi) const
 {
-    return std::max(cosTheta(wi), 0.0f) / PI;
+    return std::max(cosTheta(wi), 0.0f) / std::numbers::pi_v<float>;
 }
 
 float3

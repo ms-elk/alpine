@@ -5,7 +5,6 @@
 #include <algorithm>
 
 namespace alpine {
-static constexpr float PI = 3.14159265358979323846f;
 static constexpr float ONE_MINUS_EPSILON = 1.0f - std::numeric_limits<float>::epsilon();
 
 inline float cos2Theta(const float3& w) { return w.z * w.z; }

@@ -2,8 +2,7 @@
 
 #include <GLFW/glfw3.h>
 #include <GL/gl.h>
-
-static constexpr float PI = 3.14159265358979323846f;
+#include <numbers>
 
 static constexpr uint32_t WIDTH = 512;
 static constexpr uint32_t HEIGHT = 512;
@@ -58,8 +57,8 @@ void cursorPositionCallback(GLFWwindow* window, double xpos, double ypos)
 
         if (gMouseAction == MouseAction::LeftPressed)
         {
-            float theta = deltaX / static_cast<float>(WIDTH) * PI;
-            float phi = deltaY / static_cast<float>(HEIGHT) * PI;
+            float theta = deltaX / static_cast<float>(WIDTH) * std::numbers::pi_v<float>;
+            float phi = deltaY / static_cast<float>(HEIGHT) * std::numbers::pi_v<float>;
             gCamera->orbit(theta, phi);
         }
         else if (gMouseAction == MouseAction::MiddlePressed)
@@ -125,7 +124,7 @@ int main(int argc, char* argv[])
 
     alpine::buildLightSampler(alpine::LightSamplerType::Bvh);
 
-    const float fovy = PI / 2.0f;
+    const float fovy = std::numbers::pi_v<float> / 2.0f;
     float aspect = float(WIDTH) / float(HEIGHT);
     gCamera = alpine::getCamera();
     gCamera->setLookAt(eye, target, up, fovy, aspect);
