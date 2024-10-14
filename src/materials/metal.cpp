@@ -4,6 +4,8 @@
 #include "shapes/shape.h"
 #include "utils/util.h"
 
+#include <numbers>
+
 namespace alpine {
 std::optional<Material::Sample>
 Metal::sample(
@@ -106,7 +108,7 @@ Metal::computePdf(const float3& wo, const float3& wi) const
     }
     else
     {
-        return std::max(cosTheta(wi), 0.0f) / PI;
+        return std::max(cosTheta(wi), 0.0f) / std::numbers::pi_v<float>;
     }
 }
 
@@ -117,7 +119,7 @@ Metal::computeDistribution(const float3& wh) const
     float cos2Phi = cosPhi(wh) * cosPhi(wh);
     float sin2Phi = sinPhi(wh) * sinPhi(wh);
     float term = 1.0f + tan2Theta(wh) * (cos2Phi / (mAlpha.x * mAlpha.x) + sin2Phi / (mAlpha.y * mAlpha.y));
-    float invD = PI * mAlpha.x * mAlpha.y * cos4Theta * term * term;
+    float invD = std::numbers::pi_v<float> * mAlpha.x * mAlpha.y * cos4Theta * term * term;
 
     return invD != 0.0f ? 1.0f / invD : 0.0f;
 }

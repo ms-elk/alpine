@@ -5,6 +5,7 @@
 #include "utils/util.h"
 
 #include <algorithm>
+#include <numbers>
 
 namespace alpine {
 constexpr float FILM_DIST = 1.0f;
@@ -40,7 +41,7 @@ Camera::orbit(float theta, float phi)
     toEye /= toEyeDist;
 
     theta = std::atan2(toEye.x, toEye.z) - theta;
-    phi = std::clamp(std::acos(toEye.y) - phi, 0.0f, PI);
+    phi = std::clamp(std::acos(toEye.y) - phi, 0.0f, std::numbers::pi_v<float>);
 
     float sinTheta = std::sin(theta);
     float cosTheta = std::cos(theta);

@@ -2,9 +2,8 @@
 
 #include <chrono>
 #include <filesystem>
+#include <numbers>
 #include <string>
-
-static constexpr float PI = 3.14159265358979323846f;
 
 class Timer
 {
@@ -55,7 +54,7 @@ main(int argc, char* argv[])
     const float eye[] = { 0.0f, 0.0f, -3.0f };
     const float target[] = { 0.0f, 0.0f, 0.0f };
     const float up[] = { 0.0f, 1.0f, 0.0f };
-    const float fovy = PI / 2.0f;
+    const float fovy = std::numbers::pi_v<float> / 2.0f;
     float aspect = float(width) / float(height);
 
     alpine::initialize(width, height, maxDepth);
