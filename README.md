@@ -3,7 +3,7 @@
 
 ## Requirements
 - Visual Studio 2022
-- C++ 17
+- C++ 20
 - CMake 3.26
 - OpenGL 4.6 (optional for [viewer](#viewer))
 
