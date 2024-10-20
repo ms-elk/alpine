@@ -7,7 +7,7 @@
 #include <string_view>
 
 namespace alpine {
-void initialize(uint32_t width, uint32_t height, uint32_t maxDepth);
+bool initialize(uint32_t width, uint32_t height, uint32_t maxDepth);
 
 enum class FileType {
     Gltf,

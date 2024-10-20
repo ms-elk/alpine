@@ -33,14 +33,8 @@ static constexpr float RAY_OFFSET = 0.001f;
 class Alpine
 {
 public:
-    Alpine(const Alpine&) = delete;
-    Alpine& operator=(const Alpine&) = delete;
-
-    static Alpine& getInstance()
-    {
-        static Alpine inst;
-        return inst;
-    }
+    Alpine(uint32_t width, uint32_t height, uint32_t maxDepth);
+    ~Alpine() { kernel::finalize(); }
 
     inline void setBackgroundColor(float r, float g, float b)
     {
@@ -50,8 +44,6 @@ public:
     inline api::Camera* getCamera() { return &mCamera; }
 
     inline const void* getFrameBuffer() const { return mFrameBuffer.data(); }
-
-    void initialize(uint32_t width, uint32_t height, uint32_t maxDepth);
 
     bool load(std::string_view filename, FileType fileType);
 
@@ -72,12 +64,6 @@ public:
     void addDebugScene();
 
 private:
-    Alpine()
-    {
-        kernel::initialize();
-    }
-    ~Alpine() { kernel::finalize(); }
-
     float3 estimateDirectIllumination(Sampler& sampler, const float3& hit,
         const float3& wo, const IntersectionAttributes& isectAttr) const;
 
@@ -114,9 +100,10 @@ private:
     oidn::DeviceRef mDenoiser;
 };
 
-void
-Alpine::initialize(uint32_t width, uint32_t height, uint32_t maxDepth)
+Alpine::Alpine(uint32_t width, uint32_t height, uint32_t maxDepth)
 {
+    kernel::initialize();
+
     mWidth = width;
     mHeight = height;
     mMaxDepth = maxDepth;
@@ -413,81 +400,103 @@ Alpine::addDebugScene()
 }
 
 ///////////////////////////////////////////////////////////////
-void
+std::unique_ptr<Alpine> gAlpine;
+
+bool
 initialize(uint32_t width, uint32_t height, uint32_t maxDepth)
 {
-    Alpine::getInstance().initialize(width, height, maxDepth);
+    if (!gAlpine)
+    {
+        gAlpine = std::make_unique<Alpine>(width, height, maxDepth);
+        return true;
+    }
+    else
+    {
+        return false;
+    }
 }
 
 bool
 load(std::string_view filename, FileType fileType)
 {
-    return Alpine::getInstance().load(filename, fileType);
+    assert(gAlpine);
+    return gAlpine->load(filename, fileType);
 }
 
 api::Light*
 addPointLight(float power, const float color[3], const float position[3])
 {
-    return Alpine::getInstance().addPointLight(power, color, position);
+    assert(gAlpine);
+    return gAlpine->addPointLight(power, color, position);
 }
 
 api::Light*
 addDiskLight(float power, const float color[3], const float position[3], float radius)
 {
-    return Alpine::getInstance().addDiskLight(power, color, position, radius);
+    assert(gAlpine);
+    return gAlpine->addDiskLight(power, color, position, radius);
 }
 
 void
 buildLightSampler(LightSamplerType lightSamplerType)
 {
-    Alpine::getInstance().buildLightSampler(lightSamplerType);
+    assert(gAlpine);
+    gAlpine->buildLightSampler(lightSamplerType);
 }
 
 void
 setBackgroundColor(float r, float g, float b)
 {
-    Alpine::getInstance().setBackgroundColor(r, g, b);
+    assert(gAlpine);
+    gAlpine->setBackgroundColor(r, g, b);
 }
 
 api::Camera*
 getCamera()
 {
-    return Alpine::getInstance().getCamera();
+    assert(gAlpine);
+    return gAlpine->getCamera();
 }
 
 void
 resetAccumulation()
 {
-    Alpine::getInstance().resetAccumulation();
+    assert(gAlpine);
+    gAlpine->resetAccumulation();
 }
 
 void
 render(uint32_t spp)
 {
-    Alpine::getInstance().render(spp);
+    assert(gAlpine);
+    gAlpine->render(spp);
 }
 
 void
 resolve(bool denoise)
 {
-    Alpine::getInstance().resolve(denoise);
+    assert(gAlpine);
+    gAlpine->resolve(denoise);
 }
 
 const void*
 getFrameBuffer()
 {
-    return Alpine::getInstance().getFrameBuffer();
+    assert(gAlpine);
+    return gAlpine->getFrameBuffer();
 }
 
 void
 saveImage(std::string_view filename)
 {
-    Alpine::getInstance().saveImage(filename);
+    assert(gAlpine);
+    gAlpine->saveImage(filename);
 }
 
 void
 addDebugScene()
 {
-    Alpine::getInstance().addDebugScene();
+    assert(gAlpine);
+    gAlpine->addDebugScene();
 }
 }
