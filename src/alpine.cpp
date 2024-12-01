@@ -2,7 +2,8 @@
 
 #include "camera.h"
 #include "image.h"
-#include "kernel/kernel.h"
+#include "accelerators/accelerator.h"
+#include "denoisers/denoiser.h"
 #include "light_samplers/light_sampler.h"
 #include "light_samplers/bvh_light_sampler.h"
 #include "light_samplers/power_light_sampler.h"
@@ -19,9 +20,8 @@
 #include "shapes/sphere.h"
 #include "utils/util.h"
 
-#include <OpenImageDenoise/oidn.hpp>
-
 #include <algorithm>
+#include <assert.h>
 #include <future>
 #include <memory>
 #include <vector>
@@ -34,7 +34,7 @@ class Alpine
 {
 public:
     Alpine(uint32_t width, uint32_t height, uint32_t maxDepth);
-    ~Alpine() { kernel::finalize(); }
+    ~Alpine() { accelerator::finalize(); }
 
     inline void setBackgroundColor(float r, float g, float b)
     {
@@ -74,16 +74,9 @@ private:
 
     float3 mBackgroundColor = float3(1.0f);
 
-    struct RenderTarget
-    {
-        float3 color;
-        float3 albedo;
-        float3 normal;
-    };
-
     std::vector<Sampler> mSamplers;
-    std::vector<RenderTarget> mAccumBuffer;
-    std::vector<RenderTarget> mResolvedBuffer;
+    std::vector<denoiser::RenderTarget> mAccumBuffer;
+    std::vector<denoiser::RenderTarget> mResolvedBuffer;
     std::vector<byte3> mFrameBuffer;
     uint32_t mTotalSamples = 0;
 
@@ -96,13 +89,12 @@ private:
     Camera mCamera;
 
     std::unique_ptr<LightSampler> mLightSampler;
-
-    oidn::DeviceRef mDenoiser;
 };
 
 Alpine::Alpine(uint32_t width, uint32_t height, uint32_t maxDepth)
 {
-    kernel::initialize();
+    accelerator::initialize();
+    denoiser::initialize();
 
     mWidth = width;
     mHeight = height;
@@ -118,9 +110,6 @@ Alpine::Alpine(uint32_t width, uint32_t height, uint32_t maxDepth)
     mTileHeight = (height - 1) / TILE_SIZE + 1;
     uint32_t tileCount = mTileWidth * mTileHeight;
     mTiles.resize(tileCount);
-
-    mDenoiser = oidn::newDevice();
-    mDenoiser.commit();
 
     resetAccumulation();
 }
@@ -145,7 +134,7 @@ Alpine::load(std::string_view filename, FileType fileType)
         return false;
     }
 
-    kernel::updateScene();
+    accelerator::updateScene();
 
     return true;
 }
@@ -190,7 +179,8 @@ Alpine::resetAccumulation()
     {
         mSamplers[p].reset(p);
     }
-    std::fill(mAccumBuffer.begin(), mAccumBuffer.end(), RenderTarget{float3(0.0f), float3(0.0f), float3(0.0f) });
+    std::fill(mAccumBuffer.begin(), mAccumBuffer.end(),
+        denoiser::RenderTarget{float3(0.0f), float3(0.0f), float3(0.0f) });
     mTotalSamples = 0;
 }
 
@@ -229,7 +219,7 @@ Alpine::render(uint32_t spp)
                         float3 radiance(0.0f);
                         for (uint32_t depth = 0; depth < mMaxDepth; ++depth)
                         {
-                            auto isect = kernel::intersect(ray);
+                            auto isect = accelerator::intersect(ray);
 
                             if (!isect.shapePtr)
                             {
@@ -310,7 +300,7 @@ Alpine::estimateDirectIllumination(
         const float3& position, const float3& normal, const float3& dir, float dist) {
         float3 rayOffset = normal * RAY_OFFSET;
         Ray shadowRay{ position + rayOffset, dir };
-        bool occluded = kernel::occluded(shadowRay, dist);
+        bool occluded = accelerator::occluded(shadowRay, dist);
         return occluded;
     };
 
@@ -364,14 +354,7 @@ Alpine::resolve(bool denoise)
 
     if (denoise)
     {
-        oidn::FilterRef filter = mDenoiser.newFilter("RT");
-        filter.setImage("color", mResolvedBuffer.data(), oidn::Format::Float3, mWidth, mHeight, 0, sizeof(RenderTarget));
-        filter.setImage("albedo", mResolvedBuffer.data(), oidn::Format::Float3, mWidth, mHeight, sizeof(float3), sizeof(RenderTarget));
-        filter.setImage("normal", mResolvedBuffer.data(), oidn::Format::Float3, mWidth, mHeight, 2 * sizeof(float3), sizeof(RenderTarget));
-        filter.setImage("output", mResolvedBuffer.data(), oidn::Format::Float3, mWidth, mHeight, 0, sizeof(RenderTarget));
-        filter.set("hdr", true);
-        filter.commit();
-        filter.execute();
+        denoiser::denoise(mResolvedBuffer.data(), mWidth, mHeight);
     }
 
     for (uint32_t i = 0; i < mFrameBuffer.size(); ++i)
@@ -396,7 +379,7 @@ Alpine::addDebugScene()
 {
     mScene.shapes.push_back(createDebugTriangle());
     mScene.shapes.push_back(createDebugSphere());
-    kernel::updateScene();
+    accelerator::updateScene();
 }
 
 ///////////////////////////////////////////////////////////////

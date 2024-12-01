@@ -1,6 +1,6 @@
 ﻿#include "mesh.h"
 
-#include "kernel/kernel.h"
+#include "accelerators/accelerator.h"
 #include "materials/material.h"
 #include "ray.h"
 #include "texture.h"
@@ -11,11 +11,11 @@ namespace alpine {
 Mesh::Mesh(Data&& data)
     : mData(std::move(data))
 {
-    kernel::createMesh(mData.vertices, mData.prims, this);
+    accelerator::createMesh(mData.vertices, mData.prims, this);
 }
 
 IntersectionAttributes
-Mesh::getIntersectionAttributes(const kernel::Intersection& isect) const
+Mesh::getIntersectionAttributes(const accelerator::Intersection& isect) const
 {
     IntersectionAttributes isectAttr;
     float b1 = isect.barycentric.x;

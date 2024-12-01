@@ -1,17 +1,17 @@
 ﻿#include "sphere.h"
 
-#include "kernel/kernel.h"
+#include "accelerators/accelerator.h"
 #include "ray.h"
 
 namespace alpine {
 Sphere::Sphere(const std::shared_ptr<Data>& data)
     : mData(data)
 {
-    kernel::createSphere(mData->vertices, this);
+    accelerator::createSphere(mData->vertices, this);
 }
 
 IntersectionAttributes
-Sphere::getIntersectionAttributes(const kernel::Intersection& isect) const
+Sphere::getIntersectionAttributes(const accelerator::Intersection& isect) const
 {
     IntersectionAttributes isectAttr;
     isectAttr.ns = isect.ng;

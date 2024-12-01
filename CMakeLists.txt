@@ -12,6 +12,8 @@ set(CMAKE_SUPPRESS_REGENERATION true)
 add_compile_options(/WX)
 
 option(ALPINE_BUILD_APPS "build applications of alpine" OFF)
+option(ALPINE_USE_EMBREE "use intel embree as an accelerator" ON)
+option(ALPINE_USE_OIDN "use intel open image denoise as a denoiser" ON)
 
 if (ALPINE_BUILD_APPS)
   # set directory for output executables
@@ -37,10 +39,21 @@ set(SOURCES
   src/texture.h
 )
 
-set(KERNEL
-  src/kernel/kernel.h
-  src/kernel/embree.cpp
-)
+set(ACCELERATORS src/accelerators/accelerator.h)
+
+if (ALPINE_USE_EMBREE)
+list(APPEND ACCELERATORS src/accelerators/embree/embree.cpp)
+else()
+list(APPEND ACCELERATORS src/accelerators/bvh/bvh.cpp)
+endif()
+
+set(DENOISERS src/denoisers/denoiser.h)
+
+if (ALPINE_USE_OIDN)
+list(APPEND DENOISERS src/denoisers/oidn.cpp)
+else()
+list(APPEND DENOISERS src/denoisers/dummy.cpp)
+endif()
 
 set(LIGHT_SAMPLERS
   src/light_samplers/light_sampler.h
@@ -102,7 +115,8 @@ set(UTILS
 )
 
 source_group("" FILES ${SOURCES})
-source_group("kernel" FILES ${KERNEL})
+source_group("accelerators" FILES ${ACCELERATORS})
+source_group("denoisers" FILES ${DENOISERS})
 source_group("light_samplers" FILES ${LIGHT_SAMPLERS})
 source_group("lights" FILES ${LIGHTS})
 source_group("loaders" FILES ${LOADERS})
@@ -114,7 +128,8 @@ source_group("utils" FILES ${UTILS})
 
 add_library(alpine STATIC
   ${SOURCES}
-  ${KERNEL}
+  ${ACCELERATORS}
+  ${DENOISERS}
   ${LIGHT_SAMPLERS}
   ${LIGHTS}
   ${LOADERS}
@@ -130,21 +145,14 @@ target_include_directories(alpine
     include
     ext
   PRIVATE
-    ext/embree/include
-    ext/oidn/include
     src
 )
 
-target_link_directories(alpine PUBLIC
-  ext/embree/lib
-  ext/oidn/lib
-)
-
-target_link_libraries(alpine PUBLIC
-  embree4
-  OpenImageDenoise
-  tbb12
-)
+# embree libraries
+if (ALPINE_USE_EMBREE)
+target_include_directories(alpine PRIVATE ext/embree/include)
+target_link_directories(alpine PUBLIC ext/embree/lib)
+target_link_libraries(alpine PUBLIC embree4 tbb12)
 
 add_custom_command(TARGET alpine POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -154,7 +162,16 @@ add_custom_command(TARGET alpine POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
   ${CMAKE_CURRENT_SOURCE_DIR}/ext/embree/bin/tbb12.dll
   $<TARGET_FILE_DIR:alpine>
+)
+endif()
 
+# oidn libraries
+if (ALPINE_USE_OIDN)
+target_include_directories(alpine PRIVATE ext/oidn/include)
+target_link_directories(alpine PUBLIC ext/oidn/lib)
+target_link_libraries(alpine PUBLIC OpenImageDenoise)
+
+add_custom_command(TARGET alpine POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
   ${CMAKE_CURRENT_SOURCE_DIR}/ext/oidn/bin/OpenImageDenoise.dll
   $<TARGET_FILE_DIR:alpine>
@@ -167,6 +184,7 @@ add_custom_command(TARGET alpine POST_BUILD
   ${CMAKE_CURRENT_SOURCE_DIR}/ext/oidn/bin/OpenImageDenoise_device_cpu.dll
   $<TARGET_FILE_DIR:alpine>
 )
+endif()
 
 # applications
 if (ALPINE_BUILD_APPS)

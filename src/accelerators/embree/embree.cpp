@@ -1,10 +1,10 @@
-﻿#include "kernel.h"
+﻿#include "accelerators/accelerator.h"
 
 #include "ray.h"
 #include <embree4/rtcore.h>
 #include <stdio.h>
 
-namespace alpine::kernel {
+namespace alpine::accelerator {
 RTCDevice gDevice = nullptr;
 RTCScene gScene = nullptr;
 
