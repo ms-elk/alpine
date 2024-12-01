@@ -7,7 +7,7 @@
 namespace alpine {
 struct Ray;
 
-namespace kernel {
+namespace accelerator {
 bool initialize();
 
 void finalize();
