@@ -23,11 +23,11 @@ void updateScene();
 
 struct Intersection
 {
-    void* shapePtr;
-    uint32_t primId;
+    void* shapePtr = nullptr;
+    uint32_t primId = std::numeric_limits<uint32_t>::max();
     float3 ng;
     float2 barycentric;
-    float t;
+    float t = std::numeric_limits<float>::max();
 
 };
 Intersection intersect(const Ray& ray);
