@@ -12,8 +12,8 @@ set(CMAKE_SUPPRESS_REGENERATION true)
 add_compile_options(/WX)
 
 option(ALPINE_BUILD_APPS "build applications of alpine" OFF)
-option(ALPINE_USE_EMBREE "use intel embree as an accelerator" ON)
-option(ALPINE_USE_OIDN "use intel open image denoise as a denoiser" ON)
+option(ALPINE_USE_EMBREE "use intel embree as an accelerator" OFF)
+option(ALPINE_USE_OIDN "use intel open image denoise as a denoiser" OFF)
 
 if (ALPINE_BUILD_APPS)
   # set directory for output executables
@@ -110,6 +110,7 @@ set(UTILS
   src/utils/alias_table.cpp
   src/utils/alias_table.h
   src/utils/bounding_box.h
+  src/utils/bvh_util.h
   src/utils/util.cpp
   src/utils/util.h
 )

@@ -2,6 +2,7 @@
 
 #include "lights/light.h"
 #include "utils/bounding_box.h"
+#include "utils/bvh_util.h"
 #include "utils/util.h"
 
 #include <assert.h>
@@ -50,13 +51,7 @@ struct LightNode
     }
 };
 
-struct Split
-{
-    uint8_t dim = 0;
-    float point = 0.0f;
-};
-
-std::optional<Split>
+std::optional<bvh_util::Split>
 splitLightCluster(const std::vector<Light*>& lightCluster, const float3& diagonal)
 {
     if (lightCluster.size() <= 2)
@@ -81,7 +76,7 @@ splitLightCluster(const std::vector<Light*>& lightCluster, const float3& diagona
         return {};
     }
 
-    Split split;
+    bvh_util::Split split;
     float minCost = std::numeric_limits<float>::max();
 
     struct Bin
@@ -161,11 +156,7 @@ splitLightCluster(const std::vector<Light*>& lightCluster, const float3& diagona
             if (cost < minCost)
             {
                 minCost = cost;
-                split.dim = dim;
-
-                static constexpr float normalizer = 1.0f / static_cast<float>(SPLITS_PER_DIM + 1);
-                float t = static_cast<float>(splitIdx + 1) * normalizer;
-                split.point = centroidBox.min[dim] * (1.0f - t) + centroidBox.max[dim] * t;
+                split = { dim, splitIdx, BIN_COUNT, centroidBox.min[dim], centroidBox.max[dim] };
             }
         }
     }
@@ -203,7 +194,7 @@ createLightNode(const std::vector<Light*>& lightCluster)
             for (auto* l : lightCluster)
             {
                 auto bbox = l->getBoundingBox();
-                uint8_t scIdx = bbox.getCenter()[s.dim] < s.point ? 0 : 1;
+                uint8_t scIdx = s.isBelow(bbox.getCenter()) ? 0 : 1;
                 subClusters[scIdx].push_back(l);
             }
         }
