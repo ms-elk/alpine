@@ -7,7 +7,13 @@
 #include <string_view>
 
 namespace alpine {
-bool initialize(uint32_t width, uint32_t height, uint32_t maxDepth);
+enum class AcceleratorType {
+    Bvh,
+    Embree,
+};
+
+bool initialize(
+    uint32_t width, uint32_t height, uint32_t maxDepth, AcceleratorType acceleratorType);
 
 enum class FileType {
     Gltf,

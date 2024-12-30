@@ -1,68 +1,87 @@
-﻿#include "accelerators/accelerator.h"
+﻿#include "accelerators/embree.h"
 
+#include "alpine_config.h"
 #include "ray.h"
+
+#include <assert.h>
 #include <embree4/rtcore.h>
 #include <stdio.h>
 
-namespace alpine::accelerator {
-RTCDevice gDevice = nullptr;
-RTCScene gScene = nullptr;
-
+namespace alpine {
+namespace {
 void
 errorFunction(void* userPtr, enum RTCError error, const char* str)
 {
     printf("error %d: %s\n", error, str);
 }
+}
 
-bool
-initialize()
+class Embree::Impl
 {
-    gDevice = rtcNewDevice(nullptr);
+public:
+    Impl();
+    ~Impl();
 
-    if (!gDevice)
+    void appendMesh(
+        const std::vector<float3>& vertices,
+        const std::vector<uint3>& prims,
+        const void* ptr);
+
+    void appendSphere(const std::vector<float4>& vertices, const void* ptr);
+
+    void updateScene();
+
+    Intersection intersect(const Ray& ray) const;
+
+    bool occluded(const Ray& ray, float far) const;
+
+private:
+    RTCDevice mDevice = nullptr;
+    RTCScene mScene = nullptr;
+    std::vector<const void*> mShapeTable;
+};
+
+Embree::Impl::Impl()
+{
+    mDevice = rtcNewDevice(nullptr);
+
+    if (!mDevice)
     {
         printf("error %d: cannot create device\n", rtcGetDeviceError(nullptr));
-        return false;
+        return;
     }
 
-    rtcSetDeviceErrorFunction(gDevice, errorFunction, nullptr);
+    rtcSetDeviceErrorFunction(mDevice, errorFunction, nullptr);
 
-    gScene = rtcNewScene(gDevice);
+    mScene = rtcNewScene(mDevice);
 
-    return true;
+    mShapeTable.reserve(MAX_SHAPES);
+}
+
+Embree::Impl::~Impl()
+{
+    if (mScene)
+    {
+        rtcReleaseScene(mScene);
+        mScene = nullptr;
+    }
+
+    if (mDevice)
+    {
+        rtcReleaseDevice(mDevice);
+        mDevice = nullptr;
+    }
 }
 
 void
-finalize()
-{
-    if (gScene)
-    {
-        rtcReleaseScene(gScene);
-        gScene = nullptr;
-    }
-
-    if (gDevice)
-    {
-        rtcReleaseDevice(gDevice);
-        gDevice = nullptr;
-    }
-}
-
-bool
-createMesh(
+Embree::Impl::appendMesh(
     const std::vector<float3>& vertices,
     const std::vector<uint3>& prims,
-    void* ptr)
+    const void* ptr)
 {
-    if (!gDevice || !gScene)
-    {
-        return false;
-    }
+    assert(mDevice && mScene);
 
-    auto mesh = rtcNewGeometry(gDevice, RTC_GEOMETRY_TYPE_TRIANGLE);
-
-    // register the pointer of the mesh
-    rtcSetGeometryUserData(mesh, ptr);
+    auto mesh = rtcNewGeometry(mDevice, RTC_GEOMETRY_TYPE_TRIANGLE);
 
     float3* vertexBuffer = (float3*)rtcSetNewGeometryBuffer(
         mesh, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(float3), vertices.size());
@@ -73,44 +92,38 @@ createMesh(
     memcpy(indexBuffer, prims.data(), sizeof(uint3) * prims.size());
 
     rtcCommitGeometry(mesh);
-    rtcAttachGeometry(gScene, mesh);
+    rtcAttachGeometry(mScene, mesh);
     rtcReleaseGeometry(mesh);
 
-    return true;
+    mShapeTable.push_back(ptr);
 }
 
-bool
-createSphere(const std::vector<float4>& vertices, void* ptr)
+void
+Embree::Impl::appendSphere(const std::vector<float4>& vertices, const void* ptr)
 {
-    if (!gDevice || !gScene)
-    {
-        return false;
-    }
+    assert(mDevice && mScene);
 
-    auto sphere = rtcNewGeometry(gDevice, RTC_GEOMETRY_TYPE_SPHERE_POINT);
-
-    // register the pointer of the mesh
-    rtcSetGeometryUserData(sphere, ptr);
+    auto sphere = rtcNewGeometry(mDevice, RTC_GEOMETRY_TYPE_SPHERE_POINT);
 
     float4* vertexBuffer = (float4*)rtcSetNewGeometryBuffer(
         sphere, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT4, sizeof(float4), vertices.size());
     memcpy(vertexBuffer, vertices.data(), sizeof(float4) * vertices.size());
 
     rtcCommitGeometry(sphere);
-    rtcAttachGeometry(gScene, sphere);
+    rtcAttachGeometry(mScene, sphere);
     rtcReleaseGeometry(sphere);
 
-    return true;
+    mShapeTable.push_back(ptr);
 }
 
 void
-updateScene()
+Embree::Impl::updateScene()
 {
-    rtcCommitScene(gScene);
+    rtcCommitScene(mScene);
 }
 
 Intersection
-intersect(const Ray& ray)
+Embree::Impl::intersect(const Ray& ray) const
 {
     RTCRayHit rtcRayhit;
     rtcRayhit.ray.org_x = ray.org.x;
@@ -126,20 +139,11 @@ intersect(const Ray& ray)
     rtcRayhit.hit.geomID = RTC_INVALID_GEOMETRY_ID;
     rtcRayhit.hit.instID[0] = RTC_INVALID_GEOMETRY_ID;
 
-    rtcIntersect1(gScene, &rtcRayhit);
+    rtcIntersect1(mScene, &rtcRayhit);
 
     Intersection isect;
-    if (rtcRayhit.hit.geomID != RTC_INVALID_GEOMETRY_ID)
-    {
-        auto geom = rtcGetGeometry(gScene, rtcRayhit.hit.geomID);
-
-        // retrieve the pointer of the intersected shape
-        isect.shapePtr = rtcGetGeometryUserData(geom);
-    }
-    else
-    {
-        isect.shapePtr = nullptr;
-    }
+    isect.shapePtr = rtcRayhit.hit.geomID != RTC_INVALID_GEOMETRY_ID
+        ? mShapeTable[rtcRayhit.hit.geomID] : nullptr;
     isect.primId = rtcRayhit.hit.primID;
     isect.ng = normalize(float3(rtcRayhit.hit.Ng_x, rtcRayhit.hit.Ng_y, rtcRayhit.hit.Ng_z));
     isect.barycentric.x = rtcRayhit.hit.u;
@@ -150,7 +154,7 @@ intersect(const Ray& ray)
 }
 
 bool
-occluded(const Ray& ray, float far)
+Embree::Impl::occluded(const Ray& ray, float far) const
 {
     RTCRay rtcRay;
     rtcRay.org_x = ray.org.x;
@@ -164,8 +168,45 @@ occluded(const Ray& ray, float far)
     rtcRay.mask = -1;
     rtcRay.flags = 0;
 
-    rtcOccluded1(gScene, &rtcRay);
+    rtcOccluded1(mScene, &rtcRay);
 
     return rtcRay.tfar < far;
+}
+
+Embree::Embree()
+    : mPimpl(std::make_unique<Impl>())
+{}
+
+void
+Embree::appendMesh(
+    const std::vector<float3>& vertices,
+    const std::vector<uint3>& prims,
+    const void* ptr)
+{
+    mPimpl->appendMesh(vertices, prims, ptr);
+}
+
+void
+Embree::appendSphere(const std::vector<float4>& vertices, const void* ptr)
+{
+    mPimpl->appendSphere(vertices, ptr);
+}
+
+void
+Embree::updateScene()
+{
+    mPimpl->updateScene();
+}
+
+Intersection
+Embree::intersect(const Ray& ray) const
+{
+    return mPimpl->intersect(ray);
+}
+
+bool
+Embree::occluded(const Ray& ray, float far) const
+{
+    return mPimpl->occluded(ray, far);
 }
 }

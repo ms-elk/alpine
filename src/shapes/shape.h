@@ -3,10 +3,9 @@
 #include "math/vector.h"
 
 namespace alpine {
-namespace accelerator {
-struct Intersection;
-}
 class Material;
+class Accelerator;
+struct Intersection;
 
 struct IntersectionAttributes
 {
@@ -23,7 +22,9 @@ public:
     Shape() = default;
     virtual ~Shape() = default;
 
+    virtual void appendTo(Accelerator* accelerator) const = 0;
+
     virtual IntersectionAttributes getIntersectionAttributes(
-        const accelerator::Intersection& isect) const = 0;
+        const Intersection& isect) const = 0;
 };
 }
