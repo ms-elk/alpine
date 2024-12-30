@@ -94,7 +94,8 @@ int main(int argc, char* argv[])
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
-    auto* window = glfwCreateWindow(WIDTH, HEIGHT, "alpine viewer", nullptr, nullptr);
+    auto* window = glfwCreateWindow(
+        WIDTH, HEIGHT, "alpine viewer", nullptr, nullptr);
     if (!window)
     {
         glfwTerminate();
@@ -109,7 +110,7 @@ int main(int argc, char* argv[])
     glfwSetScrollCallback(window, scrollCallback);
 
     const uint32_t maxDepth = 8;
-    alpine::initialize(WIDTH, HEIGHT, maxDepth);
+    alpine::initialize(WIDTH, HEIGHT, maxDepth, alpine::AcceleratorType::Bvh);
 
     const float eye[] = { 0.0f, 0.0f, -3.0f };
     const float target[] = { 0.0f, 0.0f, 0.0f };

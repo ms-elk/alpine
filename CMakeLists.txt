@@ -29,6 +29,7 @@ endif()
 
 set(SOURCES
   src/alpine.cpp
+  src/alpine_config.h
   src/camera.cpp
   src/camera.h
   src/sampler.cpp
@@ -39,12 +40,17 @@ set(SOURCES
   src/texture.h
 )
 
-set(ACCELERATORS src/accelerators/accelerator.h)
+set(ACCELERATORS
+  src/accelerators/accelerator.h
+  src/accelerators/bvh.cpp
+  src/accelerators/bvh.h
+  src/accelerators/embree.h
+)
 
 if (ALPINE_USE_EMBREE)
 list(APPEND ACCELERATORS src/accelerators/embree/embree.cpp)
 else()
-list(APPEND ACCELERATORS src/accelerators/bvh/bvh.cpp)
+list(APPEND ACCELERATORS src/accelerators/embree/dummy.cpp)
 endif()
 
 set(DENOISERS src/denoisers/denoiser.h)

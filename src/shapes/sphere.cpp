@@ -4,14 +4,14 @@
 #include "ray.h"
 
 namespace alpine {
-Sphere::Sphere(const std::shared_ptr<Data>& data)
-    : mData(data)
+void
+Sphere::appendTo(Accelerator* accelerator) const
 {
-    accelerator::createSphere(mData->vertices, this);
+    accelerator->appendSphere(mData->vertices, this);
 }
 
 IntersectionAttributes
-Sphere::getIntersectionAttributes(const accelerator::Intersection& isect) const
+Sphere::getIntersectionAttributes(const Intersection& isect) const
 {
     IntersectionAttributes isectAttr;
     isectAttr.ns = isect.ng;

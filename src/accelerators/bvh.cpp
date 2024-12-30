@@ -1,4 +1,4 @@
-﻿#include "accelerators/accelerator.h"
+﻿#include "bvh.h"
 
 #include "ray.h"
 #include "utils/bounding_box.h"
@@ -7,10 +7,9 @@
 #include <array>
 #include <assert.h>
 #include <future>
-#include <memory>
 #include <optional>
 
-namespace alpine::accelerator {
+namespace alpine {
 namespace {
 static constexpr uint32_t MAX_PRIMITIVES = 1024 * 1024;
 static constexpr uint8_t CHILD_NODE_COUNT = 2;
@@ -19,11 +18,12 @@ static constexpr uint8_t SPLITS_PER_DIM = 4;
 static constexpr uint8_t BIN_COUNT = SPLITS_PER_DIM + 1;
 
 static constexpr uint32_t MIN_PRIMITIVES_FOR_PARALLELIZATION = 1024;
+}
 
 struct Primitive
 {
     BoundingBox bbox;
-    void* ptr = nullptr;
+    const void* ptr = nullptr;
     uint32_t primId = std::numeric_limits<uint32_t>::max();
 
     // triangle variables
@@ -127,6 +127,7 @@ struct Node
     }
 };
 
+namespace {
 std::optional<bvh_util::Split>
 findSplit(const std::vector<Primitive*>& primitives, const float3& diagonal)
 {
@@ -289,28 +290,18 @@ buildBvh(const std::vector<Primitive*>& primitives)
 
     return node;
 }
-
-std::vector<Primitive> gPrimitives;
-std::unique_ptr<Node> gBvh;
 }
 
-bool
-initialize()
+Bvh::Bvh()
 {
-    gPrimitives.reserve(MAX_PRIMITIVES);
-    return true;
+    mPrimitives.reserve(MAX_PRIMITIVES);
 }
 
 void
-finalize()
-{
-}
-
-bool
-createMesh(
+Bvh::appendMesh(
     const std::vector<float3>& vertices,
     const std::vector<uint3>& prims,
-    void* ptr)
+    const void* ptr)
 {
     for (uint32_t primId = 0; primId < prims.size(); ++primId)
     {
@@ -332,54 +323,43 @@ createMesh(
             prim.bbox = merge(prim.bbox, vertices[idx]);
         }
 
-        gPrimitives.push_back(prim);
+        mPrimitives.push_back(prim);
     }
-
-    return true;
-}
-
-bool
-createSphere(const std::vector<float4>& vertices, void* ptr)
-{
-    return true;
 }
 
 void
-updateScene()
+Bvh::appendSphere(const std::vector<float4>& vertices, const void* ptr)
+{}
+
+void
+Bvh::updateScene()
 {
-    if (gPrimitives.empty())
+    if (mPrimitives.empty())
     {
         return;
     }
 
-    std::vector<Primitive*> primitives(gPrimitives.size());
-    for (uint32_t i = 0; i < gPrimitives.size(); ++i)
+    std::vector<Primitive*> primitives(mPrimitives.size());
+    for (uint32_t i = 0; i < mPrimitives.size(); ++i)
     {
-        primitives[i] = &gPrimitives[i];
+        primitives[i] = &mPrimitives[i];
     }
 
-    gBvh = buildBvh(primitives);
+    mBvh = buildBvh(primitives);
 }
 
 Intersection
-intersect(const Ray& ray)
+Bvh::intersect(const Ray& ray) const
 {
-    assert(gBvh);
-    auto isect = gBvh->intersect(ray);
-    if (isect.has_value())
-    {
-        return isect.value();
-    }
-    else
-    {
-        return Intersection();
-    }
+    assert(mBvh);
+    auto isect = mBvh->intersect(ray);
+    return isect.has_value() ? isect.value() : Intersection();
 }
 
 bool
-occluded(const Ray& ray, float far)
+Bvh::occluded(const Ray& ray, float far) const
 {
-    assert(gBvh);
-    return gBvh->occluded(ray, far);
+    assert(mBvh);
+    return mBvh->occluded(ray, far);
 }
 }

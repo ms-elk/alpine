@@ -18,11 +18,14 @@ public:
         std::vector<std::shared_ptr<Material>> materials;
     };
 
-    Sphere(const std::shared_ptr<Data>& data);
+    Sphere(const std::shared_ptr<Data>& data)
+        : mData(data) {}
     virtual ~Sphere() override {}
 
+    virtual void appendTo(Accelerator* accelerator) const override;
+
     virtual IntersectionAttributes getIntersectionAttributes(
-        const accelerator::Intersection& isect) const override;
+        const Intersection& isect) const override;
 
 private:
     std::shared_ptr<Data> mData;

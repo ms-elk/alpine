@@ -57,8 +57,7 @@ main(int argc, char* argv[])
     const float fovy = std::numbers::pi_v<float> / 2.0f;
     float aspect = float(width) / float(height);
 
-    alpine::initialize(width, height, maxDepth);
-    alpine::setBackgroundColor(0.0f, 0.0f, 0.0f);
+    alpine::initialize(width, height, maxDepth, alpine::AcceleratorType::Embree);
     alpine::addDiskLight(lightPower, lightColor, lightPos, lightRadius);
 
     std::string extension = filePath.extension().string();

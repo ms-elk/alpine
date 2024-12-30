@@ -8,6 +8,7 @@
 
 namespace alpine {
 class Material;
+struct Intersection;
 
 class Mesh : public Shape
 {
@@ -25,11 +26,14 @@ public:
         std::vector<std::shared_ptr<Material>> materials;
     };
 
-    Mesh(Data&& data);
+    Mesh(Data&& data)
+        : mData(std::move(data)) {};
     virtual ~Mesh() override {}
 
+    virtual void appendTo(Accelerator* accelerator) const override;
+
     virtual IntersectionAttributes getIntersectionAttributes(
-        const accelerator::Intersection& isect) const override;
+        const Intersection& isect) const override;
 
 private:
     Data mData;

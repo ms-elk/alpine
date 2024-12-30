@@ -1,8 +1,11 @@
 ﻿#include <alpine/alpine.h>
 
+#include "alpine_config.h"
 #include "camera.h"
 #include "image.h"
 #include "accelerators/accelerator.h"
+#include "accelerators/bvh.h"
+#include "accelerators/embree.h"
 #include "denoisers/denoiser.h"
 #include "light_samplers/light_sampler.h"
 #include "light_samplers/bvh_light_sampler.h"
@@ -28,13 +31,11 @@
 
 namespace alpine {
 static constexpr uint32_t TILE_SIZE = 64;
-static constexpr float RAY_OFFSET = 0.001f;
 
 class Alpine
 {
 public:
-    Alpine(uint32_t width, uint32_t height, uint32_t maxDepth);
-    ~Alpine() { accelerator::finalize(); }
+    Alpine(uint32_t width, uint32_t height, uint32_t maxDepth, AcceleratorType acceleratorType);
 
     inline void setBackgroundColor(float r, float g, float b)
     {
@@ -47,9 +48,11 @@ public:
 
     bool load(std::string_view filename, FileType fileType);
 
-    api::Light* addPointLight(float power, const float color[3], const float position[3]);
+    api::Light* addPointLight(
+        float power, const float color[3], const float position[3]);
 
-    api::Light* addDiskLight(float power, const float color[3], const float position[3], float radius);
+    api::Light* addDiskLight(
+        float power, const float color[3], const float position[3], float radius);
 
     void buildLightSampler(LightSamplerType lightSamplerType);
 
@@ -84,6 +87,8 @@ private:
     uint32_t mTileHeight = 0;
     std::vector<std::future<void>> mTiles;
 
+    std::unique_ptr<Accelerator> mAccelerator;
+
     Scene mScene;
 
     Camera mCamera;
@@ -91,9 +96,8 @@ private:
     std::unique_ptr<LightSampler> mLightSampler;
 };
 
-Alpine::Alpine(uint32_t width, uint32_t height, uint32_t maxDepth)
+Alpine::Alpine(uint32_t width, uint32_t height, uint32_t maxDepth, AcceleratorType acceleratorType)
 {
-    accelerator::initialize();
     denoiser::initialize();
 
     mWidth = width;
@@ -110,6 +114,17 @@ Alpine::Alpine(uint32_t width, uint32_t height, uint32_t maxDepth)
     mTileHeight = (height - 1) / TILE_SIZE + 1;
     uint32_t tileCount = mTileWidth * mTileHeight;
     mTiles.resize(tileCount);
+
+    switch (acceleratorType)
+    {
+    case AcceleratorType::Embree:
+        mAccelerator = std::make_unique<Embree>();
+        break;
+    case AcceleratorType::Bvh:
+    default:
+        mAccelerator = std::make_unique<Bvh>();
+        break;
+    }
 
     resetAccumulation();
 }
@@ -134,7 +149,11 @@ Alpine::load(std::string_view filename, FileType fileType)
         return false;
     }
 
-    accelerator::updateScene();
+    for (auto& shape : mScene.shapes)
+    {
+        shape->appendTo(mAccelerator.get());
+    }
+    mAccelerator->updateScene();
 
     return true;
 }
@@ -219,7 +238,7 @@ Alpine::render(uint32_t spp)
                         float3 radiance(0.0f);
                         for (uint32_t depth = 0; depth < mMaxDepth; ++depth)
                         {
-                            auto isect = accelerator::intersect(ray);
+                            auto isect = mAccelerator->intersect(ray);
 
                             if (!isect.shapePtr)
                             {
@@ -228,7 +247,7 @@ Alpine::render(uint32_t spp)
                             }
 
                             float3 hit = ray.org + ray.dir * isect.t;
-                            const auto* shape = static_cast<Shape*>(isect.shapePtr);
+                            const auto* shape = static_cast<const Shape*>(isect.shapePtr);
                             auto isectAttr
                                 = shape->getIntersectionAttributes(isect);
 
@@ -296,11 +315,11 @@ Alpine::estimateDirectIllumination(
 
     const auto& lss = olss.value();
 
-    const auto isOccluded = [](
+    const auto isOccluded = [&](
         const float3& position, const float3& normal, const float3& dir, float dist) {
         float3 rayOffset = normal * RAY_OFFSET;
         Ray shadowRay{ position + rayOffset, dir };
-        bool occluded = accelerator::occluded(shadowRay, dist);
+        bool occluded = mAccelerator->occluded(shadowRay, dist);
         return occluded;
     };
 
@@ -379,18 +398,23 @@ Alpine::addDebugScene()
 {
     mScene.shapes.push_back(createDebugTriangle());
     mScene.shapes.push_back(createDebugSphere());
-    accelerator::updateScene();
+
+    for (auto& shape : mScene.shapes)
+    {
+        shape->appendTo(mAccelerator.get());
+    }
+    mAccelerator->updateScene();
 }
 
 ///////////////////////////////////////////////////////////////
 std::unique_ptr<Alpine> gAlpine;
 
 bool
-initialize(uint32_t width, uint32_t height, uint32_t maxDepth)
+initialize(uint32_t width, uint32_t height, uint32_t maxDepth, AcceleratorType acceleratorType)
 {
     if (!gAlpine)
     {
-        gAlpine = std::make_unique<Alpine>(width, height, maxDepth);
+        gAlpine = std::make_unique<Alpine>(width, height, maxDepth, acceleratorType);
         return true;
     }
     else

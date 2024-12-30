@@ -8,14 +8,14 @@
 #include <assert.h>
 
 namespace alpine {
-Mesh::Mesh(Data&& data)
-    : mData(std::move(data))
+void
+Mesh::appendTo(Accelerator* accelerator) const
 {
-    accelerator::createMesh(mData.vertices, mData.prims, this);
+    accelerator->appendMesh(mData.vertices, mData.prims, this);
 }
 
 IntersectionAttributes
-Mesh::getIntersectionAttributes(const accelerator::Intersection& isect) const
+Mesh::getIntersectionAttributes(const Intersection& isect) const
 {
     IntersectionAttributes isectAttr;
     float b1 = isect.barycentric.x;
