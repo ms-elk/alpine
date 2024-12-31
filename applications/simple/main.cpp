@@ -1,6 +1,7 @@
 #include <alpine/alpine.h>
 
 #include <chrono>
+#include <CLI/CLI.hpp>
 #include <filesystem>
 #include <numbers>
 #include <string>
@@ -28,20 +29,75 @@ private:
     clock::time_point start;
 };
 
+const std::unordered_map<std::string, alpine::AcceleratorType> gAcceleratorTypeTable = {
+    {"bvh", alpine::AcceleratorType::Bvh},
+    {"embree", alpine::AcceleratorType::Embree}
+};
+
+const std::unordered_map<std::string, alpine::LightSamplerType> gLightSamplerTypeTable = {
+    {"uniform", alpine::LightSamplerType::Uniform},
+    {"power", alpine::LightSamplerType::Power},
+    {"bvh", alpine::LightSamplerType::Bvh}
+};
+
 int
 main(int argc, char* argv[])
 {
-    if (argc != 5)
-    {
-        printf("ERROR: invalid input parameters\n");
-        return 1;
-    }
-
     // input parameters
-    uint32_t spp = std::atoi(argv[1]);
-    std::string lightSamplerType = argv[2];
-    std::filesystem::path filePath = argv[3];
-    const char* imageFilename = argv[4];
+    std::filesystem::path inputPath;
+    alpine::FileType fileType;
+    std::filesystem::path outputPath;
+    uint32_t spp;
+    alpine::AcceleratorType acceleratorType;
+    alpine::LightSamplerType lightSamplerType;
+    bool denoise = false;
+
+    CLI::App app;
+    app.add_option("-i,--input", inputPath, "Input file (obj|glb)")
+        ->required()
+        ->check([&fileType](const std::filesystem::path& filePath) {
+            std::string extension = filePath.extension().string();
+            if (extension == ".obj")
+            {
+                fileType = alpine::FileType::Obj;
+                return "";
+            }
+            else if (extension == ".glb")
+            {
+                fileType = alpine::FileType::Gltf;
+                return "";
+            }
+            else
+            {
+                return "File extension must be .obj or .glb.";
+            }
+        });
+    app.add_option("-o,--output", outputPath, "Output image file (ppm)")
+        ->required()
+        ->check([](const std::filesystem::path& filePath) {
+            std::string extension = filePath.extension().string();
+            if (extension == ".ppm")
+            {
+                return "";
+            }
+            else
+            {
+                return "File extension must be .ppm.";
+            }
+        });
+    app.add_option("--spp", spp, "Number of samples per pixel")
+        ->required();
+    app.add_option(
+        "--accelerator", acceleratorType, "Accelerator type: \"bvh\" or \"embree\"")
+        ->required()
+        ->transform(CLI::CheckedTransformer(gAcceleratorTypeTable));
+    app.add_option(
+        "--lightSampler", lightSamplerType, "Light sampler type: \"uniform\", \"power\", or \"bvh\"")
+        ->required()
+        ->transform(CLI::CheckedTransformer(gLightSamplerTypeTable));
+    app.add_flag("--denoiser", denoise, "Enable denoiser");
+
+    CLI11_PARSE(app, argc, argv);
 
     // constant values
     const uint32_t width = 256;
@@ -55,56 +111,21 @@ main(int argc, char* argv[])
     const float target[] = { 0.0f, 0.0f, 0.0f };
     const float up[] = { 0.0f, 1.0f, 0.0f };
     const float fovy = std::numbers::pi_v<float> / 2.0f;
-    float aspect = float(width) / float(height);
+    const float aspect = float(width) / float(height);
 
-    alpine::initialize(width, height, maxDepth, alpine::AcceleratorType::Embree);
+    alpine::initialize(width, height, maxDepth, acceleratorType);
     alpine::addDiskLight(lightPower, lightColor, lightPos, lightRadius);
 
-    std::string extension = filePath.extension().string();
-    alpine::FileType fileType;
-    if (extension == ".obj")
-    {
-        fileType = alpine::FileType::Obj;
-    }
-    else if (extension == ".glb")
-    {
-        fileType = alpine::FileType::Gltf;
-    }
-    else
-    {
-        printf("ERROR: invalid file format: %s\n", filePath.filename().string().c_str());
-        return 1;
-    }
-
-    bool loaded = alpine::load(filePath.string(), fileType);
+    bool loaded = alpine::load(inputPath.string(), fileType);
     if (!loaded)
     {
-        printf("ERROR: failed to load %s\n", filePath.string().c_str());
-        return 1;
-    }
-
-    alpine::LightSamplerType lsType;
-    if (lightSamplerType == "uniform")
-    {
-        lsType = alpine::LightSamplerType::Uniform;
-    }
-    else if (lightSamplerType == "power")
-    {
-        lsType = alpine::LightSamplerType::Power;
-    }
-    else if (lightSamplerType == "bvh")
-    {
-        lsType = alpine::LightSamplerType::Bvh;
-    }
-    else
-    {
-        printf("ERROR: invalid light sampler type: %s\n", lightSamplerType.c_str());
+        printf("ERROR: failed to load %s\n", inputPath.string().c_str());
         return 1;
     }
 
     {
         Timer timer("Light Sampler Build");
-        alpine::buildLightSampler(lsType);
+        alpine::buildLightSampler(lightSamplerType);
     }
 
     auto* camera = alpine::getCamera();
@@ -115,9 +136,9 @@ main(int argc, char* argv[])
         alpine::render(spp);
     }
 
-    alpine::resolve(false);
+    alpine::resolve(denoise);
 
-    alpine::saveImage(imageFilename);
+    alpine::saveImage(outputPath.string());
 
     return 0;
 }
