@@ -25,11 +25,19 @@
 ## Sample Applications
 ### simple
 *simple* is an application which generates an image using path tracing. It takes either an obj file or a glb file as input, and outputs a ppm file.
+
+#### Options
+`-i, --input`: Input file (.obj|.glb)  
+`-o, --output`: Output image file (.ppm)  
+`--spp`: Number of samples per pixel  
+`--accelerator`: Accelerator type: "bvh" or "embree"  
+`--lightSampler`: Light sampler type: "uniform", "power", or "bvh"  
+`--denoiser`: Enable denoiser  
+
+#### Example
 ```
-simple spp lightSamplerType input.(obj|glb) output.ppm
+simple -i input.glb -o output.ppm --spp 64 --accelerator bvh --lightSamplerType bvh --denoiser
 ```
-`spp` specifies the number of samples per pixel.  
-`lightSamplerType` selects a light sampler type from "uniform", "power", or "bvh".
 
 ### viewer
 *viewer* is a progressive path tracer, and takes a glb file as input.

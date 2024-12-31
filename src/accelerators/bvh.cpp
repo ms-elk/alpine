@@ -329,7 +329,9 @@ Bvh::appendMesh(
 
 void
 Bvh::appendSphere(const std::vector<float4>& vertices, const void* ptr)
-{}
+{
+    printf("ERROR: Sphere intersection has not been implemented yet.");
+}
 
 void
 Bvh::updateScene()
