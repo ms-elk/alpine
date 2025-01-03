@@ -12,8 +12,8 @@ set(CMAKE_SUPPRESS_REGENERATION true)
 add_compile_options(/WX)
 
 option(ALPINE_BUILD_APPS "build applications of alpine" OFF)
-option(ALPINE_USE_EMBREE "use intel embree as an accelerator" OFF)
-option(ALPINE_USE_OIDN "use intel open image denoise as a denoiser" OFF)
+option(ALPINE_ENABLE_EMBREE "enable Intel Embree to use it as an accelerator" OFF)
+option(ALPINE_ENABLE_OIDN "enable Intel Open Image Denoise to use it as a denoiser" OFF)
 
 if (ALPINE_BUILD_APPS)
   # set directory for output executables
@@ -47,7 +47,7 @@ set(ACCELERATORS
   src/accelerators/embree.h
 )
 
-if (ALPINE_USE_EMBREE)
+if (ALPINE_ENABLE_EMBREE)
 list(APPEND ACCELERATORS src/accelerators/embree/embree.cpp)
 else()
 list(APPEND ACCELERATORS src/accelerators/embree/dummy.cpp)
@@ -55,7 +55,7 @@ endif()
 
 set(DENOISERS src/denoisers/denoiser.h)
 
-if (ALPINE_USE_OIDN)
+if (ALPINE_ENABLE_OIDN)
 list(APPEND DENOISERS src/denoisers/oidn.cpp)
 else()
 list(APPEND DENOISERS src/denoisers/dummy.cpp)
@@ -156,7 +156,7 @@ target_include_directories(alpine
 )
 
 # embree libraries
-if (ALPINE_USE_EMBREE)
+if (ALPINE_ENABLE_EMBREE)
 target_include_directories(alpine PRIVATE ext/embree/include)
 target_link_directories(alpine PUBLIC ext/embree/lib)
 target_link_libraries(alpine PUBLIC embree4 tbb12)
@@ -173,7 +173,7 @@ add_custom_command(TARGET alpine POST_BUILD
 endif()
 
 # oidn libraries
-if (ALPINE_USE_OIDN)
+if (ALPINE_ENABLE_OIDN)
 target_include_directories(alpine PRIVATE ext/oidn/include)
 target_link_directories(alpine PUBLIC ext/oidn/lib)
 target_link_libraries(alpine PUBLIC OpenImageDenoise)
