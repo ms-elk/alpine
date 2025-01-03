@@ -54,7 +54,8 @@ simple -i input.glb -o output.ppm --spp 64 --accelerator bvh --lightSamplerType 
 ```
 viewer input.glb
 ```
-![viewer](images/viewer.png)  
+<img src="images/viewer.png" width="50%">  
+
 The camera can be manipulated by a mouse.  
 `Left Drag`: Rotate  
 `Middle Drag`: Pan  
