@@ -21,6 +21,8 @@ enum class FileType {
 };
 bool load(std::string_view filename, FileType fileType);
 
+void buildAccelerator();
+
 api::Light* addPointLight(float power, const float color[3], const float position[3]);
 
 api::Light* addDiskLight(float power, const float color[3], const float position[3], float radius);

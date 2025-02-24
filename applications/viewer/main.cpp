@@ -123,6 +123,8 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+    alpine::buildAccelerator();
+
     alpine::buildLightSampler(alpine::LightSamplerType::Bvh);
 
     const float fovy = std::numbers::pi_v<float> / 2.0f;

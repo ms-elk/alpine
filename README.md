@@ -46,7 +46,7 @@ Options:
 
 Example:  
 ```
-simple -i input.glb -o output.ppm --spp 64 --accelerator bvh --lightSamplerType bvh --denoiser
+simple -i input.glb -o output.ppm --spp 64 --accelerator bvh --lightSampler bvh --denoiser
 ```
 
 ### viewer
