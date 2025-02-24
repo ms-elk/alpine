@@ -19,17 +19,16 @@ struct BoundingBox
         return (len.x * len.y + len.y * len.z + len.z * len.x) * 2.0f;
     }
 
-    bool intersect(const Ray& ray) const
+    bool intersect(const Ray& ray, float tFar, const float3& invRayDir) const
     {
-        float tNear = -std::numeric_limits<float>::max();
-        float tFar = std::numeric_limits<float>::max();
+        float tNear = 0.0f;
 
         for (uint32_t i = 0; i < 3; ++i)
         {
-            if (std::abs(ray.dir[i]) > 0.0f)
+            if (std::abs(invRayDir[i]) > 0.0f)
             {
-                float t0 = (min[i] - ray.org[i]) / ray.dir[i];
-                float t1 = (max[i] - ray.org[i]) / ray.dir[i];
+                float t0 = (min[i] - ray.org[i]) * invRayDir[i];
+                float t1 = (max[i] - ray.org[i]) * invRayDir[i];
 
                 if (t0 > t1)
                 {
