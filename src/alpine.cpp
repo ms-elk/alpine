@@ -244,13 +244,15 @@ Alpine::render(uint32_t spp)
                         float3 radiance(0.0f);
                         for (uint32_t depth = 0; depth < mMaxDepth; ++depth)
                         {
-                            auto isect = mAccelerator->intersect(ray);
+                            auto oi = mAccelerator->intersect(ray);
 
-                            if (!isect.shapePtr)
+                            if (!oi.has_value())
                             {
                                 radiance += throughput * mBackgroundColor;
                                 break;
                             }
+
+                            const auto& isect = oi.value();
 
                             float3 hit = ray.org + ray.dir * isect.t;
                             const auto* shape = static_cast<const Shape*>(isect.shapePtr);
