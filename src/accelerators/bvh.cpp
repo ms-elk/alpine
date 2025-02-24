@@ -98,10 +98,69 @@ struct alignas(32) LinearNode
     bool isLeaf() const { return primitiveCount > 0; }
 };
 
+namespace
+{
+class BvhStats
+{
+public:
+    void show()
+    {
+        printf("BVH Total Node Count: %zu\n", mInteriorCount + mLeafCount);
+        printf("BVH Interior Node Count: %zu\n", mInteriorCount);
+        printf("BVH Leaf Node Count: %zu\n", mLeafCount);
+        printf("BVH Node Access Count (Closest): %zu\n", mClosestCount.load());
+        printf("BVH Node Access Count (Any): %zu\n", mAnyCount.load());
+    }
+
+    void countNodes(const std::vector<LinearNode>& linearNodes)
+    {
+        mInteriorCount = 0;
+        mLeafCount = 0;
+
+        for (const auto& ln : linearNodes)
+        {
+            if (ln.isLeaf())
+            {
+                mLeafCount++;
+            }
+            else
+            {
+                mInteriorCount++;
+            }
+        }
+    }
+
+    void addNodeAccessCount(uint32_t count, bool any)
+    {
+        if (any)
+        {
+            mAnyCount += count;
+        }
+        else
+        {
+            mClosestCount += count;
+        }
+    }
+
+private:
+    uint64_t mInteriorCount = 0;
+    uint64_t mLeafCount = 0;
+    std::atomic<uint64_t> mClosestCount = 0;
+    std::atomic<uint64_t> mAnyCount = 0;
+};
+
+BvhStats gBvhStats;
+}
+
 Bvh::Bvh()
 {
     mPrimitives.reserve(MAX_PRIMITIVES);
     mOrderedPrimitives.reserve(MAX_PRIMITIVES);
+}
+
+Bvh::~Bvh()
+{
+    gBvhStats.show();
 }
 
 void
@@ -161,11 +220,12 @@ Bvh::updateScene()
     std::atomic<uint32_t> buildNodeOffset = 0;
     std::atomic<uint32_t> nodeCount = 0;
     auto bvh = buildBvh(buildPrimitives, buildNodeOffset, nodeCount);
-    printf("BVH Node Count: %d\n", nodeCount.load());
 
     mLinearNodes.resize(nodeCount);
     uint32_t linearNodeOffset = 0;
     flatten(bvh.get(), linearNodeOffset);
+
+    gBvhStats.countNodes(mLinearNodes);
 }
 
 std::optional<Intersection>
@@ -382,22 +442,29 @@ Bvh::traverse(const Ray& ray, float tFar, bool any) const
 
     std::optional<Intersection> closestIsect;
     float tNear = tFar;
+    float3 invRayDir = float3(
+        std::abs(ray.dir.x) > 0.0f ? 1.0f / ray.dir.x : 0.0f,
+        std::abs(ray.dir.y) > 0.0f ? 1.0f / ray.dir.y : 0.0f,
+        std::abs(ray.dir.z) > 0.0f ? 1.0f / ray.dir.z : 0.0f);
 
     uint32_t stack[STACK_SIZE];
     uint8_t stackIdx = 0;
     uint32_t currentIdx = 0;
 
+    uint32_t counter = 0;
+
     while (true)
     {
+        counter++;
+
         const auto& linearNode = mLinearNodes[currentIdx];
-        if (linearNode.bbox.intersect(ray))
+        if (linearNode.bbox.intersect(ray, tNear, invRayDir))
         {
             if (linearNode.isLeaf())
             {
                 for (uint16_t i = 0; i < linearNode.primitiveCount; ++i)
                 {
                     const auto& prim = mOrderedPrimitives[linearNode.offset + i];
-                    prim.intersect(ray);
                     auto isect = prim.intersect(ray);
                     if (!isect.has_value() || isect.value().t >= tNear)
                     {
@@ -418,8 +485,18 @@ Bvh::traverse(const Ray& ray, float tFar, bool any) const
             else
             {
                 assert(stackIdx < STACK_SIZE - 2);
-                stack[stackIdx++] = currentIdx + 1;
-                stack[stackIdx++] = linearNode.offset;
+
+                bool isDirNegative = ray.dir[linearNode.dim] < 0.0f;
+                if (isDirNegative)
+                {
+                    stack[stackIdx++] = currentIdx + 1;
+                    stack[stackIdx++] = linearNode.offset;
+                }
+                else
+                {
+                    stack[stackIdx++] = linearNode.offset;
+                    stack[stackIdx++] = currentIdx + 1;
+                }
             }
         }
 
@@ -430,6 +507,8 @@ Bvh::traverse(const Ray& ray, float tFar, bool any) const
 
         currentIdx = stack[--stackIdx];
     }
+
+    gBvhStats.addNodeAccessCount(counter, any);
 
     return closestIsect;
 }

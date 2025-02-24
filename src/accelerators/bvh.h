@@ -22,6 +22,7 @@ class Bvh : public Accelerator
 {
 public:
     Bvh();
+    virtual ~Bvh() override;
 
     virtual void appendMesh(
         const std::vector<float3>& vertices,
