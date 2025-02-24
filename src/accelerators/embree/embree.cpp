@@ -31,9 +31,9 @@ public:
 
     void updateScene();
 
-    Intersection intersect(const Ray& ray) const;
+    std::optional<Intersection> intersect(const Ray& ray) const;
 
-    bool occluded(const Ray& ray, float far) const;
+    bool occluded(const Ray& ray, float tFar) const;
 
 private:
     RTCDevice mDevice = nullptr;
@@ -122,7 +122,7 @@ Embree::Impl::updateScene()
     rtcCommitScene(mScene);
 }
 
-Intersection
+std::optional<Intersection>
 Embree::Impl::intersect(const Ray& ray) const
 {
     RTCRayHit rtcRayhit;
@@ -141,9 +141,13 @@ Embree::Impl::intersect(const Ray& ray) const
 
     rtcIntersect1(mScene, &rtcRayhit);
 
+    if (rtcRayhit.hit.geomID == RTC_INVALID_GEOMETRY_ID)
+    {
+        return {};
+    }
+
     Intersection isect;
-    isect.shapePtr = rtcRayhit.hit.geomID != RTC_INVALID_GEOMETRY_ID
-        ? mShapeTable[rtcRayhit.hit.geomID] : nullptr;
+    isect.shapePtr = mShapeTable[rtcRayhit.hit.geomID];
     isect.primId = rtcRayhit.hit.primID;
     isect.ng = normalize(float3(rtcRayhit.hit.Ng_x, rtcRayhit.hit.Ng_y, rtcRayhit.hit.Ng_z));
     isect.barycentric.x = rtcRayhit.hit.u;
@@ -154,7 +158,7 @@ Embree::Impl::intersect(const Ray& ray) const
 }
 
 bool
-Embree::Impl::occluded(const Ray& ray, float far) const
+Embree::Impl::occluded(const Ray& ray, float tFar) const
 {
     RTCRay rtcRay;
     rtcRay.org_x = ray.org.x;
@@ -164,13 +168,13 @@ Embree::Impl::occluded(const Ray& ray, float far) const
     rtcRay.dir_y = ray.dir.y;
     rtcRay.dir_z = ray.dir.z;
     rtcRay.tnear = 0;
-    rtcRay.tfar = far;
+    rtcRay.tfar = tFar;
     rtcRay.mask = -1;
     rtcRay.flags = 0;
 
     rtcOccluded1(mScene, &rtcRay);
 
-    return rtcRay.tfar < far;
+    return rtcRay.tfar < tFar;
 }
 
 Embree::Embree()
@@ -198,15 +202,15 @@ Embree::updateScene()
     mPimpl->updateScene();
 }
 
-Intersection
+std::optional<Intersection>
 Embree::intersect(const Ray& ray) const
 {
     return mPimpl->intersect(ray);
 }
 
 bool
-Embree::occluded(const Ray& ray, float far) const
+Embree::occluded(const Ray& ray, float tFar) const
 {
-    return mPimpl->occluded(ray, far);
+    return mPimpl->occluded(ray, tFar);
 }
 }

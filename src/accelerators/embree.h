@@ -23,9 +23,9 @@ public:
 
     virtual void updateScene() override;
 
-    virtual Intersection intersect(const Ray& ray) const override;
+    virtual std::optional<Intersection> intersect(const Ray& ray) const override;
 
-    virtual bool occluded(const Ray& ray, float far) const override;
+    virtual bool occluded(const Ray& ray, float tFar) const override;
 
 private:
     class Impl;

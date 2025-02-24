@@ -33,9 +33,9 @@ public:
 
     virtual void updateScene() override;
 
-    virtual Intersection intersect(const Ray& ray) const override;
+    virtual std::optional<Intersection> intersect(const Ray& ray) const override;
 
-    virtual bool occluded(const Ray& ray, float far) const override;
+    virtual bool occluded(const Ray& ray, float tFar) const override;
 
 private:
     std::unique_ptr<BuildNode> buildBvh(
@@ -47,6 +47,8 @@ private:
         const std::vector<BuildPrimitive>& bvhPrimitives, const float3& diagonal);
 
     uint32_t flatten(const BuildNode* node, uint32_t& offset);
+
+    std::optional<Intersection> traverse(const Ray& ray, float tFar, bool any) const;
 
 private:
     std::vector<Primitive> mPrimitives;

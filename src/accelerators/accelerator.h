@@ -2,6 +2,7 @@
 
 #include "math/vector.h"
 
+#include <optional>
 #include <vector>
 
 namespace alpine {
@@ -33,8 +34,8 @@ public:
 
     virtual void updateScene() = 0;
 
-    virtual Intersection intersect(const Ray& ray) const = 0;
+    virtual std::optional<Intersection> intersect(const Ray& ray) const = 0;
 
-    virtual bool occluded(const Ray& ray, float far) const = 0;
+    virtual bool occluded(const Ray& ray, float tFar) const = 0;
 };
 }

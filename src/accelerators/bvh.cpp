@@ -10,7 +10,7 @@
 
 namespace alpine {
 namespace {
-static constexpr uint32_t MAX_PRIMITIVES = 1024 * 1024;
+static constexpr uint32_t MAX_PRIMITIVES = 128 * 1024;
 static constexpr uint8_t CHILD_NODE_COUNT = 2;
 
 static constexpr uint8_t SPLITS_PER_DIM = 4;
@@ -94,6 +94,8 @@ struct alignas(32) LinearNode
     uint32_t offset;
     uint16_t primitiveCount = 0;
     uint8_t dim = 0;
+
+    bool isLeaf() const { return primitiveCount > 0; }
 };
 
 Bvh::Bvh()
@@ -166,101 +168,17 @@ Bvh::updateScene()
     flatten(bvh.get(), linearNodeOffset);
 }
 
-Intersection
+std::optional<Intersection>
 Bvh::intersect(const Ray& ray) const
 {
-    assert(!mLinearNodes.empty());
-
-    Intersection closestIsect;
-
-    uint32_t stack[STACK_SIZE];
-    uint8_t stackIdx = 0;
-    uint32_t currentIdx = 0;
-
-    float tNear = std::numeric_limits<float>::max();
-
-    while (true)
-    {
-        const auto& linearNode = mLinearNodes[currentIdx];
-        if (linearNode.bbox.intersect(ray))
-        {
-            if (linearNode.primitiveCount > 0)
-            {
-                for (uint16_t i = 0; i < linearNode.primitiveCount; ++i)
-                {
-                    const auto& prim = mOrderedPrimitives[linearNode.offset + i];
-                    prim.intersect(ray);
-                    auto isect = prim.intersect(ray);
-                    if (isect.has_value() && isect.value().t < tNear)
-                    {
-                        closestIsect = isect.value();
-                        tNear = isect.value().t;
-                    }
-                }
-            }
-            else
-            {
-                assert(stackIdx < STACK_SIZE - 2);
-                stack[stackIdx++] = currentIdx + 1;
-                stack[stackIdx++] = linearNode.offset;
-            }
-        }
-
-        if (stackIdx == 0)
-        {
-            break;
-        }
-
-        currentIdx = stack[--stackIdx];
-    }
-
-    return closestIsect;
+    return traverse(ray, std::numeric_limits<float>::max(), false);
 }
 
 bool
-Bvh::occluded(const Ray& ray, float far) const
+Bvh::occluded(const Ray& ray, float tFar) const
 {
-    assert(!mLinearNodes.empty());
-
-    uint32_t stack[STACK_SIZE];
-    uint8_t stackIdx = 0;
-    uint32_t currentIdx = 0;
-
-    while (true)
-    {
-        const auto& linearNode = mLinearNodes[currentIdx];
-        if (linearNode.bbox.intersect(ray))
-        {
-            if (linearNode.primitiveCount > 0)
-            {
-                for (uint16_t i = 0; i < linearNode.primitiveCount; ++i)
-                {
-                    const auto& prim = mOrderedPrimitives[linearNode.offset + i];
-                    prim.intersect(ray);
-                    auto isect = prim.intersect(ray);
-                    if (isect.has_value() && isect.value().t < far)
-                    {
-                        return true;
-                    }
-                }
-            }
-            else
-            {
-                assert(stackIdx < STACK_SIZE - 2);
-                stack[stackIdx++] = currentIdx + 1;
-                stack[stackIdx++] = linearNode.offset;
-            }
-        }
-
-        if (stackIdx == 0)
-        {
-            break;
-        }
-
-        currentIdx = stack[--stackIdx];
-    }
-
-    return false;
+    const auto intersection = traverse(ray, tFar, true);
+    return intersection.has_value();
 }
 
 std::unique_ptr<BuildNode>
@@ -290,58 +208,55 @@ Bvh::buildBvh(
     if (buildPrimitives.size() == 1)
     {
         createLeaf();
+        return node;
+    }
+
+    auto split = findSplit(buildPrimitives, node->bbox.getDiagonal());
+    uint8_t dim = 0;
+
+    std::vector<BuildPrimitive> subset[CHILD_NODE_COUNT];
+    subset[0].reserve(buildPrimitives.size());
+    subset[1].reserve(buildPrimitives.size());
+
+    if (!split.has_value())
+    {
+        createLeaf();
+        return node;
+    }
+
+    const auto& s = split.value();
+    node->dim = s.dim;
+
+    for (const auto& bp : buildPrimitives)
+    {
+        uint8_t subsetIdx = s.isBelow(bp.bbox.getCenter()) ? 0 : 1;
+        subset[subsetIdx].push_back(bp);
+    }
+
+    assert(!subset[0].empty());
+    assert(!subset[1].empty());
+
+    if (buildPrimitives.size() >= MIN_PRIMITIVES_FOR_PARALLELIZATION)
+    {
+        std::future<std::unique_ptr<BuildNode>> children[2];
+        for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
+        {
+            children[i] = std::async([&, i]() {
+                return buildBvh(subset[i], offset, nodeCount);
+            });
+        }
+
+        for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
+        {
+            node->children[i] = children[i].get();
+        }
     }
     else
     {
-        auto split = findSplit(buildPrimitives, node->bbox.getDiagonal());
-        uint8_t dim = 0;
-
-        std::vector<BuildPrimitive> subset[CHILD_NODE_COUNT];
-        subset[0].reserve(buildPrimitives.size());
-        subset[1].reserve(buildPrimitives.size());
-
-        if (!split.has_value())
+        for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
         {
-            createLeaf();
+            node->children[i] = buildBvh(subset[i], offset, nodeCount);
         }
-        else
-        {
-            const auto& s = split.value();
-            node->dim = s.dim;
-
-            for (const auto& bp : buildPrimitives)
-            {
-                uint8_t subsetIdx = s.isBelow(bp.bbox.getCenter()) ? 0 : 1;
-                subset[subsetIdx].push_back(bp);
-            }
-
-            assert(!subset[0].empty());
-            assert(!subset[1].empty());
-
-            if (buildPrimitives.size() >= MIN_PRIMITIVES_FOR_PARALLELIZATION)
-            {
-                std::future<std::unique_ptr<BuildNode>> children[2];
-                for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
-                {
-                    children[i] = std::async([&, i]() {
-                        return buildBvh(subset[i], offset, nodeCount);
-                    });
-                }
-
-                for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
-                {
-                    node->children[i] = children[i].get();
-                }
-            }
-            else
-            {
-                for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
-                {
-                    node->children[i] = buildBvh(subset[i], offset, nodeCount);
-                }
-            }
-        }
-
     }
 
     return node;
@@ -458,5 +373,64 @@ Bvh::flatten(const BuildNode* node, uint32_t& offset)
     }
 
     return nodeOffset;
+}
+
+std::optional<Intersection>
+Bvh::traverse(const Ray& ray, float tFar, bool any) const
+{
+    assert(!mLinearNodes.empty());
+
+    std::optional<Intersection> closestIsect;
+    float tNear = tFar;
+
+    uint32_t stack[STACK_SIZE];
+    uint8_t stackIdx = 0;
+    uint32_t currentIdx = 0;
+
+    while (true)
+    {
+        const auto& linearNode = mLinearNodes[currentIdx];
+        if (linearNode.bbox.intersect(ray))
+        {
+            if (linearNode.isLeaf())
+            {
+                for (uint16_t i = 0; i < linearNode.primitiveCount; ++i)
+                {
+                    const auto& prim = mOrderedPrimitives[linearNode.offset + i];
+                    prim.intersect(ray);
+                    auto isect = prim.intersect(ray);
+                    if (!isect.has_value() || isect.value().t >= tNear)
+                    {
+                        continue;
+                    }
+
+                    if (any)
+                    {
+                        return isect;
+                    }
+                    else
+                    {
+                        closestIsect = isect.value();
+                        tNear = isect.value().t;
+                    }
+                }
+            }
+            else
+            {
+                assert(stackIdx < STACK_SIZE - 2);
+                stack[stackIdx++] = currentIdx + 1;
+                stack[stackIdx++] = linearNode.offset;
+            }
+        }
+
+        if (stackIdx == 0)
+        {
+            break;
+        }
+
+        currentIdx = stack[--stackIdx];
+    }
+
+    return closestIsect;
 }
 }
