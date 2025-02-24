@@ -2,13 +2,21 @@
 
 #include "accelerator.h"
 
+#include <atomic>
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace alpine {
 struct Ray;
 struct Primitive;
-struct Node;
+struct BuildPrimitive;
+struct BuildNode;
+struct LinearNode;
+
+namespace bvh_util {
+struct Split;
+}
 
 class Bvh : public Accelerator
 {
@@ -30,7 +38,19 @@ public:
     virtual bool occluded(const Ray& ray, float far) const override;
 
 private:
+    std::unique_ptr<BuildNode> buildBvh(
+        const std::vector<BuildPrimitive>& bvhPrimitives,
+        std::atomic<uint32_t>& offset,
+        std::atomic<uint32_t>& nodeCount);
+
+    std::optional<bvh_util::Split> findSplit(
+        const std::vector<BuildPrimitive>& bvhPrimitives, const float3& diagonal);
+
+    uint32_t flatten(const BuildNode* node, uint32_t& offset);
+
+private:
     std::vector<Primitive> mPrimitives;
-    std::unique_ptr<Node> mBvh = nullptr;
+    std::vector<Primitive> mOrderedPrimitives;
+    std::vector<LinearNode> mLinearNodes;
 };
 }

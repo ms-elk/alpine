@@ -48,6 +48,8 @@ public:
 
     bool load(std::string_view filename, FileType fileType);
 
+    void buildAccelerator();
+
     api::Light* addPointLight(
         float power, const float color[3], const float position[3]);
 
@@ -149,13 +151,17 @@ Alpine::load(std::string_view filename, FileType fileType)
         return false;
     }
 
+    return true;
+}
+
+void
+Alpine::buildAccelerator()
+{
     for (auto& shape : mScene.shapes)
     {
         shape->appendTo(mAccelerator.get());
     }
     mAccelerator->updateScene();
-
-    return true;
 }
 
 api::Light*
@@ -428,6 +434,13 @@ load(std::string_view filename, FileType fileType)
 {
     assert(gAlpine);
     return gAlpine->load(filename, fileType);
+}
+
+void
+buildAccelerator()
+{
+    assert(gAlpine);
+    gAlpine->buildAccelerator();
 }
 
 api::Light*

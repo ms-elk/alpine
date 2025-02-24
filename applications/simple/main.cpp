@@ -124,6 +124,11 @@ main(int argc, char* argv[])
     }
 
     {
+        Timer timer("Accelerator Build");
+        alpine::buildAccelerator();
+    }
+
+    {
         Timer timer("Light Sampler Build");
         alpine::buildLightSampler(lightSamplerType);
     }

@@ -7,7 +7,6 @@
 #include <array>
 #include <assert.h>
 #include <future>
-#include <optional>
 
 namespace alpine {
 namespace {
@@ -18,6 +17,8 @@ static constexpr uint8_t SPLITS_PER_DIM = 4;
 static constexpr uint8_t BIN_COUNT = SPLITS_PER_DIM + 1;
 
 static constexpr uint32_t MIN_PRIMITIVES_FOR_PARALLELIZATION = 1024;
+
+static constexpr uint8_t STACK_SIZE = 64;
 }
 
 struct Primitive
@@ -70,231 +71,35 @@ struct Primitive
     }
 };
 
-struct Node
+struct BuildPrimitive
 {
     BoundingBox bbox;
-    std::array<std::unique_ptr<Node>, CHILD_NODE_COUNT> children = { nullptr, nullptr };
-    Primitive* leaf = nullptr;
-
-    std::optional<Intersection> intersect(const Ray& ray) const
-    {
-        if (!bbox.intersect(ray))
-        {
-            return {};
-        }
-
-        if (leaf)
-        {
-            return leaf->intersect(ray);
-        }
-
-        Intersection closestIsect;
-        float tNear = std::numeric_limits<float>::max();
-        for (const auto& node : children)
-        {
-            assert(node);
-
-            auto isect = node->intersect(ray);
-            if (isect.has_value() && isect.value().t < tNear)
-            {
-                closestIsect = isect.value();
-                tNear = isect.value().t;
-            }
-        }
-
-        return closestIsect;
-    }
-
-    bool occluded(const Ray& ray, float far) const
-    {
-        if (leaf)
-        {
-            auto isect = leaf->intersect(ray);
-            return isect.has_value();
-        }
-
-        for (auto& node : children)
-        {
-            assert(node);
-            auto isect = node->intersect(ray);
-            if (isect.has_value() && isect.value().t < far)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
+    uint32_t index;
 };
 
-namespace {
-std::optional<bvh_util::Split>
-findSplit(const std::vector<Primitive*>& primitives, const float3& diagonal)
+struct BuildNode
 {
-    if (primitives.size() <= 2)
-    {
-        return {};
-    }
+    BoundingBox bbox;
+    std::array<std::unique_ptr<BuildNode>, CHILD_NODE_COUNT> children = { nullptr, nullptr };
+    uint32_t offset;
+    uint16_t primitiveCount = 0;
+    uint8_t dim;
 
-    auto centroidBox = [&]() {
-        BoundingBox cb;
-        for (const auto* prim : primitives)
-        {
-            float3 c = prim->bbox.getCenter();
-            cb = merge(cb, BoundingBox{ c, c });
-        }
+    bool isLeaf() const { return primitiveCount > 0; }
+};
 
-        return cb;
-    }();
-
-    float cbDiagonalMax = maxComponent(centroidBox.getDiagonal());
-    if (cbDiagonalMax == 0.0f)
-    {
-        return {};
-    }
-
-    bvh_util::Split split;
-    float minCost = std::numeric_limits<float>::max();
-
-    for (uint8_t dim = 0; dim < 3; ++dim)
-    {
-        if (centroidBox.min[dim] == centroidBox.max[dim])
-        {
-            continue;
-        }
-
-        float kr = maxComponent(diagonal) / std::max(diagonal[dim], 0.001f);
-
-        BoundingBox binBoxes[BIN_COUNT];
-
-        // binning
-        for (const auto* prim : primitives)
-        {
-            float c = prim->bbox.getCenter()[dim];
-            uint8_t binIdx = bvh_util::getBinIndex(c, centroidBox.min[dim], centroidBox.max[dim], BIN_COUNT);
-            binIdx = std::min(binIdx, static_cast<uint8_t>(BIN_COUNT - 1));
-
-            auto& binBox = binBoxes[binIdx];
-            binBox = merge(binBox, prim->bbox);
-        }
-
-        float costs[SPLITS_PER_DIM] = { 0.0f };
-
-        const auto accumulateCosts = [&](uint8_t binIdx, uint8_t splitIdx, BoundingBox& binAccum) {
-            const auto& binBox = binBoxes[binIdx];
-            binAccum = merge(binAccum, binBox);
-
-            float sa =
-                binAccum.min.x < std::numeric_limits<float>::max() /* is initialized or not */
-                ? binAccum.computeSurfaceArea() : 0.0f;
-            costs[splitIdx] += sa;
-        };
-
-        BoundingBox binBelow;
-        for (uint8_t splitIdx = 0; splitIdx < SPLITS_PER_DIM; ++splitIdx)
-        {
-            uint8_t binIdx = splitIdx;
-            accumulateCosts(binIdx, splitIdx, binBelow);
-        }
-
-        BoundingBox binAbove;
-        for (int8_t splitIdx = SPLITS_PER_DIM - 1; splitIdx >= 0; --splitIdx)
-        {
-            uint8_t binIdx = splitIdx + 1;
-            accumulateCosts(binIdx, splitIdx, binAbove);
-        }
-
-        // find the split which has the minimum cost
-        for (uint8_t splitIdx = 0; splitIdx < SPLITS_PER_DIM; ++splitIdx)
-        {
-            auto& cost = costs[splitIdx];
-            cost *= kr;
-            if (cost < minCost)
-            {
-                minCost = cost;
-                split = { dim, splitIdx, BIN_COUNT, centroidBox.min[dim], centroidBox.max[dim] };
-            }
-        }
-    }
-
-    return split;
-}
-
-std::unique_ptr<Node>
-buildBvh(const std::vector<Primitive*>& primitives)
+struct alignas(32) LinearNode
 {
-    auto node = std::make_unique<Node>();
-    for (const auto* prim : primitives)
-    {
-        node->bbox = merge(node->bbox, prim->bbox);
-    }
-
-    if (primitives.size() == 1)
-    {
-        node->leaf = primitives[0];
-    }
-    else
-    {
-        auto split = findSplit(primitives, node->bbox.getDiagonal());
-
-        std::vector<Primitive*> subset[CHILD_NODE_COUNT];
-        subset[0].reserve(primitives.size());
-        subset[1].reserve(primitives.size());
-
-        if (split.has_value())
-        {
-            const auto& s = split.value();
-            for (auto* prim : primitives)
-            {
-                uint8_t subsetIdx = s.isBelow(prim->bbox.getCenter()) ? 0 : 1;
-                subset[subsetIdx].push_back(prim);
-            }
-        }
-        else
-        {
-            // split by the middle index
-            uint32_t midIdx = static_cast<uint32_t>(primitives.size() / 2);
-            for (uint32_t i = 0; i < primitives.size(); ++i)
-            {
-                uint8_t subsetIdx = i < midIdx ? 0 : 1;
-                subset[subsetIdx].push_back(primitives[i]);
-            }
-        }
-
-        assert(!subset[0].empty());
-        assert(!subset[1].empty());
-
-        if (primitives.size() >= MIN_PRIMITIVES_FOR_PARALLELIZATION)
-        {
-            std::future<std::unique_ptr<Node>> children[2];
-            for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
-            {
-                children[i] = std::async([&, i]() {
-                    return buildBvh(subset[i]);
-                });
-            }
-
-            for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
-            {
-                node->children[i] = children[i].get();
-            }
-        }
-        else
-        {
-            for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
-            {
-                node->children[i] = buildBvh(subset[i]);
-            }
-        }
-    }
-
-    return node;
-}
-}
+    BoundingBox bbox;
+    uint32_t offset;
+    uint16_t primitiveCount = 0;
+    uint8_t dim = 0;
+};
 
 Bvh::Bvh()
 {
     mPrimitives.reserve(MAX_PRIMITIVES);
+    mOrderedPrimitives.reserve(MAX_PRIMITIVES);
 }
 
 void
@@ -341,27 +146,317 @@ Bvh::updateScene()
         return;
     }
 
-    std::vector<Primitive*> primitives(mPrimitives.size());
+    mOrderedPrimitives.resize(mPrimitives.size());
+
+    std::vector<BuildPrimitive> buildPrimitives(mPrimitives.size());
     for (uint32_t i = 0; i < mPrimitives.size(); ++i)
     {
-        primitives[i] = &mPrimitives[i];
+        auto& bp = buildPrimitives[i];
+        bp.index = i;
+        bp.bbox = mPrimitives[i].bbox;
     }
 
-    mBvh = buildBvh(primitives);
+    std::atomic<uint32_t> buildNodeOffset = 0;
+    std::atomic<uint32_t> nodeCount = 0;
+    auto bvh = buildBvh(buildPrimitives, buildNodeOffset, nodeCount);
+    printf("BVH Node Count: %d\n", nodeCount.load());
+
+    mLinearNodes.resize(nodeCount);
+    uint32_t linearNodeOffset = 0;
+    flatten(bvh.get(), linearNodeOffset);
 }
 
 Intersection
 Bvh::intersect(const Ray& ray) const
 {
-    assert(mBvh);
-    auto isect = mBvh->intersect(ray);
-    return isect.has_value() ? isect.value() : Intersection();
+    assert(!mLinearNodes.empty());
+
+    Intersection closestIsect;
+
+    uint32_t stack[STACK_SIZE];
+    uint8_t stackIdx = 0;
+    uint32_t currentIdx = 0;
+
+    float tNear = std::numeric_limits<float>::max();
+
+    while (true)
+    {
+        const auto& linearNode = mLinearNodes[currentIdx];
+        if (linearNode.bbox.intersect(ray))
+        {
+            if (linearNode.primitiveCount > 0)
+            {
+                for (uint16_t i = 0; i < linearNode.primitiveCount; ++i)
+                {
+                    const auto& prim = mOrderedPrimitives[linearNode.offset + i];
+                    prim.intersect(ray);
+                    auto isect = prim.intersect(ray);
+                    if (isect.has_value() && isect.value().t < tNear)
+                    {
+                        closestIsect = isect.value();
+                        tNear = isect.value().t;
+                    }
+                }
+            }
+            else
+            {
+                assert(stackIdx < STACK_SIZE - 2);
+                stack[stackIdx++] = currentIdx + 1;
+                stack[stackIdx++] = linearNode.offset;
+            }
+        }
+
+        if (stackIdx == 0)
+        {
+            break;
+        }
+
+        currentIdx = stack[--stackIdx];
+    }
+
+    return closestIsect;
 }
 
 bool
 Bvh::occluded(const Ray& ray, float far) const
 {
-    assert(mBvh);
-    return mBvh->occluded(ray, far);
+    assert(!mLinearNodes.empty());
+
+    uint32_t stack[STACK_SIZE];
+    uint8_t stackIdx = 0;
+    uint32_t currentIdx = 0;
+
+    while (true)
+    {
+        const auto& linearNode = mLinearNodes[currentIdx];
+        if (linearNode.bbox.intersect(ray))
+        {
+            if (linearNode.primitiveCount > 0)
+            {
+                for (uint16_t i = 0; i < linearNode.primitiveCount; ++i)
+                {
+                    const auto& prim = mOrderedPrimitives[linearNode.offset + i];
+                    prim.intersect(ray);
+                    auto isect = prim.intersect(ray);
+                    if (isect.has_value() && isect.value().t < far)
+                    {
+                        return true;
+                    }
+                }
+            }
+            else
+            {
+                assert(stackIdx < STACK_SIZE - 2);
+                stack[stackIdx++] = currentIdx + 1;
+                stack[stackIdx++] = linearNode.offset;
+            }
+        }
+
+        if (stackIdx == 0)
+        {
+            break;
+        }
+
+        currentIdx = stack[--stackIdx];
+    }
+
+    return false;
+}
+
+std::unique_ptr<BuildNode>
+Bvh::buildBvh(
+    const std::vector<BuildPrimitive>& buildPrimitives,
+    std::atomic<uint32_t>& offset,
+    std::atomic<uint32_t>& nodeCount)
+{
+    auto node = std::make_unique<BuildNode>();
+    nodeCount++;
+    for (const auto& bp : buildPrimitives)
+    {
+        node->bbox = merge(node->bbox, bp.bbox);
+    }
+
+    const auto createLeaf = [&]() {
+        node->primitiveCount = static_cast<uint16_t>(buildPrimitives.size());
+        node->offset = offset.fetch_add(node->primitiveCount);
+
+        for (uint32_t i = 0; i < buildPrimitives.size(); ++i)
+        {
+            uint32_t index = buildPrimitives[i].index;
+            mOrderedPrimitives[node->offset + i] = mPrimitives[index];
+        }
+    };
+
+    if (buildPrimitives.size() == 1)
+    {
+        createLeaf();
+    }
+    else
+    {
+        auto split = findSplit(buildPrimitives, node->bbox.getDiagonal());
+        uint8_t dim = 0;
+
+        std::vector<BuildPrimitive> subset[CHILD_NODE_COUNT];
+        subset[0].reserve(buildPrimitives.size());
+        subset[1].reserve(buildPrimitives.size());
+
+        if (!split.has_value())
+        {
+            createLeaf();
+        }
+        else
+        {
+            const auto& s = split.value();
+            node->dim = s.dim;
+
+            for (const auto& bp : buildPrimitives)
+            {
+                uint8_t subsetIdx = s.isBelow(bp.bbox.getCenter()) ? 0 : 1;
+                subset[subsetIdx].push_back(bp);
+            }
+
+            assert(!subset[0].empty());
+            assert(!subset[1].empty());
+
+            if (buildPrimitives.size() >= MIN_PRIMITIVES_FOR_PARALLELIZATION)
+            {
+                std::future<std::unique_ptr<BuildNode>> children[2];
+                for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
+                {
+                    children[i] = std::async([&, i]() {
+                        return buildBvh(subset[i], offset, nodeCount);
+                    });
+                }
+
+                for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
+                {
+                    node->children[i] = children[i].get();
+                }
+            }
+            else
+            {
+                for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
+                {
+                    node->children[i] = buildBvh(subset[i], offset, nodeCount);
+                }
+            }
+        }
+
+    }
+
+    return node;
+}
+
+std::optional<bvh_util::Split>
+Bvh::findSplit(const std::vector<BuildPrimitive>& buildPrimitives, const float3& diagonal)
+{
+    if (buildPrimitives.size() <= 2)
+    {
+        return {};
+    }
+
+    auto centroidBox = [&]() {
+        BoundingBox cb;
+        for (const auto& bp : buildPrimitives)
+        {
+            float3 c = bp.bbox.getCenter();
+            cb = merge(cb, BoundingBox{ c, c });
+        }
+
+        return cb;
+    }();
+
+    float cbDiagonalMax = maxComponent(centroidBox.getDiagonal());
+    if (cbDiagonalMax == 0.0f)
+    {
+        return {};
+    }
+
+    bvh_util::Split split;
+    float minCost = std::numeric_limits<float>::max();
+
+    for (uint8_t dim = 0; dim < 3; ++dim)
+    {
+        if (centroidBox.min[dim] == centroidBox.max[dim])
+        {
+            continue;
+        }
+
+        float kr = maxComponent(diagonal) / std::max(diagonal[dim], 0.001f);
+
+        BoundingBox binBoxes[BIN_COUNT];
+
+        // binning
+        for (const auto& bp : buildPrimitives)
+        {
+            float c = bp.bbox.getCenter()[dim];
+            uint8_t binIdx = bvh_util::getBinIndex(c, centroidBox.min[dim], centroidBox.max[dim], BIN_COUNT);
+            binIdx = std::min(binIdx, static_cast<uint8_t>(BIN_COUNT - 1));
+
+            auto& binBox = binBoxes[binIdx];
+            binBox = merge(binBox, bp.bbox);
+        }
+
+        float costs[SPLITS_PER_DIM] = { 0.0f };
+
+        const auto accumulateCosts = [&](uint8_t binIdx, uint8_t splitIdx, BoundingBox& binAccum) {
+            const auto& binBox = binBoxes[binIdx];
+            binAccum = merge(binAccum, binBox);
+
+            float sa =
+                binAccum.min.x < std::numeric_limits<float>::max() /* is initialized or not */
+                ? binAccum.computeSurfaceArea() : 0.0f;
+            costs[splitIdx] += sa;
+        };
+
+        BoundingBox binBelow;
+        for (uint8_t splitIdx = 0; splitIdx < SPLITS_PER_DIM; ++splitIdx)
+        {
+            uint8_t binIdx = splitIdx;
+            accumulateCosts(binIdx, splitIdx, binBelow);
+        }
+
+        BoundingBox binAbove;
+        for (int8_t splitIdx = SPLITS_PER_DIM - 1; splitIdx >= 0; --splitIdx)
+        {
+            uint8_t binIdx = splitIdx + 1;
+            accumulateCosts(binIdx, splitIdx, binAbove);
+        }
+
+        // find the split which has the minimum cost
+        for (uint8_t splitIdx = 0; splitIdx < SPLITS_PER_DIM; ++splitIdx)
+        {
+            auto& cost = costs[splitIdx];
+            cost *= kr;
+            if (cost < minCost)
+            {
+                minCost = cost;
+                split = { dim, splitIdx, BIN_COUNT, centroidBox.min[dim], centroidBox.max[dim] };
+            }
+        }
+    }
+
+    return split;
+}
+
+uint32_t
+Bvh::flatten(const BuildNode* node, uint32_t& offset)
+{
+    auto& linearNode = mLinearNodes[offset];
+    uint32_t nodeOffset = offset++;
+    linearNode.bbox = node->bbox;
+    if (node->isLeaf())
+    {
+        linearNode.offset = node->offset;
+        linearNode.primitiveCount = node->primitiveCount;
+    }
+    else
+    {
+        linearNode.dim = node->dim;
+        flatten(node->children[0].get(), offset);
+        linearNode.offset = flatten(node->children[1].get(), offset);
+    }
+
+    return nodeOffset;
 }
 }
