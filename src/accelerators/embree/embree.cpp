@@ -33,7 +33,7 @@ public:
 
     std::optional<Intersection> intersect(const Ray& ray) const;
 
-    bool occluded(const Ray& ray, float tFar) const;
+    bool intersectAny(const Ray& ray, float tFar) const;
 
 private:
     RTCDevice mDevice = nullptr;
@@ -158,7 +158,7 @@ Embree::Impl::intersect(const Ray& ray) const
 }
 
 bool
-Embree::Impl::occluded(const Ray& ray, float tFar) const
+Embree::Impl::intersectAny(const Ray& ray, float tFar) const
 {
     RTCRay rtcRay;
     rtcRay.org_x = ray.org.x;
@@ -209,8 +209,8 @@ Embree::intersect(const Ray& ray) const
 }
 
 bool
-Embree::occluded(const Ray& ray, float tFar) const
+Embree::intersectAny(const Ray& ray, float tFar) const
 {
-    return mPimpl->occluded(ray, tFar);
+    return mPimpl->intersectAny(ray, tFar);
 }
 }

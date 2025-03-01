@@ -36,6 +36,6 @@ public:
 
     virtual std::optional<Intersection> intersect(const Ray& ray) const = 0;
 
-    virtual bool occluded(const Ray& ray, float tFar) const = 0;
+    virtual bool intersectAny(const Ray& ray, float tFar) const = 0;
 };
 }

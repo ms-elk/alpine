@@ -327,8 +327,8 @@ Alpine::estimateDirectIllumination(
         const float3& position, const float3& normal, const float3& dir, float dist) {
         float3 rayOffset = normal * RAY_OFFSET;
         Ray shadowRay{ position + rayOffset, dir };
-        bool occluded = mAccelerator->occluded(shadowRay, dist);
-        return occluded;
+        bool isOccluded = mAccelerator->intersectAny(shadowRay, dist);
+        return isOccluded;
     };
 
     // Light sampling
