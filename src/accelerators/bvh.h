@@ -36,7 +36,7 @@ public:
 
     virtual std::optional<Intersection> intersect(const Ray& ray) const override;
 
-    virtual bool occluded(const Ray& ray, float tFar) const override;
+    virtual bool intersectAny(const Ray& ray, float tFar) const override;
 
 private:
     std::unique_ptr<BuildNode> buildBvh(

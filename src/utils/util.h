@@ -6,6 +6,12 @@
 
 namespace alpine {
 static constexpr float ONE_MINUS_EPSILON = 1.0f - std::numeric_limits<float>::epsilon();
+static constexpr float MACHINE_EPSILON = 0.5f * std::numeric_limits<float>::epsilon();
+
+inline constexpr float gamma(int32_t n)
+{
+    return (n * MACHINE_EPSILON) / (1.0f - n * MACHINE_EPSILON);
+}
 
 inline float cos2Theta(const float3& w) { return w.z * w.z; }
 inline float cosTheta(const float3& w) { return w.z; }

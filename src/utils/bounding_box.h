@@ -2,6 +2,7 @@
 
 #include "math/vector.h"
 #include "ray.h"
+#include "utils/util.h"
 
 #include <algorithm>
 
@@ -21,38 +22,37 @@ struct BoundingBox
 
     bool intersect(const Ray& ray, float tFar, const float3& invRayDir) const
     {
-        float tNear = 0.0f;
+        static constexpr float correction = 1.0f + 2.0f * gamma(3); // ensure conserative intersection
 
-        for (uint32_t i = 0; i < 3; ++i)
+        float tMin = ((invRayDir.x >= 0.0f ? min.x : max.x) - ray.org.x) * invRayDir.x;
+        float tMax = ((invRayDir.x >= 0.0f ? max.x : min.x) - ray.org.x) * invRayDir.x;
+        tMax *= correction;
+
+        float tyMin = ((invRayDir.y >= 0.0f ? min.y : max.y) - ray.org.y) * invRayDir.y;
+        float tyMax = ((invRayDir.y >= 0.0f ? max.y : min.y) - ray.org.y) * invRayDir.y;
+        tyMax *= correction;
+
+        if (tMin > tyMax || tMax < tyMin)
         {
-            if (std::abs(invRayDir[i]) > 0.0f)
-            {
-                float t0 = (min[i] - ray.org[i]) * invRayDir[i];
-                float t1 = (max[i] - ray.org[i]) * invRayDir[i];
-
-                if (t0 > t1)
-                {
-                    std::swap(t0, t1);
-                }
-
-                tNear = std::max(tNear, t0);
-                tFar = std::min(tFar, t1);
-
-                if (tNear > tFar)
-                {
-                    return false;
-                }
-            }
-            else
-            {
-                if (ray.org[i] < min[i] || ray.org[i] > max[i])
-                {
-                    return false;
-                }
-            }
+            return false;
         }
 
-        return true;
+        tMin = std::max(tMin, tyMin);
+        tMax = std::min(tMax, tyMax);
+
+        float tzMin = ((invRayDir.z >= 0.0f ? min.z : max.z) - ray.org.z) * invRayDir.z;
+        float tzMax = ((invRayDir.z >= 0.0f ? max.z : min.z) - ray.org.z) * invRayDir.z;
+        tzMax *= correction;
+
+        if (tMin > tzMax || tMax < tzMin)
+        {
+            return false;
+        }
+
+        tMin = std::max(tMin, tzMin);
+        tMax = std::min(tMax, tzMax);
+
+        return tMin < tFar && tMax > 0.0f;
     }
 };
 
