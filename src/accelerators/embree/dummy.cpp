@@ -24,14 +24,14 @@ void
 Embree::updateScene()
 {}
 
-Intersection
+std::optional<Intersection>
 Embree::intersect(const Ray& ray) const
 {
-    return Intersection();
+    return {};
 }
 
 bool
-Embree::occluded(const Ray& ray, float far) const
+Embree::intersectAny(const Ray& ray, float far) const
 {
     return false;
 }

@@ -1,5 +1,7 @@
 #include "denoiser.h"
 
+#include <stdio.h>
+
 namespace alpine::denoiser {
 void
 initialize()
