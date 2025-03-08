@@ -34,4 +34,6 @@
 # Folders
 bin/
 build/
-ext/
+ext/embree
+ext/glfw
+ext/oidn
