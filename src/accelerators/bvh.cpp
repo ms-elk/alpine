@@ -288,7 +288,7 @@ Bvh::buildBvh(
         return node;
     }
 
-    auto split = findSplit(buildPrimitives, node->bbox.getDiagonal());
+    auto split = findSplit(buildPrimitives);
     uint8_t dim = 0;
 
     std::vector<BuildPrimitive> subset[CHILD_NODE_COUNT];
@@ -340,7 +340,7 @@ Bvh::buildBvh(
 }
 
 std::optional<bvh_util::Split>
-Bvh::findSplit(const std::vector<BuildPrimitive>& buildPrimitives, const float3& diagonal)
+Bvh::findSplit(const std::vector<BuildPrimitive>& buildPrimitives)
 {
     if (buildPrimitives.size() <= 2)
     {
@@ -373,8 +373,6 @@ Bvh::findSplit(const std::vector<BuildPrimitive>& buildPrimitives, const float3&
         {
             continue;
         }
-
-        float kr = maxComponent(diagonal) / std::max(diagonal[dim], 0.001f);
 
         BoundingBox binBoxes[BIN_COUNT];
 
@@ -418,8 +416,7 @@ Bvh::findSplit(const std::vector<BuildPrimitive>& buildPrimitives, const float3&
         // find the split which has the minimum cost
         for (uint8_t splitIdx = 0; splitIdx < SPLITS_PER_DIM; ++splitIdx)
         {
-            auto& cost = costs[splitIdx];
-            cost *= kr;
+            const auto& cost = costs[splitIdx];
             if (cost < minCost)
             {
                 minCost = cost;

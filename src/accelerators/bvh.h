@@ -44,8 +44,7 @@ private:
         std::atomic<uint32_t>& offset,
         std::atomic<uint32_t>& nodeCount);
 
-    std::optional<bvh_util::Split> findSplit(
-        const std::vector<BuildPrimitive>& bvhPrimitives, const float3& diagonal);
+    std::optional<bvh_util::Split> findSplit(const std::vector<BuildPrimitive>& bvhPrimitives);
 
     uint32_t flatten(const BuildNode* node, uint32_t& offset);
 
