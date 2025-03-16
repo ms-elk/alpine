@@ -8,24 +8,25 @@
 namespace alpine {
 struct Ray;
 
-class Embree : public Accelerator
+class Embree final : public Accelerator
 {
 public:
     Embree();
+    ~Embree() override;
 
-    virtual void appendMesh(
+    void appendMesh(
         const std::vector<float3>& vertices,
         const std::vector<uint3>& prims,
         const void* ptr) override;
 
-    virtual void appendSphere(
+    void appendSphere(
         const std::vector<float4>& vertices, const void* ptr) override;
 
-    virtual void updateScene() override;
+    void updateScene() override;
 
-    virtual std::optional<Intersection> intersect(const Ray& ray) const override;
+    std::optional<Intersection> intersect(const Ray& ray) const override;
 
-    virtual bool intersectAny(const Ray& ray, float tFar) const override;
+    bool intersectAny(const Ray& ray, float tFar) const override;
 
 private:
     class Impl;

@@ -262,6 +262,8 @@ BvhLightSampler::BvhLightSampler(const std::vector<std::shared_ptr<Light>>& ligh
     bvh->root = createLightNode(lightCluster);
 }
 
+BvhLightSampler::~BvhLightSampler() = default;
+
 std::optional<LightSampler::Sample>
 BvhLightSampler::sample(float u, const float3& hit, const float3& ns) const
 {

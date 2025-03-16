@@ -4,7 +4,7 @@
 #include "light_sampler.h"
 
 namespace alpine {
-class PowerLightSampler : public LightSampler
+class PowerLightSampler final : public LightSampler
 {
 public:
     PowerLightSampler(const std::vector<std::shared_ptr<Light>>& lights);

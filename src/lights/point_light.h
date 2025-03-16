@@ -6,7 +6,7 @@
 namespace alpine {
 struct IntersectionAttributes;
 
-class PointLight : public Light
+class PointLight final : public Light
 {
 public:
     PointLight(const float3& intensity, const float3& position);
