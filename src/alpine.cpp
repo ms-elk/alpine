@@ -30,7 +30,8 @@
 #include <vector>
 
 namespace alpine {
-static constexpr uint32_t TILE_SIZE = 64;
+static constexpr uint32_t BATCH_WIDTH = 16;
+static constexpr uint32_t BATCH_HEIGHT = 16;
 
 class Alpine
 {
@@ -69,6 +70,8 @@ public:
     void addDebugScene();
 
 private:
+    void traceRayBatch(uint32_t batchId, uint32_t spp);
+
     float3 estimateDirectIllumination(Sampler& sampler, const float3& hit,
         const float3& wo, const IntersectionAttributes& isectAttr) const;
 
@@ -85,9 +88,8 @@ private:
     std::vector<byte3> mFrameBuffer;
     uint32_t mTotalSamples = 0;
 
-    uint32_t mTileWidth = 0;
-    uint32_t mTileHeight = 0;
-    std::vector<std::future<void>> mTiles;
+    uint32_t mBatchWidthCount = 0;
+    std::vector<std::future<void>> mBatches;
 
     std::unique_ptr<Accelerator> mAccelerator;
 
@@ -112,10 +114,10 @@ Alpine::Alpine(uint32_t width, uint32_t height, uint32_t maxDepth, AcceleratorTy
     mResolvedBuffer.resize(pixelCount);
     mFrameBuffer.resize(pixelCount);
 
-    mTileWidth = (width - 1) / TILE_SIZE + 1;
-    mTileHeight = (height - 1) / TILE_SIZE + 1;
-    uint32_t tileCount = mTileWidth * mTileHeight;
-    mTiles.resize(tileCount);
+    mBatchWidthCount = (width - 1) / BATCH_WIDTH + 1;
+    uint32_t batchHeightCount = (height - 1) / BATCH_HEIGHT + 1;
+    uint32_t batchCount = mBatchWidthCount * batchHeightCount;
+    mBatches.resize(batchCount);
 
     switch (acceleratorType)
     {
@@ -212,96 +214,96 @@ Alpine::resetAccumulation()
 void
 Alpine::render(uint32_t spp)
 {
-    for (uint32_t sampleId = 0; sampleId < spp; ++sampleId)
+    for (uint32_t batchId = 0; batchId < mBatches.size(); ++batchId)
     {
-        for (uint32_t tileId = 0; tileId < mTiles.size(); ++tileId)
-        {
-            mTiles[tileId] = std::async([&, tileId]() {
-                uint32_t xBegin = tileId % mTileWidth * TILE_SIZE;
-                uint32_t yBegin = tileId / mTileWidth * TILE_SIZE;
+        mBatches[batchId] = std::async(
+            std::launch::async, &Alpine::traceRayBatch, this, batchId, spp);
+    }
 
-                for (uint32_t y = yBegin; y < yBegin + TILE_SIZE; ++y)
+    for (auto& batch : mBatches)
+    {
+        batch.get();
+    }
+
+    mTotalSamples += spp;
+}
+
+void
+Alpine::traceRayBatch(uint32_t batchId, uint32_t spp)
+{
+    uint32_t xBegin = batchId % mBatchWidthCount * BATCH_WIDTH;
+    uint32_t xEnd = std::min(xBegin + BATCH_WIDTH, mWidth);
+    uint32_t yBegin = batchId / mBatchWidthCount * BATCH_HEIGHT;
+    uint32_t yEnd = std::min(yBegin + BATCH_HEIGHT, mHeight);
+
+    for (uint32_t y = yBegin; y < yEnd; ++y)
+    {
+        for (uint32_t x = xBegin; x < xEnd; ++x)
+        {
+            uint32_t index = y * mWidth + x;
+            auto& sampler = mSamplers[index];
+
+            for (uint32_t sampleId = 0; sampleId < spp; ++sampleId)
+            {
+                float2 jitter = sampler.get2D();
+                auto ray = mCamera.generateRay(
+                    (x + jitter.x) / float(mWidth), (y + jitter.y) / float(mHeight));
+
+                float3 throughput(1.0f);
+                float3 radiance(0.0f);
+
+                for (uint32_t depth = 0; depth < mMaxDepth; ++depth)
                 {
-                    if (y >= mHeight)
+                    auto oi = mAccelerator->intersect(ray);
+
+                    if (!oi.has_value())
                     {
-                        continue;
+                        radiance += throughput * mBackgroundColor;
+                        break;
                     }
 
-                    for (uint32_t x = xBegin; x < xBegin + TILE_SIZE; ++x)
+                    const auto& isect = oi.value();
+
+                    float3 hit = ray.org + ray.dir * isect.t;
+                    const auto* shape = static_cast<const Shape*>(isect.shapePtr);
+                    auto isectAttr
+                        = shape->getIntersectionAttributes(isect);
+
+                    if (depth == 0)
                     {
-                        if (x >= mWidth)
-                        {
-                            continue;
-                        }
-
-                        uint32_t index = y * mWidth + x;
-                        auto& sampler = mSamplers[index];
-                        float2 jitter = sampler.get2D();
-                        auto ray = mCamera.generateRay(
-                            (x + jitter.x) / float(mWidth), (y + jitter.y) / float(mHeight));
-
-                        float3 throughput(1.0f);
-                        float3 radiance(0.0f);
-                        for (uint32_t depth = 0; depth < mMaxDepth; ++depth)
-                        {
-                            auto oi = mAccelerator->intersect(ray);
-
-                            if (!oi.has_value())
-                            {
-                                radiance += throughput * mBackgroundColor;
-                                break;
-                            }
-
-                            const auto& isect = oi.value();
-
-                            float3 hit = ray.org + ray.dir * isect.t;
-                            const auto* shape = static_cast<const Shape*>(isect.shapePtr);
-                            auto isectAttr
-                                = shape->getIntersectionAttributes(isect);
-
-                            if (depth == 0)
-                            {
-                                mAccumBuffer[index].albedo += isectAttr.material->getBaseColor(isectAttr.uv);
-                                mAccumBuffer[index].normal += isectAttr.ns;
-                            }
-
-                            float3 wo = toLocal(- ray.dir, isectAttr.ss, isectAttr.ts, isectAttr.ns);
-                            radiance += throughput * estimateDirectIllumination(sampler, hit, wo, isectAttr);
-
-                            auto oms =
-                                isectAttr.material->sample(wo, sampler.get2D(), isectAttr);
-                            if (!oms.has_value())
-                            {
-                                break;
-                            }
-
-                            const auto& ms = oms.value();
-                            float3 wiWorld = toWorld(ms.wi, isectAttr.ss, isectAttr.ts, isectAttr.ns);
-                            bool isReflect = dot(wiWorld, isect.ng) > 0.0f;
-                            if (!isReflect)
-                            {
-                                break;
-                            }
-
-                            throughput = throughput * ms.estimator;
-
-                            float3 rayOffset = isect.ng * RAY_OFFSET;
-                            ray.org = hit + rayOffset;
-                            ray.dir = wiWorld;
-                        }
-
-                        mAccumBuffer[index].color += radiance;
+                        mAccumBuffer[index].albedo += isectAttr.material->getBaseColor(isectAttr.uv);
+                        mAccumBuffer[index].normal += isectAttr.ns;
                     }
+
+                    float3 wo = toLocal(-ray.dir, isectAttr.ss, isectAttr.ts, isectAttr.ns);
+                    radiance += throughput * estimateDirectIllumination(sampler, hit, wo, isectAttr);
+
+                    auto oms =
+                        isectAttr.material->sample(wo, sampler.get2D(), isectAttr);
+                    if (!oms.has_value())
+                    {
+                        break;
+                    }
+
+                    const auto& ms = oms.value();
+                    float3 wiWorld = toWorld(ms.wi, isectAttr.ss, isectAttr.ts, isectAttr.ns);
+                    bool isReflect = dot(wiWorld, isect.ng) > 0.0f;
+                    if (!isReflect)
+                    {
+                        break;
+                    }
+
+                    throughput = throughput * ms.estimator;
+
+                    float3 rayOffset = isect.ng * RAY_OFFSET;
+                    ray.org = hit + rayOffset;
+                    ray.dir = wiWorld;
                 }
-                });
-        }
 
-        for (auto& tile : mTiles)
-        {
-            tile.get();
+                mAccumBuffer[index].color += radiance;
+            }
         }
     }
-    mTotalSamples += spp;
 }
 
 float3
