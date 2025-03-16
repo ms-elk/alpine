@@ -148,12 +148,8 @@ Alpine::load(std::string_view filename, FileType fileType)
         }
     };
 
-    if (!load())
-    {
-        return false;
-    }
-
-    return true;
+    bool isLoaded = load();
+    return isLoaded;
 }
 
 void

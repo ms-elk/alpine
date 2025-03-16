@@ -6,7 +6,7 @@
 #include <memory>
 
 namespace alpine {
-class Matte : public Material
+class Matte final : public Material
 {
 public:
     Matte(const float3& baseColor,

@@ -9,7 +9,7 @@
 namespace alpine {
 class Material;
 
-class Sphere : public Shape
+class Sphere final : public Shape
 {
 public:
     struct Data
@@ -20,11 +20,10 @@ public:
 
     Sphere(const std::shared_ptr<Data>& data)
         : mData(data) {}
-    virtual ~Sphere() override {}
 
-    virtual void appendTo(Accelerator* accelerator) const override;
+    void appendTo(Accelerator* accelerator) const override;
 
-    virtual IntersectionAttributes getIntersectionAttributes(
+    IntersectionAttributes getIntersectionAttributes(
         const Intersection& isect) const override;
 
 private:

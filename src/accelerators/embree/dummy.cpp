@@ -9,6 +9,8 @@ Embree::Embree()
     printf("ERROR: Embree is not available in this build.\n");
 }
 
+Embree::~Embree() = default;
+
 void
 Embree::appendMesh(
     const std::vector<float3>& vertices,

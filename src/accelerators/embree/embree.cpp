@@ -181,6 +181,8 @@ Embree::Embree()
     : mPimpl(std::make_unique<Impl>())
 {}
 
+Embree::~Embree() = default;
+
 void
 Embree::appendMesh(
     const std::vector<float3>& vertices,

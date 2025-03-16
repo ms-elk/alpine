@@ -3,7 +3,7 @@
 #include "light_sampler.h"
 
 namespace alpine {
-class UniformLightSampler : public LightSampler
+class UniformLightSampler final : public LightSampler
 {
 public:
     UniformLightSampler(const std::vector<std::shared_ptr<Light>>& lights);

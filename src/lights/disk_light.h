@@ -6,7 +6,7 @@
 namespace alpine {
 struct IntersectionAttributes;
 
-class DiskLight : public Light
+class DiskLight final : public Light
 {
 public:
     DiskLight(
