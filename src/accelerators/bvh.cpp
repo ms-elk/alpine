@@ -245,19 +245,6 @@ Bvh::updateScene()
     gBvhStats.countNodes(mLinearNodes);
 }
 
-std::optional<Intersection>
-Bvh::intersect(const Ray& ray) const
-{
-    return traverse(ray, std::numeric_limits<float>::max(), false);
-}
-
-bool
-Bvh::intersectAny(const Ray& ray, float tFar) const
-{
-    const auto intersection = traverse(ray, tFar, true);
-    return intersection.has_value();
-}
-
 std::unique_ptr<BuildNode>
 Bvh::buildBvh(
     const std::vector<BuildPrimitive>& buildPrimitives,
@@ -447,6 +434,19 @@ Bvh::flatten(const BuildNode* node, uint32_t& offset)
     }
 
     return nodeOffset;
+}
+
+std::optional<Intersection>
+Bvh::intersect(const Ray& ray) const
+{
+    return traverse(ray, std::numeric_limits<float>::max(), false);
+}
+
+bool
+Bvh::intersectAny(const Ray& ray, float tFar) const
+{
+    const auto intersection = traverse(ray, tFar, true);
+    return intersection.has_value();
 }
 
 std::optional<Intersection>
