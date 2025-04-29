@@ -5,6 +5,7 @@
 #include "image.h"
 #include "accelerators/accelerator.h"
 #include "accelerators/bvh.h"
+#include "accelerators/bvh4.h"
 #include "accelerators/embree.h"
 #include "denoisers/denoiser.h"
 #include "light_samplers/light_sampler.h"
@@ -123,6 +124,9 @@ Alpine::Alpine(uint32_t width, uint32_t height, uint32_t maxDepth, AcceleratorTy
     {
     case AcceleratorType::Embree:
         mAccelerator = std::make_unique<Embree>();
+        break;
+    case AcceleratorType::Bvh4:
+        mAccelerator = std::make_unique<Bvh4>();
         break;
     case AcceleratorType::Bvh:
     default:

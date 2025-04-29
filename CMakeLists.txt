@@ -44,6 +44,8 @@ set(ACCELERATORS
   src/accelerators/accelerator.h
   src/accelerators/bvh.cpp
   src/accelerators/bvh.h
+  src/accelerators/bvh4.cpp
+  src/accelerators/bvh4.h
   src/accelerators/embree.h
 )
 

@@ -1,0 +1,515 @@
+﻿#include "bvh4.h"
+
+#include "ray.h"
+#include "utils/bounding_box.h"
+
+#include <array>
+#include <assert.h>
+#include <future>
+
+namespace alpine {
+namespace {
+static constexpr uint32_t MAX_PRIMITIVES = 128 * 1024;
+static constexpr uint8_t CHILD_NODE_COUNT = 4;
+static constexpr uint8_t MAX_CLUSTERING_ITERATIONS = 8;
+static constexpr uint32_t MIN_PRIMITIVES_FOR_PARALLELIZATION = 1024;
+}
+
+struct Primitive4
+{
+    BoundingBox bbox;
+    const void* ptr = nullptr;
+    uint32_t primId = std::numeric_limits<uint32_t>::max();
+
+    // triangle variables
+    float3 vertex;
+    float3 edges[2];
+    float3 ng;
+
+    std::optional<Intersection> intersect(const Ray& ray) const
+    {
+        float3 s = ray.org - vertex;
+        float3 s1 = cross(ray.dir, edges[1]);
+        float3 s2 = cross(s, edges[0]);
+        float det = dot(s1, edges[0]);
+
+        if (det == 0.0f)
+        {
+            return {};
+        }
+
+        Intersection isect;
+        isect.shapePtr = ptr;
+        isect.primId = primId;
+        isect.ng = ng;
+
+        isect.t = dot(s2, edges[1]) / det;
+        if (isect.t < std::numeric_limits<float>::epsilon())
+        {
+            return {};
+        }
+
+        isect.barycentric[0] = dot(s1, s) / det;
+        if (isect.barycentric[0] < 0.0f || isect.barycentric[0] > 1.0f)
+        {
+            return {};
+        }
+
+        isect.barycentric[1] = dot(s2, ray.dir) / det;
+        if (isect.barycentric[1] < 0.0f || isect.barycentric[1] > 1.0f - isect.barycentric[0])
+        {
+            return {};
+        }
+
+        return isect;
+    }
+};
+
+struct BuildPrimitive4
+{
+    BoundingBox bbox;
+    uint32_t index;
+};
+
+struct BuildNode4
+{
+    BoundingBox bbox;
+    std::array<std::unique_ptr<BuildNode4>, CHILD_NODE_COUNT> children{};
+    uint32_t offset = 0;
+    uint16_t primitiveCount = 0;
+
+    bool isLeaf() const { return primitiveCount > 0; }
+};
+
+namespace {
+class BvhStats
+{
+public:
+    void show()
+    {
+        printf("BVH Total Node Count: %zu\n", mNodeCount);
+        printf("BVH Node Access Count (Closest): %zu\n", mClosestCount.load());
+        printf("BVH Node Access Count (Any): %zu\n", mAnyCount.load());
+    }
+
+    void countNodes(uint64_t nodeCount)
+    {
+        mNodeCount = nodeCount;
+    }
+
+    void addNodeAccessCount(uint32_t count, bool any)
+    {
+        if (any)
+        {
+            mAnyCount += count;
+        }
+        else
+        {
+            mClosestCount += count;
+        }
+    }
+
+private:
+    uint64_t mNodeCount = 0;
+    std::atomic<uint64_t> mClosestCount = 0;
+    std::atomic<uint64_t> mAnyCount = 0;
+};
+
+BvhStats gBvhStats;
+}
+
+Bvh4::Bvh4()
+{
+    mPrimitives.reserve(MAX_PRIMITIVES);
+    mOrderedPrimitives.reserve(MAX_PRIMITIVES);
+}
+
+Bvh4::~Bvh4()
+{
+    gBvhStats.show();
+}
+
+void
+Bvh4::appendMesh(
+    const std::vector<float3>& vertices,
+    const std::vector<uint3>& prims,
+    const void* ptr)
+{
+    for (uint32_t primId = 0; primId < prims.size(); ++primId)
+    {
+        Primitive4 prim;
+        prim.ptr = ptr;
+        prim.primId = primId;
+
+        uint32_t idx0 = prims[primId][0];
+        uint32_t idx1 = prims[primId][1];
+        uint32_t idx2 = prims[primId][2];
+        prim.vertex = vertices[idx0];
+        prim.edges[0] = vertices[idx1] - vertices[idx0];
+        prim.edges[1] = vertices[idx2] - vertices[idx0];
+        prim.ng = normalize(cross(prim.edges[0], prim.edges[1]));
+
+        for (uint8_t i = 0; i < 3; ++i)
+        {
+            uint32_t idx = prims[primId][i];
+            prim.bbox = merge(prim.bbox, vertices[idx]);
+        }
+
+        mPrimitives.push_back(prim);
+    }
+}
+
+void
+Bvh4::appendSphere(const std::vector<float4>& vertices, const void* ptr)
+{
+    printf("ERROR: Sphere intersection has not been implemented yet.");
+}
+
+void
+Bvh4::updateScene()
+{
+    if (mPrimitives.empty())
+    {
+        return;
+    }
+
+    mOrderedPrimitives.resize(mPrimitives.size());
+
+    std::vector<BuildPrimitive4> buildPrimitives(mPrimitives.size());
+    for (uint32_t i = 0; i < mPrimitives.size(); ++i)
+    {
+        auto& bp = buildPrimitives[i];
+        bp.index = i;
+        bp.bbox = mPrimitives[i].bbox;
+    }
+
+    std::atomic<uint32_t> buildNodeOffset = 0;
+    std::atomic<uint32_t> nodeCount = 0;
+    mBvh = buildBvh(buildPrimitives, buildNodeOffset, nodeCount);
+
+    gBvhStats.countNodes(nodeCount);
+}
+
+namespace {
+// k-means++
+std::vector<float3>
+pickInitialCentroids(
+    const float3& seed, const std::vector<BuildPrimitive4>& buildPrimitives, uint8_t clusterCount)
+{
+    std::vector<float3> clusterCentroids;
+    clusterCentroids.reserve(clusterCount);
+
+    auto firstCentroid = [&]() {
+        uint32_t primId = 0;
+        float maxDist2 = -std::numeric_limits<float>::max();
+        for (uint32_t i = 0; i < buildPrimitives.size(); ++i)
+        {
+            float3 v = buildPrimitives[i].bbox.getCenter() - seed;
+            float dist2 = dot(v, v);
+
+            if (dist2 > maxDist2)
+            {
+                maxDist2 = dist2;
+                primId = i;
+            }
+        }
+
+        return buildPrimitives[primId].bbox.getCenter();
+    }();
+
+    clusterCentroids.push_back(firstCentroid);
+
+    for (uint8_t k = 1; k < clusterCount; ++k)
+    {
+        uint32_t primId = 0;
+        float maxDist2 = -std::numeric_limits<float>::max();
+        for (uint32_t i = 0; i < buildPrimitives.size(); ++i)
+        {
+            float clusterDist2 = std::numeric_limits<float>::max();
+            for (const auto& centroid : clusterCentroids)
+            {
+                float3 v = buildPrimitives[i].bbox.getCenter() - centroid;
+                float dist2 = dot(v, v);
+
+                if (dist2 < clusterDist2)
+                {
+                    clusterDist2 = dist2;
+                }
+            }
+
+            if (clusterDist2 > maxDist2)
+            {
+                maxDist2 = clusterDist2;
+                primId = i;
+            }
+        }
+
+        clusterCentroids.push_back(buildPrimitives[primId].bbox.getCenter());
+    }
+
+    return clusterCentroids;
+}
+
+std::pair<std::vector<std::vector<BuildPrimitive4>>, float /* cost */>
+clusterPrimitives(const std::vector<BuildPrimitive4>& buildPrimitives, uint8_t clusterCount)
+{
+    if (buildPrimitives.size() <= clusterCount)
+    {
+        return { std::vector<std::vector<BuildPrimitive4>>(), 0.0f };
+    }
+
+    auto centroidBox = [&]() {
+        BoundingBox cb;
+        for (const auto& bp : buildPrimitives)
+        {
+            float3 c = bp.bbox.getCenter();
+            cb = merge(cb, BoundingBox{ c, c });
+        }
+
+        return cb;
+    }();
+
+    float cbDiagonalMax = maxComponent(centroidBox.getDiagonal());
+    if (cbDiagonalMax == 0.0f)
+    {
+        return { std::vector<std::vector<BuildPrimitive4>>(), 0.0f };
+    }
+
+    auto clusterCentroids = pickInitialCentroids(
+        centroidBox.getCenter(), buildPrimitives, clusterCount);
+
+    std::vector<std::vector<BuildPrimitive4>> clusters(clusterCount);
+    const uint32_t clusterSize = 2 * static_cast<uint32_t>(buildPrimitives.size()) / clusterCount;
+    for (auto& cluster : clusters)
+    {
+        cluster.reserve(clusterSize);
+    }
+
+    // k-means clustering iteration
+    for (uint8_t iter = 0; iter < MAX_CLUSTERING_ITERATIONS; ++iter)
+    {
+        for (auto& cluster : clusters)
+        {
+            cluster.clear();
+        }
+
+        for (const auto& prim : buildPrimitives)
+        {
+            uint32_t clusterId = 0;
+            float minDist2 = std::numeric_limits<float>::max();
+            for (uint8_t k = 0; k < clusterCount; ++k)
+            {
+                float3 v = prim.bbox.getCenter() - clusterCentroids[k];
+                float dist2 = dot(v, v);
+
+                if (dist2 < minDist2 && clusters[k].size() < clusterSize)
+                {
+                    minDist2 = dist2;
+                    clusterId = k;
+                }
+            }
+
+            clusters[clusterId].push_back(prim);
+        }
+
+        for (const auto& cluster : clusters)
+        {
+            // cancel clustering if one of clusters is empty
+            if (cluster.empty())
+            {
+                clusters.clear();
+                return { std::vector<std::vector<BuildPrimitive4>>(), 0.0f };
+            }
+        }
+
+        for (uint8_t k = 0; k < clusterCount; ++k)
+        {
+            const auto& cluster = clusters[k];
+
+            clusterCentroids[k] = float3(0.0f);
+
+            for (const auto& prim : cluster)
+            {
+                clusterCentroids[k] += prim.bbox.getCenter();
+            }
+
+            clusterCentroids[k] /= static_cast<float>(cluster.size());
+        }
+    }
+
+    float cost = 0.0f;
+    for (const auto& cluster : clusters)
+    {
+        BoundingBox bbox;
+        for (const auto& prim : cluster)
+        {
+            bbox = merge(bbox, prim.bbox);
+        }
+
+        cost += bbox.computeSurfaceArea() * cluster.size();
+    }
+    
+    return { clusters, cost };
+}
+}
+
+std::unique_ptr<BuildNode4>
+Bvh4::buildBvh(
+    const std::vector<BuildPrimitive4>& buildPrimitives,
+    std::atomic<uint32_t>& offset,
+    std::atomic<uint32_t>& nodeCount)
+{
+    nodeCount++;
+
+    BoundingBox nodeBbox;
+    for (const auto& bp : buildPrimitives)
+    {
+        nodeBbox = merge(nodeBbox, bp.bbox);
+    }
+
+    auto [subset, splitCost] = clusterPrimitives(buildPrimitives, CHILD_NODE_COUNT);
+    float leafCost = static_cast<float>(buildPrimitives.size()) * nodeBbox.computeSurfaceArea();
+
+    if (subset.empty() || splitCost >= leafCost)
+    {
+        return createLeaf(buildPrimitives, nodeBbox, offset);
+    }
+
+    auto node = std::make_unique<BuildNode4>();
+    node->bbox = nodeBbox;
+
+    if (buildPrimitives.size() >= MIN_PRIMITIVES_FOR_PARALLELIZATION)
+    {
+        std::future<std::unique_ptr<BuildNode4>> children[CHILD_NODE_COUNT];
+        for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
+        {
+            children[i] = std::async([&, i]() {
+                return buildBvh(subset[i], offset, nodeCount);
+            });
+        }
+
+        for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
+        {
+            node->children[i] = children[i].get();
+        }
+    }
+    else
+    {
+        for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
+        {
+            node->children[i] = buildBvh(subset[i], offset, nodeCount);
+        }
+    }
+
+    return node;
+}
+
+std::unique_ptr<BuildNode4>
+Bvh4::createLeaf(
+    const std::vector<BuildPrimitive4>& buildPrimitives,
+    const BoundingBox& bbox,
+    std::atomic<uint32_t>& offset)
+{
+    auto leaf = std::make_unique<BuildNode4>();
+
+    leaf->bbox = bbox;
+    leaf->primitiveCount = static_cast<uint16_t>(buildPrimitives.size());
+    leaf->offset = offset.fetch_add(leaf->primitiveCount);
+
+    for (uint32_t i = 0; i < buildPrimitives.size(); ++i)
+    {
+        uint32_t srcIdx = buildPrimitives[i].index;
+        uint32_t dstIdx = leaf->offset + i;
+        assert(dstIdx < mOrderedPrimitives.size());
+        mOrderedPrimitives[dstIdx] = mPrimitives[srcIdx];
+    }
+
+    return leaf;
+}
+
+std::optional<Intersection>
+Bvh4::intersect(const Ray& ray) const
+{
+    return traverse(ray, std::numeric_limits<float>::max(), false);
+}
+
+bool
+Bvh4::intersectAny(const Ray& ray, float tFar) const
+{
+    const auto intersection = traverse(ray, tFar, true);
+    return intersection.has_value();
+}
+
+std::optional<Intersection>
+Bvh4::traverse(const Ray& ray, float tFar, bool any) const
+{
+    float3 invRayDir = float3(1.0f / ray.dir.x, 1.0f / ray.dir.y, 1.0f / ray.dir.z);
+    uint32_t counter = 0;
+
+    auto isect = traverseRecursively(mBvh.get(), ray, tFar, any, invRayDir, counter);
+    gBvhStats.addNodeAccessCount(counter, any);
+
+    return isect;
+}
+
+std::optional<Intersection>
+Bvh4::traverseRecursively(const BuildNode4* node, const Ray& ray,
+    float tFar, bool any, const float3& invRayDir, uint32_t& counter) const
+{
+    counter++;
+
+    std::optional<Intersection> closestIsect;
+    float tNear = tFar;
+
+    if (node->isLeaf())
+    {
+        for (uint16_t i = 0; i < node->primitiveCount; ++i)
+        {
+            const auto& prim = mOrderedPrimitives[node->offset + i];
+            auto isect = prim.intersect(ray);
+            if (!isect.has_value() || isect.value().t >= tNear)
+            {
+                continue;
+            }
+
+            if (any)
+            {
+                return isect;
+            }
+            else
+            {
+                closestIsect = isect.value();
+                tNear = isect.value().t;
+            }
+        }
+
+        return closestIsect;
+    }
+    
+    for (const auto& child : node->children)
+    {
+        assert(child);
+
+        if (!child->bbox.intersect(ray, tNear, invRayDir))
+        {
+            continue;
+        }
+
+        auto isect = traverseRecursively(child.get(), ray, tNear, any, invRayDir, counter);
+        if (isect.has_value() && isect.value().t < tNear)
+        {
+            if (any)
+            {
+                return isect;
+            }
+            else
+            {
+                closestIsect = isect.value();
+                tNear = isect.value().t;
+            }
+        }
+    }
+
+    return closestIsect;
+}
+}
