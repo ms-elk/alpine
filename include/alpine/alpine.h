@@ -9,6 +9,7 @@
 namespace alpine {
 enum class AcceleratorType {
     Bvh,
+    Bvh4,
     Embree,
 };
 
