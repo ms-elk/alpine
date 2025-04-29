@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1.0)
+cmake_minimum_required(VERSION 3.15)
 
 project(alpine CXX)
 
@@ -18,13 +18,9 @@ option(ALPINE_ENABLE_OIDN "enable Intel Open Image Denoise to use it as a denois
 if (ALPINE_BUILD_APPS)
   # set directory for output executables
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/bin/Debug)
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/bin/Release)
 
   # set directory for output libraries
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
-  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/bin/Debug)
-  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/bin/Release)
 endif()
 
 set(SOURCES
@@ -123,6 +119,19 @@ set(UTILS
   src/utils/util.h
 )
 
+# TODO: make it optional to build with ispc
+set(ISPC_EXE ${CMAKE_CURRENT_SOURCE_DIR}/ext/ispc/bin/ispc.exe)
+set(ISPC_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/accelerators/ispc/bvh.ispc)
+set(ISPC_OBJ ${CMAKE_CURRENT_BINARY_DIR}/ispc/bvh.obj)
+set(ISPC_H ${CMAKE_CURRENT_BINARY_DIR}/ispc/bvh.h)
+
+add_custom_command(
+    OUTPUT ${ISPC_OBJ} ${ISPC_H}
+    COMMAND ${ISPC_EXE} ${ISPC_SRC} -o ${ISPC_OBJ} -h ${ISPC_H}
+    DEPENDS ${ISPC_SRC}
+    COMMENT "Compiling ISPC file ${ISPC_SRC}"
+)
+
 source_group("" FILES ${SOURCES})
 source_group("accelerators" FILES ${ACCELERATORS})
 source_group("denoisers" FILES ${DENOISERS})
@@ -134,6 +143,7 @@ source_group("math" FILES ${MATH})
 source_group("scene" FILES ${SCENE})
 source_group("shapes" FILES ${SHAPES})
 source_group("utils" FILES ${UTILS})
+source_group("ispc" FILES ${ISPC_SRC})
 
 add_library(alpine STATIC
   ${SOURCES}
@@ -147,7 +157,10 @@ add_library(alpine STATIC
   ${SCENE}
   ${SHAPES}
   ${UTILS}
+  ${ISPC_OBJ}
+  ${ISPC_SRC}
 )
+
 
 target_include_directories(alpine
   PUBLIC
@@ -155,6 +168,7 @@ target_include_directories(alpine
     ext
   PRIVATE
     src
+    ${CMAKE_CURRENT_BINARY_DIR}
 )
 
 # embree libraries

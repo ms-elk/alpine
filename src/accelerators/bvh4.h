@@ -47,9 +47,6 @@ private:
 
     std::optional<Intersection> traverse(const Ray& ray, float tFar, bool any) const;
 
-    std::optional<Intersection> traverseRecursively(const BuildNode4* node, const Ray& ray,
-            float tFar, bool any, const float3& invRayDir, uint32_t& counter) const;
-
 private:
     std::vector<Primitive4> mPrimitives;
     std::vector<Primitive4> mOrderedPrimitives;

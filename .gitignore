@@ -36,4 +36,5 @@ bin/
 build/
 ext/embree
 ext/glfw
+ext/ispc
 ext/oidn

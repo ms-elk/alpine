@@ -22,7 +22,7 @@ struct BoundingBox
 
     bool intersect(const Ray& ray, float tFar, const float3& invRayDir) const
     {
-        static constexpr float correction = 1.0f + 2.0f * gamma(3); // ensure conserative intersection
+        static constexpr float correction = 1.0f + 2.0f * gamma(3); // ensure conservative intersection
 
         float tMin = ((invRayDir.x >= 0.0f ? min.x : max.x) - ray.org.x) * invRayDir.x;
         float tMax = ((invRayDir.x >= 0.0f ? max.x : min.x) - ray.org.x) * invRayDir.x;
