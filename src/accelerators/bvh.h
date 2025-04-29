@@ -10,13 +10,10 @@
 namespace alpine {
 struct Ray;
 struct Primitive;
+struct BoundingBox;
 struct BuildPrimitive;
 struct BuildNode;
 struct LinearNode;
-
-namespace bvh_util {
-struct Split;
-}
 
 class Bvh final : public Accelerator
 {
@@ -40,11 +37,14 @@ public:
 
 private:
     std::unique_ptr<BuildNode> buildBvh(
-        const std::vector<BuildPrimitive>& bvhPrimitives,
+        const std::vector<BuildPrimitive>& buildPrimitives,
         std::atomic<uint32_t>& offset,
         std::atomic<uint32_t>& nodeCount);
 
-    std::optional<bvh_util::Split> findSplit(const std::vector<BuildPrimitive>& bvhPrimitives);
+    std::unique_ptr<BuildNode> createLeaf(
+        const std::vector<BuildPrimitive>& buildPrimitives,
+        const BoundingBox& bbox,
+        std::atomic<uint32_t>& offset);
 
     uint32_t flatten(const BuildNode* node, uint32_t& offset);
 

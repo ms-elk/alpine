@@ -80,7 +80,7 @@ struct BuildPrimitive
 struct BuildNode
 {
     BoundingBox bbox;
-    std::array<std::unique_ptr<BuildNode>, CHILD_NODE_COUNT> children = { nullptr, nullptr };
+    std::array<std::unique_ptr<BuildNode>, CHILD_NODE_COUNT> children{};
     uint32_t offset;
     uint16_t primitiveCount = 0;
     uint8_t dim;
@@ -98,8 +98,7 @@ struct alignas(32) LinearNode
     bool isLeaf() const { return primitiveCount > 0; }
 };
 
-namespace
-{
+namespace {
 class BvhStats
 {
 public:
@@ -245,51 +244,130 @@ Bvh::updateScene()
     gBvhStats.countNodes(mLinearNodes);
 }
 
+namespace {
+std::pair<std::optional<bvh_util::Split>, float /* cost */>
+findSplit(const std::vector<BuildPrimitive>& buildPrimitives)
+{
+    auto centroidBox = [&]() {
+        BoundingBox cb;
+        for (const auto& bp : buildPrimitives)
+        {
+            float3 c = bp.bbox.getCenter();
+            cb = merge(cb, BoundingBox{ c, c });
+        }
+
+        return cb;
+        }();
+
+    float cbDiagonalMax = maxComponent(centroidBox.getDiagonal());
+    if (cbDiagonalMax == 0.0f)
+    {
+        return { {}, 0.0f };
+    }
+
+    bvh_util::Split split;
+    float minCost = std::numeric_limits<float>::max();
+
+    for (uint8_t dim = 0; dim < 3; ++dim)
+    {
+        if (centroidBox.min[dim] == centroidBox.max[dim])
+        {
+            continue;
+        }
+
+        struct Bin
+        {
+            BoundingBox bbox;
+            uint32_t count = 0;
+        };
+        Bin bins[BIN_COUNT];
+
+        // binning
+        for (const auto& bp : buildPrimitives)
+        {
+            float c = bp.bbox.getCenter()[dim];
+            uint8_t binIdx = bvh_util::getBinIndex(c, centroidBox.min[dim], centroidBox.max[dim], BIN_COUNT);
+            binIdx = std::min(binIdx, static_cast<uint8_t>(BIN_COUNT - 1));
+
+            auto& bin = bins[binIdx];
+            bin.bbox = merge(bin.bbox, bp.bbox);
+            bin.count++;
+        }
+
+        float costs[SPLITS_PER_DIM] = { 0.0f };
+
+        const auto accumulateCosts = [&](uint8_t binIdx, uint8_t splitIdx, Bin& binAccum) {
+            const auto& bin = bins[binIdx];
+            binAccum.bbox = merge(binAccum.bbox, bin.bbox);
+            binAccum.count += bin.count;
+
+            costs[splitIdx] += binAccum.count * binAccum.bbox.computeSurfaceArea();
+        };
+
+        Bin binBelow;
+        for (uint8_t splitIdx = 0; splitIdx < SPLITS_PER_DIM; ++splitIdx)
+        {
+            uint8_t binIdx = splitIdx;
+            accumulateCosts(binIdx, splitIdx, binBelow);
+        }
+
+        Bin binAbove;
+        for (int8_t splitIdx = SPLITS_PER_DIM - 1; splitIdx >= 0; --splitIdx)
+        {
+            uint8_t binIdx = splitIdx + 1;
+            accumulateCosts(binIdx, splitIdx, binAbove);
+        }
+
+        // find the split which has the minimum cost
+        for (uint8_t splitIdx = 0; splitIdx < SPLITS_PER_DIM; ++splitIdx)
+        {
+            const auto& cost = costs[splitIdx];
+            if (cost < minCost)
+            {
+                minCost = cost;
+                split = { dim, splitIdx, BIN_COUNT, centroidBox.min[dim], centroidBox.max[dim] };
+            }
+        }
+    }
+
+    return { split, minCost };
+}
+}
+
 std::unique_ptr<BuildNode>
 Bvh::buildBvh(
     const std::vector<BuildPrimitive>& buildPrimitives,
     std::atomic<uint32_t>& offset,
     std::atomic<uint32_t>& nodeCount)
 {
-    auto node = std::make_unique<BuildNode>();
     nodeCount++;
+
+    BoundingBox nodeBbox;
     for (const auto& bp : buildPrimitives)
     {
-        node->bbox = merge(node->bbox, bp.bbox);
+        nodeBbox = merge(nodeBbox, bp.bbox);
     }
 
-    const auto createLeaf = [&]() {
-        node->primitiveCount = static_cast<uint16_t>(buildPrimitives.size());
-        node->offset = offset.fetch_add(node->primitiveCount);
-
-        for (uint32_t i = 0; i < buildPrimitives.size(); ++i)
-        {
-            uint32_t index = buildPrimitives[i].index;
-            mOrderedPrimitives[node->offset + i] = mPrimitives[index];
-        }
-    };
-
-    if (buildPrimitives.size() == 1)
+    if (buildPrimitives.size() <= 2)
     {
-        createLeaf();
-        return node;
+        return createLeaf(buildPrimitives, nodeBbox, offset);
     }
 
-    auto split = findSplit(buildPrimitives);
-    uint8_t dim = 0;
+    auto [split, splitCost] = findSplit(buildPrimitives);
+    float leafCost = static_cast<float>(buildPrimitives.size()) * nodeBbox.computeSurfaceArea();
+
+    if (!split.has_value() || splitCost >= leafCost)
+    {
+        return createLeaf(buildPrimitives, nodeBbox, offset);
+    }
 
     std::vector<BuildPrimitive> subset[CHILD_NODE_COUNT];
-    subset[0].reserve(buildPrimitives.size());
-    subset[1].reserve(buildPrimitives.size());
-
-    if (!split.has_value())
+    for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
     {
-        createLeaf();
-        return node;
+        subset[i].reserve(buildPrimitives.size());
     }
 
     const auto& s = split.value();
-    node->dim = s.dim;
 
     for (const auto& bp : buildPrimitives)
     {
@@ -299,6 +377,10 @@ Bvh::buildBvh(
 
     assert(!subset[0].empty());
     assert(!subset[1].empty());
+
+    auto node = std::make_unique<BuildNode>();
+    node->bbox = nodeBbox;
+    node->dim = s.dim;
 
     if (buildPrimitives.size() >= MIN_PRIMITIVES_FOR_PARALLELIZATION)
     {
@@ -326,93 +408,27 @@ Bvh::buildBvh(
     return node;
 }
 
-std::optional<bvh_util::Split>
-Bvh::findSplit(const std::vector<BuildPrimitive>& buildPrimitives)
+std::unique_ptr<BuildNode>
+Bvh::createLeaf(
+    const std::vector<BuildPrimitive>& buildPrimitives,
+    const BoundingBox& bbox,
+    std::atomic<uint32_t>& offset)
 {
-    if (buildPrimitives.size() <= 2)
+    auto leaf = std::make_unique<BuildNode>();
+
+    leaf->bbox = bbox;
+    leaf->primitiveCount = static_cast<uint16_t>(buildPrimitives.size());
+    leaf->offset = offset.fetch_add(leaf->primitiveCount);
+
+    for (uint32_t i = 0; i < buildPrimitives.size(); ++i)
     {
-        return {};
+        uint32_t srcIdx = buildPrimitives[i].index;
+        uint32_t dstIdx = leaf->offset + i;
+        assert(dstIdx < mOrderedPrimitives.size());
+        mOrderedPrimitives[dstIdx] = mPrimitives[srcIdx];
     }
 
-    auto centroidBox = [&]() {
-        BoundingBox cb;
-        for (const auto& bp : buildPrimitives)
-        {
-            float3 c = bp.bbox.getCenter();
-            cb = merge(cb, BoundingBox{ c, c });
-        }
-
-        return cb;
-    }();
-
-    float cbDiagonalMax = maxComponent(centroidBox.getDiagonal());
-    if (cbDiagonalMax == 0.0f)
-    {
-        return {};
-    }
-
-    bvh_util::Split split;
-    float minCost = std::numeric_limits<float>::max();
-
-    for (uint8_t dim = 0; dim < 3; ++dim)
-    {
-        if (centroidBox.min[dim] == centroidBox.max[dim])
-        {
-            continue;
-        }
-
-        BoundingBox binBoxes[BIN_COUNT];
-
-        // binning
-        for (const auto& bp : buildPrimitives)
-        {
-            float c = bp.bbox.getCenter()[dim];
-            uint8_t binIdx = bvh_util::getBinIndex(c, centroidBox.min[dim], centroidBox.max[dim], BIN_COUNT);
-            binIdx = std::min(binIdx, static_cast<uint8_t>(BIN_COUNT - 1));
-
-            auto& binBox = binBoxes[binIdx];
-            binBox = merge(binBox, bp.bbox);
-        }
-
-        float costs[SPLITS_PER_DIM] = { 0.0f };
-
-        const auto accumulateCosts = [&](uint8_t binIdx, uint8_t splitIdx, BoundingBox& binAccum) {
-            const auto& binBox = binBoxes[binIdx];
-            binAccum = merge(binAccum, binBox);
-
-            float sa =
-                binAccum.min.x < std::numeric_limits<float>::max() /* is initialized or not */
-                ? binAccum.computeSurfaceArea() : 0.0f;
-            costs[splitIdx] += sa;
-        };
-
-        BoundingBox binBelow;
-        for (uint8_t splitIdx = 0; splitIdx < SPLITS_PER_DIM; ++splitIdx)
-        {
-            uint8_t binIdx = splitIdx;
-            accumulateCosts(binIdx, splitIdx, binBelow);
-        }
-
-        BoundingBox binAbove;
-        for (int8_t splitIdx = SPLITS_PER_DIM - 1; splitIdx >= 0; --splitIdx)
-        {
-            uint8_t binIdx = splitIdx + 1;
-            accumulateCosts(binIdx, splitIdx, binAbove);
-        }
-
-        // find the split which has the minimum cost
-        for (uint8_t splitIdx = 0; splitIdx < SPLITS_PER_DIM; ++splitIdx)
-        {
-            const auto& cost = costs[splitIdx];
-            if (cost < minCost)
-            {
-                minCost = cost;
-                split = { dim, splitIdx, BIN_COUNT, centroidBox.min[dim], centroidBox.max[dim] };
-            }
-        }
-    }
-
-    return split;
+    return leaf;
 }
 
 uint32_t
