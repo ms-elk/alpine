@@ -1,5 +1,6 @@
 ﻿#include "bvh.h"
 
+#include "alpine_config.h"
 #include "ray.h"
 #include "utils/bounding_box.h"
 #include "utils/bvh_util.h"
@@ -19,6 +20,72 @@ static constexpr uint8_t BIN_COUNT = SPLITS_PER_DIM + 1;
 static constexpr uint32_t MIN_PRIMITIVES_FOR_PARALLELIZATION = 1024;
 
 static constexpr uint8_t STACK_SIZE = 64;
+
+class BvhStats
+{
+public:
+    void show()
+    {
+        printf("BVH Total Node Count: %zu\n", mNodeCount);
+        printf("BVH Node Access Count (Closest): %zu\n", mClosestCount.load());
+        printf("BVH Node Access Count (Any): %zu\n", mAnyCount.load());
+        printf("BVH Triangle Access Count: %zu\n", mTriangleCount.load());
+    }
+
+    void countNodes(uint64_t nodeCount)
+    {
+        mNodeCount = nodeCount;
+    }
+
+    void addNodeAccessCount(uint32_t count, bool any)
+    {
+#ifdef ENABLE_BVH_STATS
+        if (any)
+        {
+            mAnyCount += count;
+        }
+        else
+        {
+            mClosestCount += count;
+        }
+#endif
+    }
+
+    void addTriangleAccessCount(uint32_t count)
+    {
+#ifdef ENABLE_BVH_STATS
+        mTriangleCount += count;
+#endif
+    }
+
+private:
+    uint64_t mNodeCount = 0;
+    std::atomic<uint64_t> mClosestCount = 0;
+    std::atomic<uint64_t> mAnyCount = 0;
+    std::atomic<uint64_t> mTriangleCount = 0;
+};
+
+BvhStats gBvhStats;
+
+class NodeAccessCounter
+{
+public:
+    NodeAccessCounter(bool any) : mAny(any) {};
+
+    ~NodeAccessCounter()
+    {
+        gBvhStats.addNodeAccessCount(mNodeCounter, mAny);
+        gBvhStats.addTriangleAccessCount(mTriCounter);
+    }
+
+    void incrementNode() { mNodeCounter++; }
+    void incrementTriangle() { mTriCounter++; }
+
+private:
+    uint32_t mNodeCounter = 0;
+    uint32_t mTriCounter = 0;
+    bool mAny;
+};
 }
 
 struct Primitive
@@ -81,9 +148,9 @@ struct BuildNode
 {
     BoundingBox bbox;
     std::array<std::unique_ptr<BuildNode>, CHILD_NODE_COUNT> children{};
-    uint32_t offset;
+    uint32_t offset = 0;
     uint16_t primitiveCount = 0;
-    uint8_t dim;
+    uint8_t dim = 0;
 
     bool isLeaf() const { return primitiveCount > 0; }
 };
@@ -97,76 +164,6 @@ struct alignas(32) LinearNode
 
     bool isLeaf() const { return primitiveCount > 0; }
 };
-
-namespace {
-class BvhStats
-{
-public:
-    void show()
-    {
-        printf("BVH Total Node Count: %zu\n", mInteriorCount + mLeafCount);
-        printf("BVH Interior Node Count: %zu\n", mInteriorCount);
-        printf("BVH Leaf Node Count: %zu\n", mLeafCount);
-        printf("BVH Node Access Count (Closest): %zu\n", mClosestCount.load());
-        printf("BVH Node Access Count (Any): %zu\n", mAnyCount.load());
-    }
-
-    void countNodes(const std::vector<LinearNode>& linearNodes)
-    {
-        mInteriorCount = 0;
-        mLeafCount = 0;
-
-        for (const auto& ln : linearNodes)
-        {
-            if (ln.isLeaf())
-            {
-                mLeafCount++;
-            }
-            else
-            {
-                mInteriorCount++;
-            }
-        }
-    }
-
-    void addNodeAccessCount(uint32_t count, bool any)
-    {
-        if (any)
-        {
-            mAnyCount += count;
-        }
-        else
-        {
-            mClosestCount += count;
-        }
-    }
-
-private:
-    uint64_t mInteriorCount = 0;
-    uint64_t mLeafCount = 0;
-    std::atomic<uint64_t> mClosestCount = 0;
-    std::atomic<uint64_t> mAnyCount = 0;
-};
-
-BvhStats gBvhStats;
-
-class NodeAccessCounter
-{
-public:
-    NodeAccessCounter(bool any) : mCounter(0), mAny(any) {};
-
-    ~NodeAccessCounter()
-    {
-        gBvhStats.addNodeAccessCount(mCounter, mAny);
-    }
-
-    void increment() { mCounter++; }
-
-private:
-    uint32_t mCounter;
-    bool mAny;
-};
-}
 
 Bvh::Bvh()
 {
@@ -241,7 +238,7 @@ Bvh::updateScene()
     uint32_t linearNodeOffset = 0;
     flatten(bvh.get(), linearNodeOffset);
 
-    gBvhStats.countNodes(mLinearNodes);
+    gBvhStats.countNodes(nodeCount);
 }
 
 namespace {
@@ -482,7 +479,7 @@ Bvh::traverse(const Ray& ray, float tFar, bool any) const
 
     while (true)
     {
-        counter.increment();
+        counter.incrementNode();
 
         const auto& linearNode = mLinearNodes[currentIdx];
         if (linearNode.bbox.intersect(ray, tNear, invRayDir))
@@ -508,6 +505,8 @@ Bvh::traverse(const Ray& ray, float tFar, bool any) const
 
             for (uint16_t i = 0; i < linearNode.primitiveCount; ++i)
             {
+                counter.incrementTriangle();
+
                 const auto& prim = mOrderedPrimitives[linearNode.offset + i];
                 auto isect = prim.intersect(ray);
                 if (!isect.has_value() || isect.value().t >= tNear)

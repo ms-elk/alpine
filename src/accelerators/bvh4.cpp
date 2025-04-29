@@ -1,11 +1,19 @@
 ﻿#include "bvh4.h"
 
+#include "alpine_config.h"
 #include "ray.h"
 #include "utils/bounding_box.h"
+
+#include <ispc/bvh.h>
 
 #include <array>
 #include <assert.h>
 #include <future>
+
+// TODO: 
+// - flatten BVH nodes (pointerless)
+// - triangle intersection tests using SIMD
+// - generalize the code between bvh4 and bvh
 
 namespace alpine {
 namespace {
@@ -13,6 +21,74 @@ static constexpr uint32_t MAX_PRIMITIVES = 128 * 1024;
 static constexpr uint8_t CHILD_NODE_COUNT = 4;
 static constexpr uint8_t MAX_CLUSTERING_ITERATIONS = 8;
 static constexpr uint32_t MIN_PRIMITIVES_FOR_PARALLELIZATION = 1024;
+
+static constexpr uint8_t STACK_SIZE = 64;
+
+class BvhStats
+{
+public:
+    void show()
+    {
+        printf("BVH Total Node Count: %zu\n", mNodeCount);
+        printf("BVH Node Access Count (Closest): %zu\n", mClosestCount.load());
+        printf("BVH Node Access Count (Any): %zu\n", mAnyCount.load());
+        printf("BVH Triangle Access Count: %zu\n", mTriangleCount.load());
+    }
+
+    void countNodes(uint64_t nodeCount)
+    {
+        mNodeCount = nodeCount;
+    }
+
+    void addNodeAccessCount(uint32_t count, bool any)
+    {
+#ifdef ENABLE_BVH_STATS
+        if (any)
+        {
+            mAnyCount += count;
+        }
+        else
+        {
+            mClosestCount += count;
+        }
+#endif
+    }
+
+    void addTriangleAccessCount(uint32_t count)
+    {
+#ifdef ENABLE_BVH_STATS
+        mTriangleCount += count;
+#endif
+    }
+
+private:
+    uint64_t mNodeCount = 0;
+    std::atomic<uint64_t> mClosestCount = 0;
+    std::atomic<uint64_t> mAnyCount = 0;
+    std::atomic<uint64_t> mTriangleCount = 0;
+};
+
+BvhStats gBvhStats;
+
+class NodeAccessCounter
+{
+public:
+    NodeAccessCounter(bool any) : mAny(any) {};
+
+    ~NodeAccessCounter()
+    {
+        gBvhStats.addNodeAccessCount(mNodeCounter, mAny);
+        gBvhStats.addTriangleAccessCount(mTriCounter);
+    }
+
+    void incrementNode() { mNodeCounter++; }
+    void incrementTriangle() { mTriCounter++; }
+
+private:
+    uint32_t mNodeCounter = 0;
+    uint32_t mTriCounter = 0;
+    bool mAny;
+};
 }
 
 struct Primitive4
@@ -74,49 +150,14 @@ struct BuildPrimitive4
 struct BuildNode4
 {
     BoundingBox bbox;
+    ispc::BoundingBox4 bbox4;
     std::array<std::unique_ptr<BuildNode4>, CHILD_NODE_COUNT> children{};
     uint32_t offset = 0;
     uint16_t primitiveCount = 0;
+    uint8_t dim = 0;
 
     bool isLeaf() const { return primitiveCount > 0; }
 };
-
-namespace {
-class BvhStats
-{
-public:
-    void show()
-    {
-        printf("BVH Total Node Count: %zu\n", mNodeCount);
-        printf("BVH Node Access Count (Closest): %zu\n", mClosestCount.load());
-        printf("BVH Node Access Count (Any): %zu\n", mAnyCount.load());
-    }
-
-    void countNodes(uint64_t nodeCount)
-    {
-        mNodeCount = nodeCount;
-    }
-
-    void addNodeAccessCount(uint32_t count, bool any)
-    {
-        if (any)
-        {
-            mAnyCount += count;
-        }
-        else
-        {
-            mClosestCount += count;
-        }
-    }
-
-private:
-    uint64_t mNodeCount = 0;
-    std::atomic<uint64_t> mClosestCount = 0;
-    std::atomic<uint64_t> mAnyCount = 0;
-};
-
-BvhStats gBvhStats;
-}
 
 Bvh4::Bvh4()
 {
@@ -201,7 +242,7 @@ pickInitialCentroids(
 
     auto firstCentroid = [&]() {
         uint32_t primId = 0;
-        float maxDist2 = -std::numeric_limits<float>::max();
+        float maxDist2 = 0.0f;
         for (uint32_t i = 0; i < buildPrimitives.size(); ++i)
         {
             float3 v = buildPrimitives[i].bbox.getCenter() - seed;
@@ -222,7 +263,7 @@ pickInitialCentroids(
     for (uint8_t k = 1; k < clusterCount; ++k)
     {
         uint32_t primId = 0;
-        float maxDist2 = -std::numeric_limits<float>::max();
+        float maxDist2 = 0.0f;
         for (uint32_t i = 0; i < buildPrimitives.size(); ++i)
         {
             float clusterDist2 = std::numeric_limits<float>::max();
@@ -312,16 +353,6 @@ clusterPrimitives(const std::vector<BuildPrimitive4>& buildPrimitives, uint8_t c
             clusters[clusterId].push_back(prim);
         }
 
-        for (const auto& cluster : clusters)
-        {
-            // cancel clustering if one of clusters is empty
-            if (cluster.empty())
-            {
-                clusters.clear();
-                return { std::vector<std::vector<BuildPrimitive4>>(), 0.0f };
-            }
-        }
-
         for (uint8_t k = 0; k < clusterCount; ++k)
         {
             const auto& cluster = clusters[k];
@@ -351,6 +382,43 @@ clusterPrimitives(const std::vector<BuildPrimitive4>& buildPrimitives, uint8_t c
     
     return { clusters, cost };
 }
+
+void
+sortChildNodeByLongestAxis(std::unique_ptr<BuildNode4>& node)
+{
+    BoundingBox centroidBox;
+    for (const auto& child : node->children)
+    {
+        if (child)
+        {
+            centroidBox = merge(centroidBox, child->bbox.getCenter());
+        }
+    }
+
+    float maxDist = 0.0f;
+    for (uint8_t dim = 0; dim < 3; ++dim)
+    {
+        float dist = centroidBox.max[dim] - centroidBox.min[dim];
+
+        if (dist > maxDist)
+        {
+            maxDist = dist;
+            node->dim = dim;
+        }
+    }
+
+    std::sort(node->children.begin(), node->children.end(),
+        [dim = node->dim](const auto& a, const auto& b) {
+            if (!a || !b)
+            {
+                return a != nullptr || b == nullptr;
+            }
+            else
+            {
+                return a->bbox.getCenter()[dim] < b->bbox.getCenter()[dim];
+            }
+        });
+}
 }
 
 std::unique_ptr<BuildNode4>
@@ -359,6 +427,11 @@ Bvh4::buildBvh(
     std::atomic<uint32_t>& offset,
     std::atomic<uint32_t>& nodeCount)
 {
+    if (buildPrimitives.empty())
+    {
+        return nullptr;
+    }
+
     nodeCount++;
 
     BoundingBox nodeBbox;
@@ -398,6 +471,34 @@ Bvh4::buildBvh(
         for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
         {
             node->children[i] = buildBvh(subset[i], offset, nodeCount);
+        }
+    }
+
+    sortChildNodeByLongestAxis(node);
+
+    for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
+    {
+        const auto& child = node->children[i];
+        
+        if (child)
+        {
+            node->bbox4.minX[i] = child->bbox.min.x;
+            node->bbox4.minY[i] = child->bbox.min.y;
+            node->bbox4.minZ[i] = child->bbox.min.z;
+
+            node->bbox4.maxX[i] = child->bbox.max.x;
+            node->bbox4.maxY[i] = child->bbox.max.y;
+            node->bbox4.maxZ[i] = child->bbox.max.z;
+        }
+        else
+        {
+            node->bbox4.minX[i] = std::numeric_limits<float>::max();
+            node->bbox4.minY[i] = std::numeric_limits<float>::max();
+            node->bbox4.minZ[i] = std::numeric_limits<float>::max();
+
+            node->bbox4.maxX[i] = -std::numeric_limits<float>::max();
+            node->bbox4.maxY[i] = -std::numeric_limits<float>::max();
+            node->bbox4.maxZ[i] = -std::numeric_limits<float>::max();
         }
     }
 
@@ -443,71 +544,78 @@ Bvh4::intersectAny(const Ray& ray, float tFar) const
 std::optional<Intersection>
 Bvh4::traverse(const Ray& ray, float tFar, bool any) const
 {
-    float3 invRayDir = float3(1.0f / ray.dir.x, 1.0f / ray.dir.y, 1.0f / ray.dir.z);
-    uint32_t counter = 0;
-
-    auto isect = traverseRecursively(mBvh.get(), ray, tFar, any, invRayDir, counter);
-    gBvhStats.addNodeAccessCount(counter, any);
-
-    return isect;
-}
-
-std::optional<Intersection>
-Bvh4::traverseRecursively(const BuildNode4* node, const Ray& ray,
-    float tFar, bool any, const float3& invRayDir, uint32_t& counter) const
-{
-    counter++;
+    NodeAccessCounter counter(any);
 
     std::optional<Intersection> closestIsect;
     float tNear = tFar;
+    float3 invRayDir = float3(1.0f / ray.dir.x, 1.0f / ray.dir.y, 1.0f / ray.dir.z);
 
-    if (node->isLeaf())
+    BuildNode4* stack[STACK_SIZE];
+    uint8_t stackIdx = 0;
+    const BuildNode4* currentNode = mBvh.get();
+
+    while (true)
     {
-        for (uint16_t i = 0; i < node->primitiveCount; ++i)
-        {
-            const auto& prim = mOrderedPrimitives[node->offset + i];
-            auto isect = prim.intersect(ray);
-            if (!isect.has_value() || isect.value().t >= tNear)
-            {
-                continue;
-            }
+        counter.incrementNode();
 
-            if (any)
+        if (currentNode->isLeaf())
+        {
+            for (uint16_t i = 0; i < currentNode->primitiveCount; ++i)
             {
-                return isect;
+                counter.incrementTriangle();
+
+                const auto& prim = mOrderedPrimitives[currentNode->offset + i];
+                auto isect = prim.intersect(ray);
+                if (!isect.has_value() || isect.value().t >= tNear)
+                {
+                    continue;
+                }
+
+                if (any)
+                {
+                    return isect;
+                }
+                else
+                {
+                    closestIsect = isect.value();
+                    tNear = isect.value().t;
+                }
             }
-            else
+        }
+        else
+        {
+            std::array<bool, CHILD_NODE_COUNT> intersects;
+#ifdef USE_BVH_SIMD
+            static constexpr float correction = 1.0f + 2.0f * gamma(3); // ensure conservative intersection
+            ispc::intersectBoundingBox4(
+                intersects.data(), &ray.org[0], &ray.dir[0], &invRayDir[0], tNear, correction, currentNode->bbox4);
+#else
+            for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
             {
-                closestIsect = isect.value();
-                tNear = isect.value().t;
+                const auto& child = currentNode->children[i];
+                hits[i] = child ? child->bbox.intersect(ray, tNear, invRayDir) : false;
+            }
+#endif
+
+            bool isDirNegative = ray.dir[currentNode->dim] < 0.0f;
+            for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
+            {
+                uint8_t idx = !isDirNegative ? CHILD_NODE_COUNT - 1 - i : i;
+
+                if (intersects[idx] && currentNode->children[idx].get())
+                {
+                    assert(stackIdx < STACK_SIZE - 1);
+                    stack[stackIdx++] = currentNode->children[idx].get();
+                }
             }
         }
 
-        return closestIsect;
-    }
-    
-    for (const auto& child : node->children)
-    {
-        assert(child);
-
-        if (!child->bbox.intersect(ray, tNear, invRayDir))
+        if (stackIdx == 0)
         {
-            continue;
+            break;
         }
 
-        auto isect = traverseRecursively(child.get(), ray, tNear, any, invRayDir, counter);
-        if (isect.has_value() && isect.value().t < tNear)
-        {
-            if (any)
-            {
-                return isect;
-            }
-            else
-            {
-                closestIsect = isect.value();
-                tNear = isect.value().t;
-            }
-        }
+        currentNode = stack[--stackIdx];
     }
 
     return closestIsect;
