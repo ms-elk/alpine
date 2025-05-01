@@ -1,11 +1,13 @@
+static const uniform uint CHILD_NODE_COUNT = 4;
+
 struct BoundingBox4
 {
-    uniform float minX[4];
-    uniform float minY[4];
-    uniform float minZ[4];
-    uniform float maxX[4];
-    uniform float maxY[4];
-    uniform float maxZ[4];
+    uniform float minX[CHILD_NODE_COUNT];
+    uniform float minY[CHILD_NODE_COUNT];
+    uniform float minZ[CHILD_NODE_COUNT];
+    uniform float maxX[CHILD_NODE_COUNT];
+    uniform float maxY[CHILD_NODE_COUNT];
+    uniform float maxZ[CHILD_NODE_COUNT];
 };
 
 static bool
@@ -49,7 +51,7 @@ intersectBoundingBox4(
     uniform float correction,
     const uniform BoundingBox4& bbox4)
 {
-    foreach(i = 0 ... 4) {
+    foreach(i = 0 ... CHILD_NODE_COUNT) {
         intersects[i] = intersectBoundingBox(rayOrg, rayDir, invRayDir, tFar, correction,
             bbox4.minX[i], bbox4.minY[i], bbox4.minZ[i], bbox4.maxX[i], bbox4.maxY[i], bbox4.maxZ[i]);
     }

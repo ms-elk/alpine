@@ -121,7 +121,7 @@ set(UTILS
 
 # TODO: make it optional to build with ispc
 set(ISPC_EXE ${CMAKE_CURRENT_SOURCE_DIR}/ext/ispc/bin/ispc.exe)
-set(ISPC_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/accelerators/ispc/bvh.ispc)
+set(ISPC_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/ispc/bounding_box.ispc)
 set(ISPC_OBJ ${CMAKE_CURRENT_BINARY_DIR}/ispc/bvh.obj)
 set(ISPC_H ${CMAKE_CURRENT_BINARY_DIR}/ispc/bvh.h)
 
