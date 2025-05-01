@@ -11,9 +11,9 @@
 #include <future>
 
 // TODO: 
-// - flatten BVH nodes (pointerless)
 // - triangle intersection tests using SIMD
 // - generalize the code between bvh4 and bvh
+// - Node alignment
 
 namespace alpine {
 namespace {
@@ -150,13 +150,47 @@ struct BuildPrimitive4
 struct BuildNode4
 {
     BoundingBox bbox;
-    ispc::BoundingBox4 bbox4;
     std::array<std::unique_ptr<BuildNode4>, CHILD_NODE_COUNT> children{};
     uint32_t offset = 0;
     uint16_t primitiveCount = 0;
     uint8_t dim = 0;
 
     bool isLeaf() const { return primitiveCount > 0; }
+};
+
+struct alignas(32) LinearNode4
+{
+#ifdef USE_BVH_SIMD
+    ispc::BoundingBox4 bbox4;
+#else
+    BoundingBox bbox[4];
+#endif
+
+    static constexpr uint32_t invalid_offset = std::numeric_limits<uint32_t>::max();
+    std::array <uint32_t, CHILD_NODE_COUNT - 1> offset;
+
+    uint16_t primitiveCount = 0;
+    uint8_t dim = 0;
+
+    bool isLeaf() const { return primitiveCount > 0; }
+
+    LinearNode4()
+    {
+        std::fill(offset.begin(), offset.end(), invalid_offset);
+
+#ifdef USE_BVH_SIMD
+        for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
+        {
+            bbox4.minX[i] = std::numeric_limits<float>::max();
+            bbox4.minY[i] = std::numeric_limits<float>::max();
+            bbox4.minZ[i] = std::numeric_limits<float>::max();
+
+            bbox4.maxX[i] = -std::numeric_limits<float>::max();
+            bbox4.maxY[i] = -std::numeric_limits<float>::max();
+            bbox4.maxZ[i] = -std::numeric_limits<float>::max();
+        }
+#endif
+    }
 };
 
 Bvh4::Bvh4()
@@ -226,7 +260,11 @@ Bvh4::updateScene()
 
     std::atomic<uint32_t> buildNodeOffset = 0;
     std::atomic<uint32_t> nodeCount = 0;
-    mBvh = buildBvh(buildPrimitives, buildNodeOffset, nodeCount);
+    auto bvh = buildBvh(buildPrimitives, buildNodeOffset, nodeCount);
+
+    mLinearNodes.resize(nodeCount);
+    uint32_t linearNodeOffset = 0;
+    flatten(bvh.get(), linearNodeOffset);
 
     gBvhStats.countNodes(nodeCount);
 }
@@ -384,7 +422,7 @@ clusterPrimitives(const std::vector<BuildPrimitive4>& buildPrimitives, uint8_t c
 }
 
 void
-sortChildNodeByLongestAxis(std::unique_ptr<BuildNode4>& node)
+sortChildNodesByLongestAxis(std::unique_ptr<BuildNode4>& node)
 {
     BoundingBox centroidBox;
     for (const auto& child : node->children)
@@ -411,7 +449,7 @@ sortChildNodeByLongestAxis(std::unique_ptr<BuildNode4>& node)
         [dim = node->dim](const auto& a, const auto& b) {
             if (!a || !b)
             {
-                return a != nullptr || b == nullptr;
+                return a != nullptr;
             }
             else
             {
@@ -474,33 +512,7 @@ Bvh4::buildBvh(
         }
     }
 
-    sortChildNodeByLongestAxis(node);
-
-    for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
-    {
-        const auto& child = node->children[i];
-        
-        if (child)
-        {
-            node->bbox4.minX[i] = child->bbox.min.x;
-            node->bbox4.minY[i] = child->bbox.min.y;
-            node->bbox4.minZ[i] = child->bbox.min.z;
-
-            node->bbox4.maxX[i] = child->bbox.max.x;
-            node->bbox4.maxY[i] = child->bbox.max.y;
-            node->bbox4.maxZ[i] = child->bbox.max.z;
-        }
-        else
-        {
-            node->bbox4.minX[i] = std::numeric_limits<float>::max();
-            node->bbox4.minY[i] = std::numeric_limits<float>::max();
-            node->bbox4.minZ[i] = std::numeric_limits<float>::max();
-
-            node->bbox4.maxX[i] = -std::numeric_limits<float>::max();
-            node->bbox4.maxY[i] = -std::numeric_limits<float>::max();
-            node->bbox4.maxZ[i] = -std::numeric_limits<float>::max();
-        }
-    }
+    sortChildNodesByLongestAxis(node);
 
     return node;
 }
@@ -528,6 +540,56 @@ Bvh4::createLeaf(
     return leaf;
 }
 
+uint32_t
+Bvh4::flatten(const BuildNode4* node, uint32_t& offset)
+{
+    assert(node);
+
+    auto& linearNode = mLinearNodes[offset];
+    uint32_t nodeOffset = offset++;
+    if (node->isLeaf())
+    {
+        linearNode.offset[0] = node->offset;
+        linearNode.primitiveCount = node->primitiveCount;
+    }
+    else
+    {
+        for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
+        {
+            const auto& child = node->children[i];
+
+            if (child)
+            {
+#ifdef USE_BVH_SIMD
+                linearNode.bbox4.minX[i] = child->bbox.min.x;
+                linearNode.bbox4.minY[i] = child->bbox.min.y;
+                linearNode.bbox4.minZ[i] = child->bbox.min.z;
+
+                linearNode.bbox4.maxX[i] = child->bbox.max.x;
+                linearNode.bbox4.maxY[i] = child->bbox.max.y;
+                linearNode.bbox4.maxZ[i] = child->bbox.max.z;
+#else
+                linearNode.bbox[i] = child->bbox;
+#endif
+            }
+        }
+
+        linearNode.dim = node->dim;
+        flatten(node->children[0].get(), offset);
+
+        for (uint8_t i = 1; i < CHILD_NODE_COUNT; ++i)
+        {
+            const auto& child = node->children[i];
+            if (child)
+            {
+                linearNode.offset[i - 1] = flatten(node->children[i].get(), offset);
+            }
+        }
+    }
+
+    return nodeOffset;
+}
+
 std::optional<Intersection>
 Bvh4::intersect(const Ray& ray) const
 {
@@ -550,21 +612,22 @@ Bvh4::traverse(const Ray& ray, float tFar, bool any) const
     float tNear = tFar;
     float3 invRayDir = float3(1.0f / ray.dir.x, 1.0f / ray.dir.y, 1.0f / ray.dir.z);
 
-    BuildNode4* stack[STACK_SIZE];
+    uint32_t stack[STACK_SIZE];
     uint8_t stackIdx = 0;
-    const BuildNode4* currentNode = mBvh.get();
+    uint32_t currentIdx = 0;
 
     while (true)
     {
         counter.incrementNode();
 
-        if (currentNode->isLeaf())
+        const auto& linearNode = mLinearNodes[currentIdx];
+        if (linearNode.isLeaf())
         {
-            for (uint16_t i = 0; i < currentNode->primitiveCount; ++i)
+            for (uint16_t i = 0; i < linearNode.primitiveCount; ++i)
             {
                 counter.incrementTriangle();
 
-                const auto& prim = mOrderedPrimitives[currentNode->offset + i];
+                const auto& prim = mOrderedPrimitives[linearNode.offset[0] + i];
                 auto isect = prim.intersect(ray);
                 if (!isect.has_value() || isect.value().t >= tNear)
                 {
@@ -587,25 +650,32 @@ Bvh4::traverse(const Ray& ray, float tFar, bool any) const
             std::array<bool, CHILD_NODE_COUNT> intersects;
 #ifdef USE_BVH_SIMD
             static constexpr float correction = 1.0f + 2.0f * gamma(3); // ensure conservative intersection
-            ispc::intersectBoundingBox4(
-                intersects.data(), &ray.org[0], &ray.dir[0], &invRayDir[0], tNear, correction, currentNode->bbox4);
+            ispc::intersectBoundingBox4(intersects.data(),
+                &ray.org[0], &ray.dir[0], &invRayDir[0], tNear, correction, linearNode.bbox4);
 #else
             for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
             {
-                const auto& child = currentNode->children[i];
-                hits[i] = child ? child->bbox.intersect(ray, tNear, invRayDir) : false;
+                intersects[i] = linearNode.bbox[i].intersect(ray, tNear, invRayDir);
             }
 #endif
 
-            bool isDirNegative = ray.dir[currentNode->dim] < 0.0f;
+            bool isDirNegative = ray.dir[linearNode.dim] < 0.0f;
             for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
             {
                 uint8_t idx = !isDirNegative ? CHILD_NODE_COUNT - 1 - i : i;
 
-                if (intersects[idx] && currentNode->children[idx].get())
+                if (intersects[idx])
                 {
                     assert(stackIdx < STACK_SIZE - 1);
-                    stack[stackIdx++] = currentNode->children[idx].get();
+
+                    if (idx == 0)
+                    {
+                        stack[stackIdx++] = currentIdx + 1;
+                    }
+                    else if (linearNode.offset[idx - 1] != LinearNode4::invalid_offset)
+                    {
+                        stack[stackIdx++] = linearNode.offset[idx - 1];
+                    }
                 }
             }
         }
@@ -615,7 +685,7 @@ Bvh4::traverse(const Ray& ray, float tFar, bool any) const
             break;
         }
 
-        currentNode = stack[--stackIdx];
+        currentIdx = stack[--stackIdx];
     }
 
     return closestIsect;
