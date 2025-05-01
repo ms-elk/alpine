@@ -13,6 +13,7 @@ struct Primitive4;
 struct BoundingBox;
 struct BuildPrimitive4;
 struct BuildNode4;
+struct LinearNode4;
 
 class Bvh4 final : public Accelerator
 {
@@ -45,11 +46,13 @@ private:
         const BoundingBox& bbox,
         std::atomic<uint32_t>& offset);
 
+    uint32_t flatten(const BuildNode4* node, uint32_t& offset);
+
     std::optional<Intersection> traverse(const Ray& ray, float tFar, bool any) const;
 
 private:
     std::vector<Primitive4> mPrimitives;
     std::vector<Primitive4> mOrderedPrimitives;
-    std::unique_ptr<BuildNode4> mBvh;
+    std::vector<LinearNode4> mLinearNodes;
 };
 }
