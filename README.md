@@ -1,36 +1,34 @@
 # alpine
-**apline** is a CPU path tracer, and is developed to experiment several rendering algorithms.
+**alpine** is a CPU path tracer, and is developed to experiment with various rendering algorithms.
 
 ## Requirements
 - Visual Studio 2022
 - C++ 20
-- CMake 3.26
-- OpenGL 4.6 (optional for [viewer](#viewer))
+- CMake 3.15
+- OpenGL 4.6 (optional, required for [viewer](#viewer))
 
-## Build
-1. (Optional) Download the following libraries, and put them into the `ext` directory
-    - [GLFW](https://www.glfw.org/) 3.4  
-    It is required to build [viewer](#viewer)  
-    - [Intel Embree](https://www.embree.org/) 4.3.3  
-    It can be used as an accelerator.
-    - [Intel Open Image Denoise](https://www.openimagedenoise.org/) 2.3.0  
-    It can be used as a denoiser.
-
-2. Fetch git submodules
+## Build Instructions
+1. Fetch git submodules
     ```
     git submodule update --init
     ```
 
-3. Run CMake in the root directory
+2. Generate build files using CMake in the root directory
     ```
     cmake -S . -B build
     ```
-    CMake Options:  
-    `ALPINE_BUILD_APPS`: Enables build of [sample applications](#sample-applications). This option is OFF by default.  
-    `ALPINE_ENABLE_EMBREE`: Enables Intel Embree. This option is OFF by default.  
-    `ALPINE_ENABLE_OIDN`: Enables Intel Open Image Denoise. This option is OFF by default.
+    You can enable optional features via the following CMake options.  
+    For each option, make sure to manually download the required library and place it in the specified directory under `ext/`:  
 
-4. Open the solution file `alpine.sln` generated in the `build` directory, and build it in Visual Studio
+    | CMake Option | Description | Required Library | Place in |
+    | - | - | - | - |
+    | `ALPINE_BUILD_APPS`    | Builds alpine [sample applications](#sample-applications). | [GLFW](https://www.glfw.org/) 3.4 (for [viewer](#viewer)) | `ext/glfw` |
+    | `ALPINE_ENABLE_EMBREE` | Enables Embree as an accelerator backend option. | [Intel Embree](https://www.embree.org/) 4.3.3             | `ext/embree` |
+    | `ALPINE_ENABLE_OIDN`   | Enables a denoising option via OIDN. | [Intel Open Image Denoise](https://www.openimagedenoise.org/) 2.3.0 | `ext/oidn`   |
+    | `ALPINE_ENABLE_ISPC`   | Enables ISPC-based SIMD code generation. | [Intel ISPC](https://ispc.github.io/) 1.26.0              | `ext/ispc`   |
+
+
+3. Open the solution file `alpine.sln` generated in the `build` directory, and build it in Visual Studio
 
 ## Sample Applications
 ### simple
@@ -40,7 +38,7 @@ Options:
 `-i, --input`: Input file (.obj|.glb)  
 `-o, --output`: Output image file (.ppm)  
 `--spp`: Number of samples per pixel  
-`--accelerator`: Accelerator type: "bvh" or "embree"  
+`--accelerator`: Accelerator type: "bvh", "bvh4" or "embree"  
 `--lightSampler`: Light sampler type: "uniform", "power", or "bvh"  
 `--denoiser`: Enable denoiser  
 
