@@ -4,9 +4,10 @@
 #include "ray.h"
 #include "utils/bounding_box.h"
 
-#include <ispc/bvh.h>
+#include <ispc/bounding_box.h>
 
 #include <array>
+#include <atomic>
 #include <assert.h>
 #include <future>
 
@@ -89,7 +90,6 @@ private:
     uint32_t mTriCounter = 0;
     bool mAny;
 };
-}
 
 struct Primitive4
 {
@@ -192,20 +192,61 @@ struct alignas(32) LinearNode4
 #endif
     }
 };
+}
 
-Bvh4::Bvh4()
+class Bvh4::Impl
+{
+public:
+    Impl();
+    ~Impl();
+
+    void appendMesh(
+        const std::vector<float3>& vertices,
+        const std::vector<uint3>& prims,
+        const void* ptr);
+
+    void appendSphere(const std::vector<float4>& vertices, const void* ptr);
+
+    void updateScene();
+
+    std::optional<Intersection> intersect(const Ray& ray) const;
+
+    bool intersectAny(const Ray& ray, float tFar) const;
+
+private:
+    std::unique_ptr<BuildNode4> buildBvh(
+        const std::vector<BuildPrimitive4>& buildPrimitives,
+        std::atomic<uint32_t>& offset,
+        std::atomic<uint32_t>& nodeCount);
+
+    std::unique_ptr<BuildNode4> createLeaf(
+        const std::vector<BuildPrimitive4>& buildPrimitives,
+        const BoundingBox& bbox,
+        std::atomic<uint32_t>& offset);
+
+    uint32_t flatten(const BuildNode4* node, uint32_t& offset);
+
+    std::optional<Intersection> traverse(const Ray& ray, float tFar, bool any) const;
+
+private:
+    std::vector<Primitive4> mPrimitives;
+    std::vector<Primitive4> mOrderedPrimitives;
+    std::vector<LinearNode4> mLinearNodes;
+};
+
+Bvh4::Impl::Impl()
 {
     mPrimitives.reserve(MAX_PRIMITIVES);
     mOrderedPrimitives.reserve(MAX_PRIMITIVES);
 }
 
-Bvh4::~Bvh4()
+Bvh4::Impl::~Impl()
 {
     gBvhStats.show();
 }
 
 void
-Bvh4::appendMesh(
+Bvh4::Impl::appendMesh(
     const std::vector<float3>& vertices,
     const std::vector<uint3>& prims,
     const void* ptr)
@@ -235,13 +276,13 @@ Bvh4::appendMesh(
 }
 
 void
-Bvh4::appendSphere(const std::vector<float4>& vertices, const void* ptr)
+Bvh4::Impl::appendSphere(const std::vector<float4>& vertices, const void* ptr)
 {
     printf("ERROR: Sphere intersection has not been implemented yet.");
 }
 
 void
-Bvh4::updateScene()
+Bvh4::Impl::updateScene()
 {
     if (mPrimitives.empty())
     {
@@ -460,7 +501,7 @@ sortChildNodesByLongestAxis(std::unique_ptr<BuildNode4>& node)
 }
 
 std::unique_ptr<BuildNode4>
-Bvh4::buildBvh(
+Bvh4::Impl::buildBvh(
     const std::vector<BuildPrimitive4>& buildPrimitives,
     std::atomic<uint32_t>& offset,
     std::atomic<uint32_t>& nodeCount)
@@ -518,7 +559,7 @@ Bvh4::buildBvh(
 }
 
 std::unique_ptr<BuildNode4>
-Bvh4::createLeaf(
+Bvh4::Impl::createLeaf(
     const std::vector<BuildPrimitive4>& buildPrimitives,
     const BoundingBox& bbox,
     std::atomic<uint32_t>& offset)
@@ -541,7 +582,7 @@ Bvh4::createLeaf(
 }
 
 uint32_t
-Bvh4::flatten(const BuildNode4* node, uint32_t& offset)
+Bvh4::Impl::flatten(const BuildNode4* node, uint32_t& offset)
 {
     assert(node);
 
@@ -591,20 +632,20 @@ Bvh4::flatten(const BuildNode4* node, uint32_t& offset)
 }
 
 std::optional<Intersection>
-Bvh4::intersect(const Ray& ray) const
+Bvh4::Impl::intersect(const Ray& ray) const
 {
     return traverse(ray, std::numeric_limits<float>::max(), false);
 }
 
 bool
-Bvh4::intersectAny(const Ray& ray, float tFar) const
+Bvh4::Impl::intersectAny(const Ray& ray, float tFar) const
 {
     const auto intersection = traverse(ray, tFar, true);
     return intersection.has_value();
 }
 
 std::optional<Intersection>
-Bvh4::traverse(const Ray& ray, float tFar, bool any) const
+Bvh4::Impl::traverse(const Ray& ray, float tFar, bool any) const
 {
     NodeAccessCounter counter(any);
 
@@ -689,5 +730,44 @@ Bvh4::traverse(const Ray& ray, float tFar, bool any) const
     }
 
     return closestIsect;
+}
+
+Bvh4::Bvh4()
+    : mPimpl(std::make_unique<Impl>())
+{}
+
+Bvh4::~Bvh4() = default;
+
+void
+Bvh4::appendMesh(
+    const std::vector<float3>& vertices,
+    const std::vector<uint3>& prims,
+    const void* ptr)
+{
+    mPimpl->appendMesh(vertices, prims, ptr);
+}
+
+void
+Bvh4::appendSphere(const std::vector<float4>& vertices, const void* ptr)
+{
+    mPimpl->appendSphere(vertices, ptr);
+}
+
+void
+Bvh4::updateScene()
+{
+    mPimpl->updateScene();
+}
+
+std::optional<Intersection>
+Bvh4::intersect(const Ray& ray) const
+{
+    return mPimpl->intersect(ray);
+}
+
+bool
+Bvh4::intersectAny(const Ray& ray, float tFar) const
+{
+    return mPimpl->intersectAny(ray, tFar);
 }
 }

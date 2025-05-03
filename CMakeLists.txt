@@ -11,9 +11,10 @@ set(CMAKE_SUPPRESS_REGENERATION true)
 
 add_compile_options(/WX)
 
-option(ALPINE_BUILD_APPS "build applications of alpine" OFF)
-option(ALPINE_ENABLE_EMBREE "enable Intel Embree to use it as an accelerator" OFF)
-option(ALPINE_ENABLE_OIDN "enable Intel Open Image Denoise to use it as a denoiser" OFF)
+option(ALPINE_BUILD_APPS "Builds alpine sample applications" OFF)
+option(ALPINE_ENABLE_EMBREE "Enables Embree as an accelerator backend option" OFF)
+option(ALPINE_ENABLE_OIDN "Enables a denoising option via OIDN" OFF)
+option(ALPINE_ENABLE_ISPC "Enables ISPC-based SIMD code generation" OFF)
 
 if (ALPINE_BUILD_APPS)
   # set directory for output executables
@@ -40,17 +41,21 @@ set(ACCELERATORS
   src/accelerators/accelerator.h
   src/accelerators/bvh.cpp
   src/accelerators/bvh.h
-  src/accelerators/bvh4.cpp
   src/accelerators/bvh4.h
   src/accelerators/embree.h
 )
 
 if (ALPINE_ENABLE_EMBREE)
-list(APPEND ACCELERATORS src/accelerators/embree/embree.cpp)
+list(APPEND ACCELERATORS src/accelerators/embree.cpp)
 else()
-list(APPEND ACCELERATORS src/accelerators/embree/dummy.cpp)
+list(APPEND ACCELERATORS src/accelerators/embree_dummy.cpp)
 endif()
 
+if (ALPINE_ENABLE_ISPC)
+list(APPEND ACCELERATORS src/accelerators/bvh4.cpp)
+else()
+list(APPEND ACCELERATORS src/accelerators/bvh4_dummy.cpp)
+endif()
 set(DENOISERS src/denoisers/denoiser.h)
 
 if (ALPINE_ENABLE_OIDN)
@@ -119,11 +124,12 @@ set(UTILS
   src/utils/util.h
 )
 
-# TODO: make it optional to build with ispc
+# ispc compile setting
+if (ALPINE_ENABLE_ISPC)
 set(ISPC_EXE ${CMAKE_CURRENT_SOURCE_DIR}/ext/ispc/bin/ispc.exe)
 set(ISPC_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/ispc/bounding_box.ispc)
-set(ISPC_OBJ ${CMAKE_CURRENT_BINARY_DIR}/ispc/bvh.obj)
-set(ISPC_H ${CMAKE_CURRENT_BINARY_DIR}/ispc/bvh.h)
+set(ISPC_OBJ ${CMAKE_CURRENT_BINARY_DIR}/ispc/bounding_box.obj)
+set(ISPC_H ${CMAKE_CURRENT_BINARY_DIR}/ispc/bounding_box.h)
 
 add_custom_command(
     OUTPUT ${ISPC_OBJ} ${ISPC_H}
@@ -131,6 +137,7 @@ add_custom_command(
     DEPENDS ${ISPC_SRC}
     COMMENT "Compiling ISPC file ${ISPC_SRC}"
 )
+endif ()
 
 source_group("" FILES ${SOURCES})
 source_group("accelerators" FILES ${ACCELERATORS})
@@ -160,7 +167,6 @@ add_library(alpine STATIC
   ${ISPC_OBJ}
   ${ISPC_SRC}
 )
-
 
 target_include_directories(alpine
   PUBLIC
