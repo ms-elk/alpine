@@ -86,7 +86,6 @@ private:
     uint32_t mTriCounter = 0;
     bool mAny;
 };
-}
 
 struct Primitive
 {
@@ -164,20 +163,61 @@ struct alignas(32) LinearNode
 
     bool isLeaf() const { return primitiveCount > 0; }
 };
+}
 
-Bvh::Bvh()
+class Bvh::Impl
+{
+public:
+    Impl();
+    ~Impl();
+
+    void appendMesh(
+        const std::vector<float3>& vertices,
+        const std::vector<uint3>& prims,
+        const void* ptr);
+
+    void appendSphere(const std::vector<float4>& vertices, const void* ptr);
+
+    void updateScene();
+
+    std::optional<Intersection> intersect(const Ray& ray) const;
+
+    bool intersectAny(const Ray& ray, float tFar) const;
+
+private:
+    std::unique_ptr<BuildNode> buildBvh(
+        const std::vector<BuildPrimitive>& buildPrimitives,
+        std::atomic<uint32_t>& offset,
+        std::atomic<uint32_t>& nodeCount);
+
+    std::unique_ptr<BuildNode> createLeaf(
+        const std::vector<BuildPrimitive>& buildPrimitives,
+        const BoundingBox& bbox,
+        std::atomic<uint32_t>& offset);
+
+    uint32_t flatten(const BuildNode* node, uint32_t& offset);
+
+    std::optional<Intersection> traverse(const Ray& ray, float tFar, bool any) const;
+
+private:
+    std::vector<Primitive> mPrimitives;
+    std::vector<Primitive> mOrderedPrimitives;
+    std::vector<LinearNode> mLinearNodes;
+};
+
+Bvh::Impl::Impl()
 {
     mPrimitives.reserve(MAX_PRIMITIVES);
     mOrderedPrimitives.reserve(MAX_PRIMITIVES);
 }
 
-Bvh::~Bvh()
+Bvh::Impl::~Impl()
 {
     gBvhStats.show();
 }
 
 void
-Bvh::appendMesh(
+Bvh::Impl::appendMesh(
     const std::vector<float3>& vertices,
     const std::vector<uint3>& prims,
     const void* ptr)
@@ -207,13 +247,13 @@ Bvh::appendMesh(
 }
 
 void
-Bvh::appendSphere(const std::vector<float4>& vertices, const void* ptr)
+Bvh::Impl::appendSphere(const std::vector<float4>& vertices, const void* ptr)
 {
     printf("ERROR: Sphere intersection has not been implemented yet.");
 }
 
 void
-Bvh::updateScene()
+Bvh::Impl::updateScene()
 {
     if (mPrimitives.empty())
     {
@@ -332,7 +372,7 @@ findSplit(const std::vector<BuildPrimitive>& buildPrimitives)
 }
 
 std::unique_ptr<BuildNode>
-Bvh::buildBvh(
+Bvh::Impl::buildBvh(
     const std::vector<BuildPrimitive>& buildPrimitives,
     std::atomic<uint32_t>& offset,
     std::atomic<uint32_t>& nodeCount)
@@ -406,7 +446,7 @@ Bvh::buildBvh(
 }
 
 std::unique_ptr<BuildNode>
-Bvh::createLeaf(
+Bvh::Impl::createLeaf(
     const std::vector<BuildPrimitive>& buildPrimitives,
     const BoundingBox& bbox,
     std::atomic<uint32_t>& offset)
@@ -429,7 +469,7 @@ Bvh::createLeaf(
 }
 
 uint32_t
-Bvh::flatten(const BuildNode* node, uint32_t& offset)
+Bvh::Impl::flatten(const BuildNode* node, uint32_t& offset)
 {
     auto& linearNode = mLinearNodes[offset];
     uint32_t nodeOffset = offset++;
@@ -450,20 +490,20 @@ Bvh::flatten(const BuildNode* node, uint32_t& offset)
 }
 
 std::optional<Intersection>
-Bvh::intersect(const Ray& ray) const
+Bvh::Impl::intersect(const Ray& ray) const
 {
     return traverse(ray, std::numeric_limits<float>::max(), false);
 }
 
 bool
-Bvh::intersectAny(const Ray& ray, float tFar) const
+Bvh::Impl::intersectAny(const Ray& ray, float tFar) const
 {
     const auto intersection = traverse(ray, tFar, true);
     return intersection.has_value();
 }
 
 std::optional<Intersection>
-Bvh::traverse(const Ray& ray, float tFar, bool any) const
+Bvh::Impl::traverse(const Ray& ray, float tFar, bool any) const
 {
     assert(!mLinearNodes.empty());
 
@@ -535,5 +575,44 @@ Bvh::traverse(const Ray& ray, float tFar, bool any) const
     }
 
     return closestIsect;
+}
+
+Bvh::Bvh()
+    : mPimpl(std::make_unique<Impl>())
+{}
+
+Bvh::~Bvh() = default;
+
+void
+Bvh::appendMesh(
+    const std::vector<float3>& vertices,
+    const std::vector<uint3>& prims,
+    const void* ptr)
+{
+    mPimpl->appendMesh(vertices, prims, ptr);
+}
+
+void
+Bvh::appendSphere(const std::vector<float4>& vertices, const void* ptr)
+{
+    mPimpl->appendSphere(vertices, ptr);
+}
+
+void
+Bvh::updateScene()
+{
+    mPimpl->updateScene();
+}
+
+std::optional<Intersection>
+Bvh::intersect(const Ray& ray) const
+{
+    return mPimpl->intersect(ray);
+}
+
+bool
+Bvh::intersectAny(const Ray& ray, float tFar) const
+{
+    return mPimpl->intersectAny(ray, tFar);
 }
 }
