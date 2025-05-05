@@ -3,6 +3,7 @@
 #include "alpine_config.h"
 #include "ray.h"
 #include "utils/bounding_box.h"
+#include "utils/bvh_util.h"
 
 #include <ispc/bounding_box.h>
 
@@ -24,6 +25,9 @@ static constexpr uint8_t MAX_CLUSTERING_ITERATIONS = 8;
 static constexpr uint32_t MIN_PRIMITIVES_FOR_PARALLELIZATION = 1024;
 
 static constexpr uint8_t STACK_SIZE = 64;
+
+static constexpr uint8_t SPLITS_PER_DIM = 4;
+static constexpr uint8_t BIN_COUNT = SPLITS_PER_DIM + 1;
 
 class BvhStats
 {
@@ -91,7 +95,7 @@ private:
     bool mAny;
 };
 
-struct Primitive4
+struct Primitive
 {
     BoundingBox bbox;
     const void* ptr = nullptr;
@@ -141,16 +145,16 @@ struct Primitive4
     }
 };
 
-struct BuildPrimitive4
+struct BuildPrimitive
 {
     BoundingBox bbox;
-    uint32_t index;
+    uint32_t index = 0;
 };
 
-struct BuildNode4
+struct BuildNode
 {
     BoundingBox bbox;
-    std::array<std::unique_ptr<BuildNode4>, CHILD_NODE_COUNT> children{};
+    std::array<std::unique_ptr<BuildNode>, 2> children{};
     uint32_t offset = 0;
     uint16_t primitiveCount = 0;
     uint8_t dim = 0;
@@ -167,10 +171,10 @@ struct alignas(32) LinearNode4
 #endif
 
     static constexpr uint32_t invalid_offset = std::numeric_limits<uint32_t>::max();
-    std::array <uint32_t, CHILD_NODE_COUNT - 1> offset;
+    std::array<uint32_t, CHILD_NODE_COUNT - 1> offset;
 
     uint16_t primitiveCount = 0;
-    uint8_t dim = 0;
+    std::array<uint8_t, 3> dim{};
 
     bool isLeaf() const { return primitiveCount > 0; }
 
@@ -192,6 +196,48 @@ struct alignas(32) LinearNode4
 #endif
     }
 };
+
+consteval auto
+makeTraversalOrder(const std::array<bool, 3>& isDirNegative)
+{
+    std::array<uint8_t, CHILD_NODE_COUNT> traversalOrder{};
+
+    for (uint8_t i = 0; i < 2; ++i)
+    {
+        uint8_t parentOrder = isDirNegative[0] ? i : 1 - i;
+
+        for (uint8_t j = 0; j < 2; ++j)
+        {
+            bool n = parentOrder == 0 ? isDirNegative[1] : isDirNegative[2];
+            uint8_t childOrder = n ? j : 1 - j;
+
+            uint8_t idx = 2 * i + j;
+            traversalOrder[idx] = 2 * parentOrder + childOrder;
+        }
+    }
+
+    return traversalOrder;
+}
+
+consteval auto
+makeTraversalOrderTable() {
+    std::array<std::array<uint8_t, CHILD_NODE_COUNT>, 8> table{};
+    std::array<bool, 3> isDirNegative{};
+
+    for (uint8_t i = 0; i < 8; ++i) {
+        std::array<bool, 3> isDirNegative = {
+            static_cast<bool>((i >> 2) & 1),
+            static_cast<bool>((i >> 1) & 1),
+            static_cast<bool>((i >> 0) & 1)
+        };
+        table[i] = makeTraversalOrder(isDirNegative);
+    }
+
+    return table;
+}
+
+constexpr auto gTraversalOrderTable = makeTraversalOrderTable();
+
 }
 
 class Bvh4::Impl
@@ -214,23 +260,23 @@ public:
     bool intersectAny(const Ray& ray, float tFar) const;
 
 private:
-    std::unique_ptr<BuildNode4> buildBvh(
-        const std::vector<BuildPrimitive4>& buildPrimitives,
+    std::unique_ptr<BuildNode> buildBvh(
+        const std::vector<BuildPrimitive>& buildPrimitives,
         std::atomic<uint32_t>& offset,
         std::atomic<uint32_t>& nodeCount);
 
-    std::unique_ptr<BuildNode4> createLeaf(
-        const std::vector<BuildPrimitive4>& buildPrimitives,
+    std::unique_ptr<BuildNode> createLeaf(
+        const std::vector<BuildPrimitive>& buildPrimitives,
         const BoundingBox& bbox,
         std::atomic<uint32_t>& offset);
 
-    uint32_t flatten(const BuildNode4* node, uint32_t& offset);
+    uint32_t flatten(const BuildNode* node, uint32_t& offset);
 
     std::optional<Intersection> traverse(const Ray& ray, float tFar, bool any) const;
 
 private:
-    std::vector<Primitive4> mPrimitives;
-    std::vector<Primitive4> mOrderedPrimitives;
+    std::vector<Primitive> mPrimitives;
+    std::vector<Primitive> mOrderedPrimitives;
     std::vector<LinearNode4> mLinearNodes;
 };
 
@@ -253,7 +299,7 @@ Bvh4::Impl::appendMesh(
 {
     for (uint32_t primId = 0; primId < prims.size(); ++primId)
     {
-        Primitive4 prim;
+        Primitive prim;
         prim.ptr = ptr;
         prim.primId = primId;
 
@@ -291,7 +337,7 @@ Bvh4::Impl::updateScene()
 
     mOrderedPrimitives.resize(mPrimitives.size());
 
-    std::vector<BuildPrimitive4> buildPrimitives(mPrimitives.size());
+    std::vector<BuildPrimitive> buildPrimitives(mPrimitives.size());
     for (uint32_t i = 0; i < mPrimitives.size(); ++i)
     {
         auto& bp = buildPrimitives[i];
@@ -306,78 +352,15 @@ Bvh4::Impl::updateScene()
     mLinearNodes.resize(nodeCount);
     uint32_t linearNodeOffset = 0;
     flatten(bvh.get(), linearNodeOffset);
+    mLinearNodes.resize(linearNodeOffset);
 
-    gBvhStats.countNodes(nodeCount);
+    gBvhStats.countNodes(linearNodeOffset);
 }
 
 namespace {
-// k-means++
-std::vector<float3>
-pickInitialCentroids(
-    const float3& seed, const std::vector<BuildPrimitive4>& buildPrimitives, uint8_t clusterCount)
+std::pair<std::optional<bvh_util::Split>, float /* cost */>
+findSplit(const std::vector<BuildPrimitive>& buildPrimitives)
 {
-    std::vector<float3> clusterCentroids;
-    clusterCentroids.reserve(clusterCount);
-
-    auto firstCentroid = [&]() {
-        uint32_t primId = 0;
-        float maxDist2 = 0.0f;
-        for (uint32_t i = 0; i < buildPrimitives.size(); ++i)
-        {
-            float3 v = buildPrimitives[i].bbox.getCenter() - seed;
-            float dist2 = dot(v, v);
-
-            if (dist2 > maxDist2)
-            {
-                maxDist2 = dist2;
-                primId = i;
-            }
-        }
-
-        return buildPrimitives[primId].bbox.getCenter();
-    }();
-
-    clusterCentroids.push_back(firstCentroid);
-
-    for (uint8_t k = 1; k < clusterCount; ++k)
-    {
-        uint32_t primId = 0;
-        float maxDist2 = 0.0f;
-        for (uint32_t i = 0; i < buildPrimitives.size(); ++i)
-        {
-            float clusterDist2 = std::numeric_limits<float>::max();
-            for (const auto& centroid : clusterCentroids)
-            {
-                float3 v = buildPrimitives[i].bbox.getCenter() - centroid;
-                float dist2 = dot(v, v);
-
-                if (dist2 < clusterDist2)
-                {
-                    clusterDist2 = dist2;
-                }
-            }
-
-            if (clusterDist2 > maxDist2)
-            {
-                maxDist2 = clusterDist2;
-                primId = i;
-            }
-        }
-
-        clusterCentroids.push_back(buildPrimitives[primId].bbox.getCenter());
-    }
-
-    return clusterCentroids;
-}
-
-std::pair<std::vector<std::vector<BuildPrimitive4>>, float /* cost */>
-clusterPrimitives(const std::vector<BuildPrimitive4>& buildPrimitives, uint8_t clusterCount)
-{
-    if (buildPrimitives.size() <= clusterCount)
-    {
-        return { std::vector<std::vector<BuildPrimitive4>>(), 0.0f };
-    }
-
     auto centroidBox = [&]() {
         BoundingBox cb;
         for (const auto& bp : buildPrimitives)
@@ -392,125 +375,84 @@ clusterPrimitives(const std::vector<BuildPrimitive4>& buildPrimitives, uint8_t c
     float cbDiagonalMax = maxComponent(centroidBox.getDiagonal());
     if (cbDiagonalMax == 0.0f)
     {
-        return { std::vector<std::vector<BuildPrimitive4>>(), 0.0f };
+        return { {}, 0.0f };
     }
 
-    auto clusterCentroids = pickInitialCentroids(
-        centroidBox.getCenter(), buildPrimitives, clusterCount);
+    bvh_util::Split split;
+    float minCost = std::numeric_limits<float>::max();
 
-    std::vector<std::vector<BuildPrimitive4>> clusters(clusterCount);
-    const uint32_t clusterSize = 2 * static_cast<uint32_t>(buildPrimitives.size()) / clusterCount;
-    for (auto& cluster : clusters)
-    {
-        cluster.reserve(clusterSize);
-    }
-
-    // k-means clustering iteration
-    for (uint8_t iter = 0; iter < MAX_CLUSTERING_ITERATIONS; ++iter)
-    {
-        for (auto& cluster : clusters)
-        {
-            cluster.clear();
-        }
-
-        for (const auto& prim : buildPrimitives)
-        {
-            uint32_t clusterId = 0;
-            float minDist2 = std::numeric_limits<float>::max();
-            for (uint8_t k = 0; k < clusterCount; ++k)
-            {
-                float3 v = prim.bbox.getCenter() - clusterCentroids[k];
-                float dist2 = dot(v, v);
-
-                if (dist2 < minDist2 && clusters[k].size() < clusterSize)
-                {
-                    minDist2 = dist2;
-                    clusterId = k;
-                }
-            }
-
-            clusters[clusterId].push_back(prim);
-        }
-
-        for (uint8_t k = 0; k < clusterCount; ++k)
-        {
-            const auto& cluster = clusters[k];
-
-            clusterCentroids[k] = float3(0.0f);
-
-            for (const auto& prim : cluster)
-            {
-                clusterCentroids[k] += prim.bbox.getCenter();
-            }
-
-            clusterCentroids[k] /= static_cast<float>(cluster.size());
-        }
-    }
-
-    float cost = 0.0f;
-    for (const auto& cluster : clusters)
-    {
-        BoundingBox bbox;
-        for (const auto& prim : cluster)
-        {
-            bbox = merge(bbox, prim.bbox);
-        }
-
-        cost += bbox.computeSurfaceArea() * cluster.size();
-    }
-    
-    return { clusters, cost };
-}
-
-void
-sortChildNodesByLongestAxis(std::unique_ptr<BuildNode4>& node)
-{
-    BoundingBox centroidBox;
-    for (const auto& child : node->children)
-    {
-        if (child)
-        {
-            centroidBox = merge(centroidBox, child->bbox.getCenter());
-        }
-    }
-
-    float maxDist = 0.0f;
     for (uint8_t dim = 0; dim < 3; ++dim)
     {
-        float dist = centroidBox.max[dim] - centroidBox.min[dim];
-
-        if (dist > maxDist)
+        if (centroidBox.min[dim] == centroidBox.max[dim])
         {
-            maxDist = dist;
-            node->dim = dim;
+            continue;
+        }
+
+        struct Bin
+        {
+            BoundingBox bbox;
+            uint32_t count = 0;
+        };
+        Bin bins[BIN_COUNT];
+
+        // binning
+        for (const auto& bp : buildPrimitives)
+        {
+            float c = bp.bbox.getCenter()[dim];
+            uint8_t binIdx = bvh_util::getBinIndex(c, centroidBox.min[dim], centroidBox.max[dim], BIN_COUNT);
+            binIdx = std::min(binIdx, static_cast<uint8_t>(BIN_COUNT - 1));
+
+            auto& bin = bins[binIdx];
+            bin.bbox = merge(bin.bbox, bp.bbox);
+            bin.count++;
+        }
+
+        float costs[SPLITS_PER_DIM] = { 0.0f };
+
+        const auto accumulateCosts = [&](uint8_t binIdx, uint8_t splitIdx, Bin& binAccum) {
+            const auto& bin = bins[binIdx];
+            binAccum.bbox = merge(binAccum.bbox, bin.bbox);
+            binAccum.count += bin.count;
+
+            costs[splitIdx] += binAccum.count * binAccum.bbox.computeSurfaceArea();
+        };
+
+        Bin binBelow;
+        for (uint8_t splitIdx = 0; splitIdx < SPLITS_PER_DIM; ++splitIdx)
+        {
+            uint8_t binIdx = splitIdx;
+            accumulateCosts(binIdx, splitIdx, binBelow);
+        }
+
+        Bin binAbove;
+        for (int8_t splitIdx = SPLITS_PER_DIM - 1; splitIdx >= 0; --splitIdx)
+        {
+            uint8_t binIdx = splitIdx + 1;
+            accumulateCosts(binIdx, splitIdx, binAbove);
+        }
+
+        // find the split which has the minimum cost
+        for (uint8_t splitIdx = 0; splitIdx < SPLITS_PER_DIM; ++splitIdx)
+        {
+            const auto& cost = costs[splitIdx];
+            if (cost < minCost)
+            {
+                minCost = cost;
+                split = { dim, splitIdx, BIN_COUNT, centroidBox.min[dim], centroidBox.max[dim] };
+            }
         }
     }
 
-    std::sort(node->children.begin(), node->children.end(),
-        [dim = node->dim](const auto& a, const auto& b) {
-            if (!a || !b)
-            {
-                return a != nullptr;
-            }
-            else
-            {
-                return a->bbox.getCenter()[dim] < b->bbox.getCenter()[dim];
-            }
-        });
+    return { split, minCost };
 }
 }
 
-std::unique_ptr<BuildNode4>
+std::unique_ptr<BuildNode>
 Bvh4::Impl::buildBvh(
-    const std::vector<BuildPrimitive4>& buildPrimitives,
+    const std::vector<BuildPrimitive>& buildPrimitives,
     std::atomic<uint32_t>& offset,
     std::atomic<uint32_t>& nodeCount)
 {
-    if (buildPrimitives.empty())
-    {
-        return nullptr;
-    }
-
     nodeCount++;
 
     BoundingBox nodeBbox;
@@ -519,52 +461,73 @@ Bvh4::Impl::buildBvh(
         nodeBbox = merge(nodeBbox, bp.bbox);
     }
 
-    auto [subset, splitCost] = clusterPrimitives(buildPrimitives, CHILD_NODE_COUNT);
-    float leafCost = static_cast<float>(buildPrimitives.size()) * nodeBbox.computeSurfaceArea();
-
-    if (subset.empty() || splitCost >= leafCost)
+    if (buildPrimitives.size() <= 2)
     {
         return createLeaf(buildPrimitives, nodeBbox, offset);
     }
 
-    auto node = std::make_unique<BuildNode4>();
+    auto [split, splitCost] = findSplit(buildPrimitives);
+    float leafCost = static_cast<float>(buildPrimitives.size()) * nodeBbox.computeSurfaceArea();
+
+    if (!split.has_value() || splitCost >= leafCost)
+    {
+        return createLeaf(buildPrimitives, nodeBbox, offset);
+    }
+
+    std::vector<BuildPrimitive> subset[2];
+    for (uint8_t i = 0; i < 2; ++i)
+    {
+        subset[i].reserve(buildPrimitives.size());
+    }
+
+    const auto& s = split.value();
+
+    for (const auto& bp : buildPrimitives)
+    {
+        uint8_t subsetIdx = s.isBelow(bp.bbox.getCenter()) ? 0 : 1;
+        subset[subsetIdx].push_back(bp);
+    }
+
+    assert(!subset[0].empty());
+    assert(!subset[1].empty());
+
+    auto node = std::make_unique<BuildNode>();
     node->bbox = nodeBbox;
+    node->dim = s.dim;
 
     if (buildPrimitives.size() >= MIN_PRIMITIVES_FOR_PARALLELIZATION)
     {
-        std::future<std::unique_ptr<BuildNode4>> children[CHILD_NODE_COUNT];
-        for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
+        std::future<std::unique_ptr<BuildNode>> children[2];
+        for (uint8_t i = 0; i < 2; ++i)
         {
             children[i] = std::async([&, i]() {
                 return buildBvh(subset[i], offset, nodeCount);
-            });
+                });
         }
 
-        for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
+        for (uint8_t i = 0; i < 2; ++i)
         {
             node->children[i] = children[i].get();
         }
     }
     else
     {
-        for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
+        for (uint8_t i = 0; i < 2; ++i)
         {
             node->children[i] = buildBvh(subset[i], offset, nodeCount);
         }
     }
 
-    sortChildNodesByLongestAxis(node);
-
     return node;
 }
 
-std::unique_ptr<BuildNode4>
+std::unique_ptr<BuildNode>
 Bvh4::Impl::createLeaf(
-    const std::vector<BuildPrimitive4>& buildPrimitives,
+    const std::vector<BuildPrimitive>& buildPrimitives,
     const BoundingBox& bbox,
     std::atomic<uint32_t>& offset)
 {
-    auto leaf = std::make_unique<BuildNode4>();
+    auto leaf = std::make_unique<BuildNode>();
 
     leaf->bbox = bbox;
     leaf->primitiveCount = static_cast<uint16_t>(buildPrimitives.size());
@@ -582,12 +545,13 @@ Bvh4::Impl::createLeaf(
 }
 
 uint32_t
-Bvh4::Impl::flatten(const BuildNode4* node, uint32_t& offset)
+Bvh4::Impl::flatten(const BuildNode* node, uint32_t& offset)
 {
     assert(node);
 
     auto& linearNode = mLinearNodes[offset];
     uint32_t nodeOffset = offset++;
+
     if (node->isLeaf())
     {
         linearNode.offset[0] = node->offset;
@@ -595,35 +559,59 @@ Bvh4::Impl::flatten(const BuildNode4* node, uint32_t& offset)
     }
     else
     {
-        for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
+        linearNode.dim[0] = node->dim;
+
+        const auto flattenChild = [&](uint32_t idx, const auto* child) {
+            uint32_t childOffset = flatten(child, offset);
+
+            if (idx > 0)
+            {
+                linearNode.offset[idx - 1] = childOffset;
+            }
+        };
+
+        const auto setBbox = [&](uint32_t idx, const auto& bbox) {
+            linearNode.bbox4.minX[idx] = bbox.min.x;
+            linearNode.bbox4.minY[idx] = bbox.min.y;
+            linearNode.bbox4.minZ[idx] = bbox.min.z;
+
+            linearNode.bbox4.maxX[idx] = bbox.max.x;
+            linearNode.bbox4.maxY[idx] = bbox.max.y;
+            linearNode.bbox4.maxZ[idx] = bbox.max.z;
+        };
+
+        for (uint8_t i = 0; i < node->children.size(); ++i)
         {
             const auto& child = node->children[i];
+            assert(child);
 
-            if (child)
+            linearNode.dim[i + 1] = child->dim;
+
+            if (child->isLeaf())
             {
+                uint8_t idx = 2 * i;
+                flattenChild(idx, child.get());
 #ifdef USE_BVH_SIMD
-                linearNode.bbox4.minX[i] = child->bbox.min.x;
-                linearNode.bbox4.minY[i] = child->bbox.min.y;
-                linearNode.bbox4.minZ[i] = child->bbox.min.z;
-
-                linearNode.bbox4.maxX[i] = child->bbox.max.x;
-                linearNode.bbox4.maxY[i] = child->bbox.max.y;
-                linearNode.bbox4.maxZ[i] = child->bbox.max.z;
+                setBbox(idx, child->bbox);
 #else
-                linearNode.bbox[i] = child->bbox;
+                linearNode.bbox[idx] = child->bbox;
 #endif
             }
-        }
-
-        linearNode.dim = node->dim;
-        flatten(node->children[0].get(), offset);
-
-        for (uint8_t i = 1; i < CHILD_NODE_COUNT; ++i)
-        {
-            const auto& child = node->children[i];
-            if (child)
+            else
             {
-                linearNode.offset[i - 1] = flatten(node->children[i].get(), offset);
+                for (uint8_t j = 0; j < child->children.size(); ++j)
+                {
+                    const auto& grandchild = child->children[j];
+                    assert(grandchild);
+
+                    uint8_t idx = 2 * i + j;
+                    flattenChild(idx, grandchild.get());
+#ifdef USE_BVH_SIMD
+                    setBbox(idx, grandchild->bbox);
+#else
+                    linearNode.bbox[idx] = grandchild->bbox;
+#endif
+                }
             }
         }
     }
@@ -688,7 +676,7 @@ Bvh4::Impl::traverse(const Ray& ray, float tFar, bool any) const
         }
         else
         {
-            std::array<bool, CHILD_NODE_COUNT> intersects;
+            std::array<bool, CHILD_NODE_COUNT> intersects{};
 #ifdef USE_BVH_SIMD
             static constexpr float correction = 1.0f + 2.0f * gamma(3); // ensure conservative intersection
             ispc::intersectBoundingBox4(intersects.data(),
@@ -700,24 +688,40 @@ Bvh4::Impl::traverse(const Ray& ray, float tFar, bool any) const
             }
 #endif
 
-            bool isDirNegative = ray.dir[linearNode.dim] < 0.0f;
-            for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
-            {
-                uint8_t idx = !isDirNegative ? CHILD_NODE_COUNT - 1 - i : i;
-
-                if (intersects[idx])
+            const auto stackChild = [&](uint8_t idx) {
+                if (!intersects[idx])
                 {
-                    assert(stackIdx < STACK_SIZE - 1);
+                    return;
+                }
 
-                    if (idx == 0)
+                assert(stackIdx < STACK_SIZE - 1);
+
+                if (idx == 0)
+                {
+                    stack[stackIdx++] = currentIdx + 1;
+                }
+                else
+                {
+                    uint32_t offset = linearNode.offset[idx - 1];
+                    if (offset != LinearNode4::invalid_offset)
                     {
-                        stack[stackIdx++] = currentIdx + 1;
-                    }
-                    else if (linearNode.offset[idx - 1] != LinearNode4::invalid_offset)
-                    {
-                        stack[stackIdx++] = linearNode.offset[idx - 1];
+                        stack[stackIdx++] = offset;
                     }
                 }
+            };
+
+            std::array<bool, 3> isNeg{};
+            for (uint8_t i = 0; i < isNeg.size(); ++i)
+            {
+                uint8_t dim = linearNode.dim[i];
+                isNeg[i] = ray.dir[dim] < 0.0f;
+            }
+
+            uint8_t tableIdx = (isNeg[0] << 2) | (isNeg[1] << 1) | (isNeg[2] << 0);
+            const auto& traversalOrder = gTraversalOrderTable[tableIdx];
+            for (uint8_t idx : traversalOrder)
+            {
+                stackChild(idx);
             }
         }
 
