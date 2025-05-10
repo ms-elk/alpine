@@ -8,6 +8,7 @@
 #include <future>
 
 namespace {
+static constexpr uint8_t LEAF_THRESHOLD = 8;
 static constexpr uint8_t SPLITS_PER_DIM = 4;
 static constexpr uint8_t BIN_COUNT = SPLITS_PER_DIM + 1;
 static constexpr uint32_t MIN_PRIMITIVES_FOR_PARALLELIZATION = 1024;
@@ -168,7 +169,8 @@ findSplit(const std::vector<BuildPrimitive>& buildPrimitives)
         for (const auto& bp : buildPrimitives)
         {
             float c = bp.bbox.getCenter()[dim];
-            uint8_t binIdx = bvh_util::getBinIndex(c, centroidBox.min[dim], centroidBox.max[dim], BIN_COUNT);
+            uint8_t binIdx = bvh_util::getBinIndex(
+                c, centroidBox.min[dim], centroidBox.max[dim], BIN_COUNT);
             binIdx = std::min(binIdx, static_cast<uint8_t>(BIN_COUNT - 1));
 
             auto& bin = bins[binIdx];
@@ -229,7 +231,7 @@ BvhBuilder::buildNode(
         nodeBbox = merge(nodeBbox, bp.bbox);
     }
 
-    if (buildPrimitives.size() <= 2)
+    if (buildPrimitives.size() <= LEAF_THRESHOLD)
     {
         return createLeaf(buildPrimitives, nodeBbox, offset);
     }

@@ -82,11 +82,6 @@ public:
     bool intersectAny(const Ray& ray, float tFar) const;
 
 private:
-    uint32_t flatten(const BuildNode* node, uint32_t& offset);
-
-    std::optional<Intersection> traverse(const Ray& ray, float tFar, bool any) const;
-
-private:
     struct alignas(32) LinearNode
     {
 #ifdef USE_BVH_SIMD
@@ -122,6 +117,11 @@ private:
         }
     };
 
+    uint32_t flatten(const BuildNode* node, uint32_t& offset);
+
+    std::optional<Intersection> traverse(const Ray& ray, float tFar, bool any) const;
+
+private:
     std::vector<Primitive> mPrimitives;
     std::vector<Primitive> mOrderedPrimitives;
     std::array<LinearNode, MAX_NODES> mLinearNodes;
