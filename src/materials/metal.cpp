@@ -1,8 +1,8 @@
 #include "metal.h"
 
-#include "sampler.h"
-#include "shapes/shape.h"
-#include "utils/util.h"
+#include <sampler.h>
+#include <shapes/shape.h>
+#include <utils/util.h>
 
 #include <numbers>
 

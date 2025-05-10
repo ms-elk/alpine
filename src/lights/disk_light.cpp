@@ -1,7 +1,7 @@
 #include "disk_light.h"
 
-#include "shapes/shape.h"
-#include "utils/util.h"
+#include <shapes/shape.h>
+#include <utils/util.h>
 
 #include <numbers>
 

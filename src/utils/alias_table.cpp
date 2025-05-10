@@ -1,6 +1,6 @@
 #include "alias_table.h"
 
-#include "util.h"
+#include <utils/util.h>
 
 #include <numeric>
 

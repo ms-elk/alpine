@@ -1,11 +1,11 @@
 ﻿#include "mesh.h"
 
-#include "accelerators/accelerator.h"
-#include "materials/material.h"
+#include <accelerators/accelerator.h>
+#include <materials/material.h>
 
-#include "intersection.h"
-#include "ray.h"
-#include "texture.h"
+#include <intersection.h>
+#include <ray.h>
+#include <texture.h>
 
 #include <assert.h>
 

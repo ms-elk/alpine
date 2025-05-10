@@ -1,10 +1,10 @@
 ﻿#include "file_loader.h"
 
-#include "materials/matte.h"
-#include "materials/metal.h"
-#include "scenes/scene.h"
-#include "shapes/mesh.h"
-#include "texture.h"
+#include <materials/matte.h>
+#include <materials/metal.h>
+#include <scenes/scene.h>
+#include <shapes/mesh.h>
+#include <texture.h>
 
 #include <filesystem>
 

@@ -1,6 +1,6 @@
 #include "point_light.h"
 
-#include "utils/util.h"
+#include <utils/util.h>
 
 #include <numbers>
 

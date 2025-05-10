@@ -1,9 +1,9 @@
 ﻿#include "debug_scene.h"
 
-#include "materials/matte.h"
-#include "materials/metal.h"
-#include "shapes/mesh.h"
-#include "shapes/sphere.h"
+#include <materials/matte.h>
+#include <materials/metal.h>
+#include <shapes/mesh.h>
+#include <shapes/sphere.h>
 
 namespace alpine {
 std::shared_ptr<Mesh>

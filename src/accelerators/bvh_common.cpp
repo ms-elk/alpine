@@ -1,7 +1,7 @@
 #include "bvh_common.h"
 
-#include "utils/bvh_util.h"
-#include "intersection.h"
+#include <utils/bvh_util.h>
+#include <intersection.h>
 
 #include <array>
 #include <assert.h>

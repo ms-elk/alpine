@@ -1,6 +1,6 @@
 #pragma once
 
-#include "utils/bounding_box.h"
+#include <utils/bounding_box.h>
 
 #include <array>
 #include <memory>

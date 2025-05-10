@@ -1,8 +1,8 @@
 ﻿#include "sphere.h"
 
-#include "accelerators/accelerator.h"
-#include "intersection.h"
-#include "ray.h"
+#include <accelerators/accelerator.h>
+#include <intersection.h>
+#include <ray.h>
 
 namespace alpine {
 void

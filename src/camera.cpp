@@ -1,8 +1,8 @@
 ﻿#include "camera.h"
 
-#include "math/vector.h"
-#include "ray.h"
-#include "utils/util.h"
+#include <math/vector.h>
+#include <ray.h>
+#include <utils/util.h>
 
 #include <algorithm>
 #include <numbers>

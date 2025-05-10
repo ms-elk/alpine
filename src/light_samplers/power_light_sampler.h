@@ -1,7 +1,8 @@
 #pragma once
 
-#include "utils/alias_table.h"
 #include "light_sampler.h"
+
+#include <utils/alias_table.h>
 
 namespace alpine {
 class PowerLightSampler final : public LightSampler
