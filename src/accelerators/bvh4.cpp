@@ -220,6 +220,7 @@ Bvh4::Impl::flatten(const BuildNode* node, uint32_t& offset)
         };
 
         const auto setBbox = [&](uint32_t idx, const auto& bbox) {
+#ifdef USE_BVH_SIMD
             linearNode.bbox4.minX[idx] = bbox.min.x;
             linearNode.bbox4.minY[idx] = bbox.min.y;
             linearNode.bbox4.minZ[idx] = bbox.min.z;
@@ -227,6 +228,9 @@ Bvh4::Impl::flatten(const BuildNode* node, uint32_t& offset)
             linearNode.bbox4.maxX[idx] = bbox.max.x;
             linearNode.bbox4.maxY[idx] = bbox.max.y;
             linearNode.bbox4.maxZ[idx] = bbox.max.z;
+#else
+            linearNode.bbox[idx] = bbox;
+#endif
         };
 
         for (uint8_t i = 0; i < node->children.size(); ++i)
@@ -240,11 +244,7 @@ Bvh4::Impl::flatten(const BuildNode* node, uint32_t& offset)
             {
                 uint8_t idx = 2 * i;
                 flattenChild(idx, child.get());
-#ifdef USE_BVH_SIMD
                 setBbox(idx, child->bbox);
-#else
-                linearNode.bbox[idx] = child->bbox;
-#endif
             }
             else
             {
@@ -255,11 +255,7 @@ Bvh4::Impl::flatten(const BuildNode* node, uint32_t& offset)
 
                     uint8_t idx = 2 * i + j;
                     flattenChild(idx, grandchild.get());
-#ifdef USE_BVH_SIMD
                     setBbox(idx, grandchild->bbox);
-#else
-                    linearNode.bbox[idx] = grandchild->bbox;
-#endif
                 }
             }
         }
