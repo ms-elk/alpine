@@ -43,7 +43,7 @@ intersectBoundingBox(
 
 export void
 intersectBoundingBox4(
-    uniform bool intersects[4],
+    uniform bool intersects[CHILD_NODE_COUNT],
     const uniform float rayOrg[3],
     const uniform float rayDir[3],
     const uniform float invRayDir[3],

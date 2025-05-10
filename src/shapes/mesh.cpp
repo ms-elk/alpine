@@ -2,6 +2,8 @@
 
 #include "accelerators/accelerator.h"
 #include "materials/material.h"
+
+#include "intersection.h"
 #include "ray.h"
 #include "texture.h"
 

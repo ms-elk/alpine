@@ -1,8 +1,5 @@
 ﻿#include <alpine/alpine.h>
 
-#include "alpine_config.h"
-#include "camera.h"
-#include "image.h"
 #include "accelerators/accelerator.h"
 #include "accelerators/bvh.h"
 #include "accelerators/bvh4.h"
@@ -16,13 +13,18 @@
 #include "lights/point_light.h"
 #include "loaders/file_loader.h"
 #include "materials/material.h"
-#include "ray.h"
-#include "sampler.h"
 #include "scenes/debug_scene.h"
 #include "scenes/scene.h"
 #include "shapes/mesh.h"
 #include "shapes/sphere.h"
 #include "utils/util.h"
+
+#include "alpine_config.h"
+#include "camera.h"
+#include "image.h"
+#include "intersection.h"
+#include "ray.h"
+#include "sampler.h"
 
 #include <algorithm>
 #include <assert.h>
