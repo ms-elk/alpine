@@ -1,6 +1,7 @@
 ﻿#include "accelerators/embree.h"
 
 #include "alpine_config.h"
+#include "intersection.h"
 #include "ray.h"
 
 #include <assert.h>

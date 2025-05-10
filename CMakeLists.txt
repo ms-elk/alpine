@@ -33,6 +33,7 @@ set(SOURCES
   src/sampler.h
   src/image.cpp
   src/image.h
+  src/intersection.h
   src/ray.h
   src/texture.h
 )
@@ -42,6 +43,8 @@ set(ACCELERATORS
   src/accelerators/bvh.cpp
   src/accelerators/bvh.h
   src/accelerators/bvh4.h
+  src/accelerators/bvh_common.cpp
+  src/accelerators/bvh_common.h
   src/accelerators/embree.h
 )
 
