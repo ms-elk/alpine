@@ -1,7 +1,7 @@
 ﻿#pragma once
 
-#include "math/vector.h"
-#include "texture.h"
+#include <math/vector.h>
+#include <texture.h>
 
 #include <optional>
 

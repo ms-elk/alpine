@@ -1,7 +1,7 @@
 ﻿#pragma once
 
-#include "math/matrix.h"
-#include "math/vector.h"
+#include <math/matrix.h>
+#include <math/vector.h>
 
 #include <alpine/camera.h>
 

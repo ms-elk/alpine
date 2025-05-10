@@ -1,6 +1,6 @@
 #pragma once
 
-#include "math/vector.h"
+#include <math/vector.h>
 
 namespace alpine::bvh_util {
 inline uint8_t getBinIndex(float center, float min, float max, uint8_t binCount)

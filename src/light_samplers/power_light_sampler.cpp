@@ -1,6 +1,6 @@
 #include "power_light_sampler.h"
 
-#include "lights/light.h"
+#include <lights/light.h>
 
 namespace alpine {
 PowerLightSampler::PowerLightSampler(const std::vector<std::shared_ptr<Light>>& lights)

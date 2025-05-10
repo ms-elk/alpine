@@ -1,12 +1,12 @@
 #include "file_loader.h"
 
-#include "lights/point_light.h"
-#include "materials/matte.h"
-#include "materials/metal.h"
-#include "math/matrix.h"
-#include "scenes/scene.h"
-#include "shapes/mesh.h"
-#include "texture.h"
+#include <lights/point_light.h>
+#include <materials/matte.h>
+#include <materials/metal.h>
+#include <math/matrix.h>
+#include <scenes/scene.h>
+#include <shapes/mesh.h>
+#include <texture.h>
 
 #pragma warning(push)
 #pragma warning(disable:4018)

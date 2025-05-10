@@ -1,7 +1,7 @@
 #pragma once
 
-#include "math/vector.h"
-#include "utils/bounding_box.h"
+#include <math/vector.h>
+#include <utils/bounding_box.h>
 
 #include <alpine/light.h>
 
