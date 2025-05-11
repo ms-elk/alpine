@@ -13,6 +13,7 @@
 namespace alpine {
 static constexpr uint32_t MAX_PRIMITIVES = 4 * 1024 * 1024;
 static constexpr uint32_t MAX_NODES = 2 * MAX_PRIMITIVES;
+static constexpr uint8_t STACK_SIZE = 64;
 
 struct Intersection;
 

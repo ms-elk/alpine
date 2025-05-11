@@ -1,4 +1,5 @@
 static const uniform uint CHILD_NODE_COUNT = 4;
+static const uniform float CORRECTION = 1.0000004f; // 1.0f + 2.0f * gamma(3)
 
 struct BoundingBox4
 {
@@ -16,7 +17,6 @@ intersectBoundingBox(
     const uniform float rayDir[3],
     const uniform float invRayDir[3],
     uniform float tFar,
-    uniform float correction,
     float minX,
     float minY,
     float minZ,
@@ -36,7 +36,7 @@ intersectBoundingBox(
     float tMin = max(max(min(tx0, tx1), min(ty0, ty1)), min(tz0, tz1));
     float tMax = min(min(max(tx0, tx1), max(ty0, ty1)), max(tz0, tz1));
 
-    tMax *= correction;
+    tMax *= CORRECTION; // ensure conservative intersection
 
     return (tMin <= tMax) & (tMax > 0.0f) & (tMin < tFar);
 }
@@ -48,11 +48,12 @@ intersectBoundingBox4(
     const uniform float rayDir[3],
     const uniform float invRayDir[3],
     uniform float tFar,
-    uniform float correction,
     const uniform BoundingBox4& bbox4)
 {
     foreach(i = 0 ... CHILD_NODE_COUNT) {
-        intersects[i] = intersectBoundingBox(rayOrg, rayDir, invRayDir, tFar, correction,
-            bbox4.minX[i], bbox4.minY[i], bbox4.minZ[i], bbox4.maxX[i], bbox4.maxY[i], bbox4.maxZ[i]);
+        intersects[i] = intersectBoundingBox(
+            rayOrg, rayDir, invRayDir, tFar,
+            bbox4.minX[i], bbox4.minY[i], bbox4.minZ[i],
+            bbox4.maxX[i], bbox4.maxY[i], bbox4.maxZ[i]);
     }
 }
