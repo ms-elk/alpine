@@ -11,7 +11,6 @@
 
 namespace {
 static constexpr uint8_t CHILD_NODE_COUNT = 2;
-static constexpr uint8_t STACK_SIZE = 64;
 
 alpine::BvhStats gBvhStats;
 }

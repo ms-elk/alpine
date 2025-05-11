@@ -15,7 +15,6 @@
 
 namespace {
 static constexpr uint8_t CHILD_NODE_COUNT = 4;
-static constexpr uint8_t STACK_SIZE = 64;
 
 alpine::BvhStats gBvhStats;
 
@@ -324,9 +323,8 @@ Bvh4::Impl::traverse(const Ray& ray, float tFar, bool any) const
         {
             std::array<bool, CHILD_NODE_COUNT> intersects{};
 #ifdef USE_BVH_SIMD
-            static constexpr float correction = 1.0f + 2.0f * gamma(3); // ensure conservative intersection
             ispc::intersectBoundingBox4(intersects.data(),
-                &ray.org[0], &ray.dir[0], &invRayDir[0], tNear, correction, linearNode.bbox4);
+                &ray.org[0], &ray.dir[0], &invRayDir[0], tNear, linearNode.bbox4);
 #else
             for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
             {

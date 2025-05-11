@@ -9,7 +9,7 @@
 
 namespace {
 static constexpr uint8_t LEAF_THRESHOLD = 8;
-static constexpr uint8_t SPLITS_PER_DIM = 4;
+static constexpr uint8_t SPLITS_PER_DIM = 8;
 static constexpr uint8_t BIN_COUNT = SPLITS_PER_DIM + 1;
 static constexpr uint32_t MIN_PRIMITIVES_FOR_PARALLELIZATION = 1024;
 }
