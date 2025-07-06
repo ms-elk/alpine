@@ -23,12 +23,16 @@ public:
     Impl();
     ~Impl();
 
-    void appendMesh(
+    uint32_t appendMesh(
         const std::vector<float3>& vertices,
         const std::vector<uint3>& prims,
         const void* ptr);
 
     void appendSphere(const std::vector<float4>& vertices, const void* ptr);
+
+    void* getVertexBuffer(uint32_t shapeId);
+
+    void updateShape(uint32_t shapeId);
 
     void updateScene();
 
@@ -74,7 +78,7 @@ Embree::Impl::~Impl()
     }
 }
 
-void
+uint32_t
 Embree::Impl::appendMesh(
     const std::vector<float3>& vertices,
     const std::vector<uint3>& prims,
@@ -82,21 +86,22 @@ Embree::Impl::appendMesh(
 {
     assert(mDevice && mScene);
 
-    auto mesh = rtcNewGeometry(mDevice, RTC_GEOMETRY_TYPE_TRIANGLE);
+    auto geom = rtcNewGeometry(mDevice, RTC_GEOMETRY_TYPE_TRIANGLE);
 
-    float3* vertexBuffer = (float3*)rtcSetNewGeometryBuffer(
-        mesh, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(float3), vertices.size());
+    float3* vertexBuffer = static_cast<float3*>(rtcSetNewGeometryBuffer(
+        geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(float3), vertices.size()));
     memcpy(vertexBuffer, vertices.data(), sizeof(float3) * vertices.size());
 
-    unsigned int* indexBuffer = (unsigned int*)rtcSetNewGeometryBuffer(
-        mesh, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(uint3), prims.size());
+    unsigned int* indexBuffer = static_cast<unsigned int*>(rtcSetNewGeometryBuffer(
+        geom, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(uint3), prims.size()));
     memcpy(indexBuffer, prims.data(), sizeof(uint3) * prims.size());
 
-    rtcCommitGeometry(mesh);
-    rtcAttachGeometry(mScene, mesh);
-    rtcReleaseGeometry(mesh);
+    rtcCommitGeometry(geom);
+    uint32_t shapeId = rtcAttachGeometry(mScene, geom);
 
     mShapeTable.push_back(ptr);
+
+    return shapeId;
 }
 
 void
@@ -106,15 +111,31 @@ Embree::Impl::appendSphere(const std::vector<float4>& vertices, const void* ptr)
 
     auto sphere = rtcNewGeometry(mDevice, RTC_GEOMETRY_TYPE_SPHERE_POINT);
 
-    float4* vertexBuffer = (float4*)rtcSetNewGeometryBuffer(
-        sphere, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT4, sizeof(float4), vertices.size());
+    float4* vertexBuffer = static_cast<float4*>(rtcSetNewGeometryBuffer(
+        sphere, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT4, sizeof(float4), vertices.size()));
     memcpy(vertexBuffer, vertices.data(), sizeof(float4) * vertices.size());
 
     rtcCommitGeometry(sphere);
     rtcAttachGeometry(mScene, sphere);
-    rtcReleaseGeometry(sphere);
 
     mShapeTable.push_back(ptr);
+}
+
+void*
+Embree::Impl::getVertexBuffer(uint32_t shapeId)
+{
+    auto geom = rtcGetGeometry(mScene, shapeId);
+    void* vertexBuffer = rtcGetGeometryBufferData(geom, RTC_BUFFER_TYPE_VERTEX, 0);
+
+    return vertexBuffer;
+}
+
+void
+Embree::Impl::updateShape(uint32_t shapeId)
+{
+    auto geom = rtcGetGeometry(mScene, shapeId);
+    rtcUpdateGeometryBuffer(geom, RTC_BUFFER_TYPE_VERTEX, 0);
+    rtcCommitGeometry(geom);
 }
 
 void
@@ -184,19 +205,31 @@ Embree::Embree()
 
 Embree::~Embree() = default;
 
-void
+uint32_t
 Embree::appendMesh(
     const std::vector<float3>& vertices,
     const std::vector<uint3>& prims,
     const void* ptr)
 {
-    mPimpl->appendMesh(vertices, prims, ptr);
+    return mPimpl->appendMesh(vertices, prims, ptr);
 }
 
 void
 Embree::appendSphere(const std::vector<float4>& vertices, const void* ptr)
 {
     mPimpl->appendSphere(vertices, ptr);
+}
+
+void*
+Embree::getVertexBuffer(uint32_t shapeId)
+{
+    return mPimpl->getVertexBuffer(shapeId);
+}
+
+void
+Embree::updateShape(uint32_t shapeId)
+{
+    mPimpl->updateShape(shapeId);
 }
 
 void

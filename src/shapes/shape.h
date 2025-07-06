@@ -22,7 +22,9 @@ public:
     Shape() = default;
     virtual ~Shape() = default;
 
-    virtual void appendTo(Accelerator* accelerator) const = 0;
+    virtual void appendTo(Accelerator* accelerator) = 0;
+
+    virtual void update(Accelerator* accelerator, float weight) = 0;
 
     virtual IntersectionAttributes getIntersectionAttributes(
         const Intersection& isect) const = 0;

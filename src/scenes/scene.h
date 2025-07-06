@@ -6,13 +6,15 @@
 #include <vector>
 
 namespace alpine {
-class Shape;
+class Animation;
 class Light;
+class Shape;
 
 struct Scene
 {
     std::vector<std::shared_ptr<Shape>> shapes;
-    std::vector <std::shared_ptr<Light>> lights;
+    std::vector<std::shared_ptr<Light>> lights;
+    std::vector<std::shared_ptr<Animation>> animations;
 
     Scene()
     {

@@ -22,7 +22,7 @@ public:
     Impl();
     ~Impl();
 
-    void appendMesh(
+    uint32_t appendMesh(
         const std::vector<float3>& vertices,
         const std::vector<uint3>& prims,
         const void* ptr);
@@ -67,7 +67,7 @@ Bvh::Impl::~Impl()
     gBvhStats.show();
 }
 
-void
+uint32_t
 Bvh::Impl::appendMesh(
     const std::vector<float3>& vertices,
     const std::vector<uint3>& prims,
@@ -96,6 +96,8 @@ Bvh::Impl::appendMesh(
         assert(mPrimitives.size() < MAX_PRIMITIVES);
         mPrimitives.push_back(prim);
     }
+
+    return 0; // TODO
 }
 
 void
@@ -239,13 +241,13 @@ Bvh::Bvh()
 
 Bvh::~Bvh() = default;
 
-void
+uint32_t
 Bvh::appendMesh(
     const std::vector<float3>& vertices,
     const std::vector<uint3>& prims,
     const void* ptr)
 {
-    mPimpl->appendMesh(vertices, prims, ptr);
+    return mPimpl->appendMesh(vertices, prims, ptr);
 }
 
 void

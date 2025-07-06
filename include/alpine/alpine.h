@@ -41,6 +41,8 @@ void setBackgroundColor(float r, float g, float b);
 
 api::Camera* getCamera();
 
+void updateAnimation(float time);
+
 // Render
 void resetAccumulation();
 void render(uint32_t spp);

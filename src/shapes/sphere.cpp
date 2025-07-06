@@ -6,9 +6,15 @@
 
 namespace alpine {
 void
-Sphere::appendTo(Accelerator* accelerator) const
+Sphere::appendTo(Accelerator* accelerator)
 {
     accelerator->appendSphere(mData->vertices, this);
+}
+
+void
+Sphere::update(Accelerator* accelerator, float weight)
+{
+    printf("ERROR: Sphere update has not been implemented yet.");
 }
 
 IntersectionAttributes

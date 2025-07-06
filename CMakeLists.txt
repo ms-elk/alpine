@@ -27,6 +27,8 @@ endif()
 set(SOURCES
   src/alpine.cpp
   src/alpine_config.h
+  src/animation.cpp
+  src/animation.h
   src/camera.cpp
   src/camera.h
   src/sampler.cpp

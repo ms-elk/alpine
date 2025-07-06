@@ -14,13 +14,17 @@ public:
     Embree();
     ~Embree() override;
 
-    void appendMesh(
+    uint32_t appendMesh(
         const std::vector<float3>& vertices,
         const std::vector<uint3>& prims,
         const void* ptr) override;
 
     void appendSphere(
         const std::vector<float4>& vertices, const void* ptr) override;
+
+    void* getVertexBuffer(uint32_t shapeId) override;
+
+    void updateShape(uint32_t shapeId) override;
 
     void updateScene() override;
 
