@@ -6,6 +6,7 @@
 #include <math/matrix.h>
 #include <scenes/scene.h>
 #include <shapes/mesh.h>
+#include <animation.h>
 #include <texture.h>
 
 #pragma warning(push)
@@ -33,22 +34,41 @@ private:
     std::shared_ptr<Mesh> createMesh(const float4x4& matrix, uint32_t meshIdx) const;
 
     template <typename T>
-    std::size_t appendVertexBuffer(
-        std::vector<T>& dst, const std::string& name, const tinygltf::Primitive& srcPrim) const;
+    void appendVertexBuffer(
+        std::vector<T>& dst,
+        const std::string& name,
+        const std::map<std::string, int32_t>& srcMap) const;
 
-    std::size_t appendTangentBuffer(
+    template <typename T>
+    void appendTargetVertexBuffer(
+        std::vector<T>& dst,
+        const std::vector<float3>& vertices,
+        const std::map<std::string, int32_t>& targetMap) const;
+
+    void appendTangentBuffer(
         std::vector<float3>& tangents,
         std::vector<float3>& bitangents,
-        const std::vector<float3>& normals,
-        const tinygltf::Primitive& srcPrim) const;
+        const std::vector<float4>& tangents4,
+        const std::vector<float3>& normals) const;
 
-    std::size_t appendIndexBuffer(std::vector<uint3>& dst, const tinygltf::Primitive& srcPrim) const;
+    std::size_t appendIndexBuffer(
+        std::vector<uint3>& dst, const tinygltf::Primitive& srcPrim) const;
 
     std::shared_ptr<Material> createMaterial(uint32_t matIdx) const;
 
     std::shared_ptr<Texture4f> createTexture(uint32_t texIdx, bool isSigned) const;
 
     std::shared_ptr<Light> createLight(const float4x4& matrix, uint32_t lightIdx) const;
+
+    std::shared_ptr<Animation> createAnimation(uint32_t animIdx) const;
+
+    template <typename T>
+    inline const T* getBufferValues(const auto& acc) const
+    {
+        const auto& bufView = mSrcModel.bufferViews[acc.bufferView];
+        const auto& buf = mSrcModel.buffers[bufView.buffer];
+        return reinterpret_cast<const T*>(&buf.data[bufView.byteOffset + acc.byteOffset]);
+    }
 
 private:
     Scene* mScene = nullptr;
@@ -88,12 +108,19 @@ GltfLoader::load(std::string_view filename)
         mMaterials.push_back(createMaterial(matIdx));
     }
 
+    mScene->shapes.resize(mSrcModel.meshes.size());
     for (const auto& srcScene : mSrcModel.scenes)
     {
         for (uint32_t nodeIdx : srcScene.nodes)
         {
             traverse(float4x4(), nodeIdx);
         }
+    }
+
+    mScene->animations.reserve(mSrcModel.animations.size());
+    for (uint32_t animIdx = 0; animIdx < mSrcModel.animations.size(); ++animIdx)
+    {
+        mScene->animations.push_back(createAnimation(animIdx));
     }
 
     return true;
@@ -168,7 +195,7 @@ GltfLoader::traverse(const float4x4& parent, uint32_t nodeIdx)
 
     if (srcNode.mesh >= 0)
     {
-        mScene->shapes.push_back(createMesh(matrix, srcNode.mesh));
+        mScene->shapes[srcNode.mesh] = createMesh(matrix, srcNode.mesh);
     }
 
     if (srcNode.light >= 0)
@@ -193,12 +220,49 @@ GltfLoader::createMesh(const float4x4& matrix, uint32_t meshIdx) const
         assert(srcPrim.mode == TINYGLTF_MODE_TRIANGLES);
         assert(srcPrim.material >= 0);
 
-        appendVertexBuffer(meshData.vertices, "POSITION", srcPrim);
-        appendVertexBuffer(meshData.normals, "NORMAL", srcPrim);
-        appendVertexBuffer(meshData.uvs, "TEXCOORD_0", srcPrim);
+        appendVertexBuffer(meshData.vertices, "POSITION", srcPrim.attributes);
+        appendVertexBuffer(meshData.normals, "NORMAL", srcPrim.attributes);
+        appendVertexBuffer(meshData.uvs, "TEXCOORD_0", srcPrim.attributes);
 
-        appendTangentBuffer(
-            meshData.tangents, meshData.bitangents, meshData.normals, srcPrim);
+        std::vector<float4> tangents4;
+        appendVertexBuffer(tangents4, "TANGENT", srcPrim.attributes);
+        appendTangentBuffer(meshData.tangents, meshData.bitangents, tangents4, meshData.normals);
+
+        // create targets
+        if (!srcPrim.targets.empty())
+        {
+            if (meshData.targets.empty())
+            {
+                meshData.targets.resize(srcPrim.targets.size());
+            }
+            assert(meshData.targets.size() == srcPrim.targets.size());
+
+            for (uint32_t i = 0; i < meshData.targets.size(); ++i)
+            {
+                auto& dstTarget = meshData.targets[i];
+                const auto& srcTarget = srcPrim.targets[i];
+
+                appendTargetVertexBuffer(dstTarget.vertices, meshData.vertices, srcTarget);
+
+                appendVertexBuffer(dstTarget.normals, "NORMAL", srcTarget);
+                for (uint32_t j = 0; j < dstTarget.normals.size(); ++j)
+                {
+                    dstTarget.normals[j] = normalize(dstTarget.normals[j] + meshData.normals[j]);
+                }
+
+                std::vector<float4> targetTangents4(tangents4.size());
+                appendVertexBuffer(dstTarget.tangents, "TANGENT", srcTarget);
+                for (uint32_t j = 0; j < dstTarget.tangents.size(); ++j)
+                {
+                    float3 tan = normalize(tangents4[j].xyz() + dstTarget.tangents[j]);
+                    targetTangents4[j] = Vector4(tan, tangents4[j].w);
+                }
+
+                dstTarget.tangents.clear();
+                appendTangentBuffer(
+                    dstTarget.tangents, dstTarget.bitangents, targetTangents4, dstTarget.normals);
+            }
+        }
 
         std::size_t primCount = appendIndexBuffer(meshData.prims, srcPrim);
         for (uint32_t i = 0; i < primCount; ++i)
@@ -209,6 +273,7 @@ GltfLoader::createMesh(const float4x4& matrix, uint32_t meshIdx) const
 
     // transform
     // TODO: fix matrix for normals
+    // TODO: support targets
     assert(meshData.vertices.size() == meshData.normals.size());
     for (uint32_t i = 0; i < meshData.vertices.size(); ++i)
     {
@@ -233,68 +298,110 @@ GltfLoader::createMesh(const float4x4& matrix, uint32_t meshIdx) const
 }
 
 template <typename T>
-std::size_t
+void
 GltfLoader::appendVertexBuffer(
-    std::vector<T>& dst, const std::string& name, const tinygltf::Primitive& srcPrim) const
+    std::vector<T>& dst,
+    const std::string& name,
+    const std::map<std::string, int32_t>& srcMap) const
 {
-    const auto itr = srcPrim.attributes.find(name);
-    if (itr == srcPrim.attributes.end())
+    const auto itr = srcMap.find(name);
+    if (itr == srcMap.end())
     {
-        return 0;
+        return;
     }
 
-    const auto& acc = mSrcModel.accessors[itr->second];
-    const auto& bufView = mSrcModel.bufferViews[acc.bufferView];
-    const auto& buf = mSrcModel.buffers[bufView.buffer];
-    const auto* values = reinterpret_cast<const T*>(&buf.data[bufView.byteOffset + acc.byteOffset]);
+    const auto& acc = mSrcModel.accessors[itr->second];;
+    const auto* values = getBufferValues<T>(acc);
 
     assert(acc.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
 
-    for (uint32_t i = 0; i < acc.count; ++i)
-    {
-        dst.emplace_back(values[i]);
-    }
-
-    return acc.count;
+    std::copy(values, values + acc.count, std::back_inserter(dst));
 }
 
-std::size_t
+template <typename T>
+void
+GltfLoader::appendTargetVertexBuffer(
+    std::vector<T>& dst,
+    const std::vector<float3>& vertices,
+    const std::map<std::string, int32_t>& targetMap) const
+{
+    const auto itr = targetMap.find("POSITION");
+    if (itr == targetMap.end())
+    {
+        return;
+    }
+ 
+    const auto& sparse = mSrcModel.accessors[itr->second].sparse;
+    if (!sparse.isSparse)
+    {
+        appendVertexBuffer(dst, "POSITION", targetMap);
+        for (uint32_t i = 0; i < dst.size(); ++i)
+        {
+            dst[i] += vertices[i];
+        }
+    }
+    else
+    {
+        dst = vertices;
+
+        const auto append = [&dst, count = sparse.count](const auto& deltas, const auto& indices) {
+            for (int32_t i = 0; i < count; ++i)
+            {
+                auto index = indices[i];
+                dst[index] += deltas[i];
+            }
+            };
+
+        const auto* deltas = getBufferValues<T>(sparse.values);
+
+        if (sparse.indices.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
+        {
+            const auto* indices = getBufferValues<uint32_t>(sparse.indices);
+            append(deltas, indices);
+        }
+        else if (sparse.indices.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
+        {
+            const auto* indices = getBufferValues<uint16_t>(sparse.indices);
+            append(deltas, indices);
+        }
+        else
+        {
+            assert(false);
+        }
+    }
+}
+
+void
 GltfLoader::appendTangentBuffer(
     std::vector<float3>& tangents,
     std::vector<float3>& bitangents,
-    const std::vector<float3>& normals,
-    const tinygltf::Primitive& srcPrim) const
+    const std::vector<float4>& tangents4,
+    const std::vector<float3>& normals) const
 {
-    const auto itr = srcPrim.attributes.find("TANGENT");
-    if (itr == srcPrim.attributes.end())
+    if (tangents4.empty())
     {
-        return 0;
+        return;
     }
 
-    assert(!normals.empty());
+    assert(tangents4.size() == normals.size());
 
-    const auto& acc = mSrcModel.accessors[itr->second];
-    const auto& bufView = mSrcModel.bufferViews[acc.bufferView];
-    const auto& buf = mSrcModel.buffers[bufView.buffer];
-    const auto* values = reinterpret_cast<const float4*>(&buf.data[bufView.byteOffset + acc.byteOffset]);
-
-    for (uint32_t i = 0; i < acc.count; ++i)
+    for (uint32_t i = 0; i < tangents4.size(); ++i)
     {
+        const float4& tangent4 = tangents4[i];
         const float3& normal = normals[i];
-        float4 tangent = values[i];
-        float3 bitangent = cross(normal, tangent.xyz()) * tangent.w;
 
-        tangents.push_back(tangent.xyz());
+        float3 bitangent = cross(normal, tangent4.xyz()) * tangent4.w;
+        bitangent = normalize(bitangent);
+
+        tangents.push_back(tangent4.xyz());
         bitangents.push_back(bitangent);
     }
-
-    return acc.count;
 }
 
 std::size_t
 GltfLoader::appendIndexBuffer(std::vector<uint3>& dst, const tinygltf::Primitive& srcPrim) const
 {
-    const auto append = [&](const auto& values, std::size_t primCount) {
+    const auto append = [&dst](const auto& values, std::size_t primCount) {
         for (uint32_t i = 0; i < primCount; ++i)
         {
             const auto* v = &values[3 * i];
@@ -303,23 +410,21 @@ GltfLoader::appendIndexBuffer(std::vector<uint3>& dst, const tinygltf::Primitive
     };
 
     const auto& acc = mSrcModel.accessors[srcPrim.indices];
-    const auto& bufView = mSrcModel.bufferViews[acc.bufferView];
-    const auto& buf = mSrcModel.buffers[bufView.buffer];
-
     std::size_t primCount = acc.count / 3;
 
     if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
     {
-        const auto* values =
-            reinterpret_cast<const uint32_t*>(&buf.data[bufView.byteOffset + acc.byteOffset]);
+        const auto* values = getBufferValues<uint32_t>(acc);
+        append(values, primCount);
+    }
+    else if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
+    {
+        const auto* values = getBufferValues<uint16_t>(acc);
         append(values, primCount);
     }
     else
     {
-        assert(acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT);
-        const auto* values =
-            reinterpret_cast<const uint16_t*>(&buf.data[bufView.byteOffset + acc.byteOffset]);
-        append(values, primCount);
+        assert(false);
     }
 
     return primCount;
@@ -407,6 +512,63 @@ GltfLoader::createLight(const float4x4& matrix, uint32_t lightIdx) const
     float3 position = mul(matrix, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz();
 
     return std::make_shared<PointLight>(intensity, position);
+}
+
+std::shared_ptr<Animation>
+GltfLoader::createAnimation(uint32_t animIdx) const
+{
+    const auto& srcAnim = mSrcModel.animations[animIdx];
+    std::vector<Animation::Channel> channels(srcAnim.channels.size());
+
+    for (uint32_t channelIdx = 0; channelIdx < channels.size(); ++channelIdx)
+    {
+        auto& channel = channels[channelIdx];
+        const auto& srcChannel = srcAnim.channels[channelIdx];
+
+        // TODO: support the animations other than "weights" as well
+        if (srcChannel.target_path != "weights")
+        {
+            continue;
+        }
+
+        const auto& srcNode = mSrcModel.nodes[srcChannel.target_node];
+        if (srcNode.mesh < 0)
+        {
+            continue;
+        }
+
+        channel.shape = mScene->shapes[srcNode.mesh];
+
+        const auto& sampler = srcAnim.samplers[srcChannel.sampler];
+
+        // TODO: support the interpolation types other than "LINEAR" as well
+        if (sampler.interpolation != "LINEAR")
+        {
+            continue;
+        }
+
+        const auto& inAcc = mSrcModel.accessors[sampler.input];
+        const auto& outAcc = mSrcModel.accessors[sampler.output];
+
+        const float* times = getBufferValues<float>(inAcc);
+        const float* weights = getBufferValues<float>(outAcc);
+
+        channel.morphKeyframes.resize(inAcc.count);
+        uint32_t morphCount = outAcc.count / inAcc.count;
+
+        for (uint32_t frameIdx = 0; frameIdx < channel.morphKeyframes.size(); ++frameIdx)
+        {
+            auto& morph = channel.morphKeyframes[frameIdx];
+
+            morph.time = times[frameIdx];
+
+            const auto begin = weights + frameIdx * morphCount;
+            const auto end = weights + (frameIdx + 1) * morphCount;
+            std::copy(begin, end, std::back_inserter(morph.weights));
+        }
+    }
+
+    return std::make_shared<Animation>(std::move(channels));
 }
 }
 

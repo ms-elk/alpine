@@ -67,7 +67,7 @@ public:
     Impl();
     ~Impl();
 
-    void appendMesh(
+    uint32_t appendMesh(
         const std::vector<float3>& vertices,
         const std::vector<uint3>& prims,
         const void* ptr);
@@ -89,7 +89,7 @@ private:
         BoundingBox bbox[4];
 #endif
 
-        static constexpr uint32_t invalid_offset = std::numeric_limits<uint32_t>::max();
+        static constexpr uint32_t INVALID_OFFSET = std::numeric_limits<uint32_t>::max();
         std::array<uint32_t, CHILD_NODE_COUNT - 1> offset;
 
         uint16_t primitiveCount = 0;
@@ -99,7 +99,7 @@ private:
 
         LinearNode()
         {
-            std::fill(offset.begin(), offset.end(), invalid_offset);
+            std::fill(offset.begin(), offset.end(), INVALID_OFFSET);
 
 #ifdef USE_BVH_SIMD
             for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
@@ -137,7 +137,7 @@ Bvh4::Impl::~Impl()
     gBvhStats.show();
 }
 
-void
+uint32_t
 Bvh4::Impl::appendMesh(
     const std::vector<float3>& vertices,
     const std::vector<uint3>& prims,
@@ -166,6 +166,8 @@ Bvh4::Impl::appendMesh(
         assert(mPrimitives.size() < MAX_PRIMITIVES);
         mPrimitives.push_back(prim);
     }
+
+    return 0; // TODO
 }
 
 void
@@ -347,7 +349,7 @@ Bvh4::Impl::traverse(const Ray& ray, float tFar, bool any) const
                 else
                 {
                     uint32_t offset = linearNode.offset[idx - 1];
-                    if (offset != LinearNode::invalid_offset)
+                    if (offset != LinearNode::INVALID_OFFSET)
                     {
                         stack[stackIdx++] = offset;
                     }
@@ -386,13 +388,13 @@ Bvh4::Bvh4()
 
 Bvh4::~Bvh4() = default;
 
-void
+uint32_t
 Bvh4::appendMesh(
     const std::vector<float3>& vertices,
     const std::vector<uint3>& prims,
     const void* ptr)
 {
-    mPimpl->appendMesh(vertices, prims, ptr);
+    return mPimpl->appendMesh(vertices, prims, ptr);
 }
 
 void

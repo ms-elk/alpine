@@ -22,7 +22,9 @@ public:
     Sphere(const std::shared_ptr<Data>& data)
         : mData(data) {}
 
-    void appendTo(Accelerator* accelerator) const override;
+    void appendTo(Accelerator* accelerator) override;
+
+    void update(Accelerator* accelerator, float weight) override;
 
     IntersectionAttributes getIntersectionAttributes(
         const Intersection& isect) const override;

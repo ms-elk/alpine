@@ -20,6 +20,7 @@
 #include <utils/util.h>
 
 #include <alpine_config.h>
+#include <animation.h>
 #include <camera.h>
 #include <image.h>
 #include <intersection.h>
@@ -61,6 +62,8 @@ public:
         float power, const float color[3], const float position[3], float radius);
 
     void buildLightSampler(LightSamplerType lightSamplerType);
+
+    void updateAnimation(float time);
 
     void resetAccumulation();
 
@@ -199,6 +202,16 @@ Alpine::buildLightSampler(LightSamplerType lightSamplerType)
         mLightSampler = std::make_unique<UniformLightSampler>(mScene.lights);
         break;
     }
+}
+
+void
+Alpine::updateAnimation(float time)
+{
+    for (auto& animation : mScene.animations)
+    {
+        animation->update(mAccelerator.get(), time);
+    }
+    mAccelerator->updateScene();
 }
 
 void
@@ -482,6 +495,13 @@ getCamera()
 {
     assert(gAlpine);
     return gAlpine->getCamera();
+}
+
+void
+updateAnimation(float time)
+{
+    assert(gAlpine);
+    gAlpine->updateAnimation(time);
 }
 
 void
