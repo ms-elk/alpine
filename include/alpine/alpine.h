@@ -41,7 +41,9 @@ void setBackgroundColor(float r, float g, float b);
 
 api::Camera* getCamera();
 
-void updateAnimation(float time);
+void updateScene(float time);
+
+bool isDynamicScene();
 
 // Render
 void resetAccumulation();

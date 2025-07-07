@@ -10,6 +10,8 @@ static constexpr uint32_t HEIGHT = 512;
 static constexpr float PAN_SPEED = 0.01f;
 static constexpr float ZOOM_SPEED = 0.5f;
 
+static constexpr float DELTA_TIME = 1.0f / 60.0f;
+
 enum class MouseAction
 {
     Released,
@@ -19,6 +21,8 @@ enum class MouseAction
 float gMousePos[2] = { 0.0f };
 
 alpine::api::Camera* gCamera = nullptr;
+
+float gTime = 0.0f;
 
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 {
@@ -75,6 +79,24 @@ void scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
     float zoom = -static_cast<float>(yoffset) * ZOOM_SPEED;
     gCamera->zoom(zoom);
     alpine::resetAccumulation();
+}
+
+void updateScene(GLFWwindow* window)
+{
+    if (!alpine::isDynamicScene())
+    {
+        return;
+    }
+
+    bool isRightPressed = glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS;
+    bool isLeftPressed = glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS;
+
+    if (isRightPressed || isLeftPressed)
+    {
+        gTime = isRightPressed ? gTime + DELTA_TIME : std::max(gTime - DELTA_TIME, 0.0f);
+        alpine::updateScene(gTime);
+        alpine::resetAccumulation();
+    }
 }
 
 int main(int argc, char* argv[])
@@ -137,6 +159,8 @@ int main(int argc, char* argv[])
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
+
+        updateScene(window);
 
         alpine::render(1);
         alpine::resolve(false);
