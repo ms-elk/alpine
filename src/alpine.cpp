@@ -51,6 +51,8 @@ public:
 
     inline const void* getFrameBuffer() const { return mFrameBuffer.data(); }
 
+    inline bool isDynamicScene() const{ return !mScene.animations.empty(); }
+
     bool load(std::string_view filename, FileType fileType);
 
     void buildAccelerator();
@@ -63,7 +65,7 @@ public:
 
     void buildLightSampler(LightSamplerType lightSamplerType);
 
-    void updateAnimation(float time);
+    void updateScene(float time);
 
     void resetAccumulation();
 
@@ -205,12 +207,13 @@ Alpine::buildLightSampler(LightSamplerType lightSamplerType)
 }
 
 void
-Alpine::updateAnimation(float time)
+Alpine::updateScene(float time)
 {
     for (auto& animation : mScene.animations)
     {
         animation->update(mAccelerator.get(), time);
     }
+
     mAccelerator->updateScene();
 }
 
@@ -498,10 +501,17 @@ getCamera()
 }
 
 void
-updateAnimation(float time)
+updateScene(float time)
 {
     assert(gAlpine);
-    gAlpine->updateAnimation(time);
+    gAlpine->updateScene(time);
+}
+
+bool
+isDynamicScene()
+{
+    assert(gAlpine);
+    return gAlpine->isDynamicScene();
 }
 
 void
