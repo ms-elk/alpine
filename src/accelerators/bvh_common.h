@@ -56,9 +56,15 @@ private:
     uint32_t mTriCounter = 0;
 };
 
+struct Shape
+{
+    std::vector<float3> vertices;
+    std::vector<uint3> prims;
+    uint32_t primOffset;
+};
+
 struct Primitive
 {
-    BoundingBox bbox;
     const void* ptr = nullptr;
     uint32_t primId = std::numeric_limits<uint32_t>::max();
 
@@ -67,7 +73,11 @@ struct Primitive
     float3 edges[2];
     float3 ng;
 
+    BoundingBox bbox;
+
     std::optional<Intersection> intersect(const Ray& ray) const;
+
+    void updateVertices(const Shape& shape);
 };
 
 struct BuildNode

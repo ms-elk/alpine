@@ -4,6 +4,7 @@
 
 #include <ispc/bounding_box.h>
 #include <utils/bounding_box.h>
+#include <alpine_config.h>
 #include <intersection.h>
 #include <ray.h>
 
@@ -74,6 +75,10 @@ public:
 
     void appendSphere(const std::vector<float4>& vertices, const void* ptr);
 
+    inline void* getVertexBuffer(uint32_t shapeId) { return mShapes[shapeId].vertices.data(); }
+
+    void updateShape(uint32_t shapeId);
+
     void updateScene();
 
     std::optional<Intersection> intersect(const Ray& ray) const;
@@ -97,9 +102,14 @@ private:
 
         bool isLeaf() const { return primitiveCount > 0; }
 
-        LinearNode()
+        void clearOffset()
         {
             std::fill(offset.begin(), offset.end(), INVALID_OFFSET);
+        }
+
+        LinearNode()
+        {
+            clearOffset();
 
 #ifdef USE_BVH_SIMD
             for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
@@ -121,14 +131,16 @@ private:
     std::optional<Intersection> traverse(const Ray& ray, float tFar, bool any) const;
 
 private:
+    std::vector<Shape> mShapes;
     std::vector<Primitive> mPrimitives;
     std::vector<Primitive> mOrderedPrimitives;
     std::array<LinearNode, MAX_NODES> mLinearNodes;
-    uint32_t mNodeCounts = 0;
+    uint32_t mNodeCount = 0;
 };
 
 Bvh4::Impl::Impl()
 {
+    mShapes.reserve(MAX_SHAPES);
     mPrimitives.reserve(MAX_PRIMITIVES);
 }
 
@@ -143,37 +155,41 @@ Bvh4::Impl::appendMesh(
     const std::vector<uint3>& prims,
     const void* ptr)
 {
+    assert(mShapes.size() < MAX_SHAPES);
+    uint32_t shapeId = mShapes.size();
+    mShapes.emplace_back(vertices, prims, static_cast<uint32_t>(mPrimitives.size()));
+    const auto& shape = mShapes.back();
+
     for (uint32_t primId = 0; primId < prims.size(); ++primId)
     {
         Primitive prim;
         prim.ptr = ptr;
         prim.primId = primId;
-
-        uint32_t idx0 = prims[primId][0];
-        uint32_t idx1 = prims[primId][1];
-        uint32_t idx2 = prims[primId][2];
-        prim.vertex = vertices[idx0];
-        prim.edges[0] = vertices[idx1] - vertices[idx0];
-        prim.edges[1] = vertices[idx2] - vertices[idx0];
-        prim.ng = normalize(cross(prim.edges[0], prim.edges[1]));
-
-        for (uint8_t i = 0; i < 3; ++i)
-        {
-            uint32_t idx = prims[primId][i];
-            prim.bbox = merge(prim.bbox, vertices[idx]);
-        }
+        prim.updateVertices(shape);
 
         assert(mPrimitives.size() < MAX_PRIMITIVES);
         mPrimitives.push_back(prim);
     }
 
-    return 0; // TODO
+    return shapeId;
 }
 
 void
 Bvh4::Impl::appendSphere(const std::vector<float4>& vertices, const void* ptr)
 {
     printf("ERROR: Sphere intersection has not been implemented yet.");
+}
+
+void
+Bvh4::Impl::updateShape(uint32_t shapeId)
+{
+    const auto& shape = mShapes[shapeId];
+
+    for (uint32_t primId = 0; primId < shape.prims.size(); ++primId)
+    {
+        auto& prim = mPrimitives[primId + shape.primOffset];
+        prim.updateVertices(shape);
+    }
 }
 
 void
@@ -187,10 +203,10 @@ Bvh4::Impl::updateScene()
     auto bvh = buildBvh(mPrimitives);
     mOrderedPrimitives = std::move(bvh.orderedPrimitives);
 
-    mNodeCounts = 0;
-    flatten(bvh.root.get(), mNodeCounts);
+    mNodeCount = 0;
+    flatten(bvh.root.get(), mNodeCount);
 
-    gBvhStats.countNodes(mNodeCounts);
+    gBvhStats.countNodes(mNodeCount);
 }
 
 uint32_t
@@ -209,7 +225,9 @@ Bvh4::Impl::flatten(const BuildNode* node, uint32_t& offset)
     }
     else
     {
+        linearNode.clearOffset();
         linearNode.dim[0] = node->dim;
+        linearNode.primitiveCount = 0;
 
         const auto flattenChild = [&](uint32_t idx, const auto* child) {
             uint32_t childOffset = flatten(child, offset);
@@ -295,7 +313,7 @@ Bvh4::Impl::traverse(const Ray& ray, float tFar, bool any) const
     {
         counter.incrementNode();
 
-        assert(currentIdx < mNodeCounts);
+        assert(currentIdx < mNodeCount);
         const auto& linearNode = mLinearNodes[currentIdx];
         if (linearNode.isLeaf())
         {
@@ -401,6 +419,18 @@ void
 Bvh4::appendSphere(const std::vector<float4>& vertices, const void* ptr)
 {
     mPimpl->appendSphere(vertices, ptr);
+}
+
+void*
+Bvh4::getVertexBuffer(uint32_t shapeId)
+{
+    return mPimpl->getVertexBuffer(shapeId);
+}
+
+void
+Bvh4::updateShape(uint32_t shapeId)
+{
+    mPimpl->updateShape(shapeId);
 }
 
 void

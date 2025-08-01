@@ -21,9 +21,9 @@ public:
     void appendSphere(
         const std::vector<float4>& vertices, const void* ptr) override;
 
-    void* getVertexBuffer(uint32_t shapeId) override { return nullptr; }
+    void* getVertexBuffer(uint32_t shapeId) override;
 
-    void updateShape(uint32_t shapeId) override {}
+    void updateShape(uint32_t shapeId) override;
 
     void updateScene() override;
 
