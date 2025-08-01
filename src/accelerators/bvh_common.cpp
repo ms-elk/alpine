@@ -92,6 +92,28 @@ Primitive::intersect(const Ray& ray) const
     return isect;
 }
 
+void
+Primitive::updateVertices(const Shape& shape)
+{
+    assert(primId != std::numeric_limits<uint32_t>::max());
+
+    uint32_t idx0 = shape.prims[primId][0];
+    uint32_t idx1 = shape.prims[primId][1];
+    uint32_t idx2 = shape.prims[primId][2];
+
+    vertex = shape.vertices[idx0];
+    edges[0] = shape.vertices[idx1] - shape.vertices[idx0];
+    edges[1] = shape.vertices[idx2] - shape.vertices[idx0];
+    ng = normalize(cross(edges[0], edges[1]));
+
+    bbox = BoundingBox();
+    for (uint8_t i = 0; i < 3; ++i)
+    {
+        uint32_t idx = shape.prims[primId][i];
+        bbox = merge(bbox, shape.vertices[idx]);
+    }
+}
+
 namespace {
 struct BuildPrimitive
 {
