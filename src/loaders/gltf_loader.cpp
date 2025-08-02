@@ -34,7 +34,7 @@ private:
     std::shared_ptr<Mesh> createMesh(const float4x4& matrix, uint32_t meshIdx) const;
 
     template <typename T>
-    void appendVertexBuffer(
+    std::size_t appendVertexBuffer(
         std::vector<T>& dst,
         const std::string& name,
         const std::map<std::string, int32_t>& srcMap) const;
@@ -52,7 +52,9 @@ private:
         const std::vector<float3>& normals) const;
 
     std::size_t appendIndexBuffer(
-        std::vector<uint3>& dst, const tinygltf::Primitive& srcPrim) const;
+        std::vector<uint3>& dst,
+        const tinygltf::Primitive& srcPrim,
+        std::size_t indexOffset) const;
 
     std::shared_ptr<Material> createMaterial(uint32_t matIdx) const;
 
@@ -214,13 +216,22 @@ GltfLoader::createMesh(const float4x4& matrix, uint32_t meshIdx) const
 {
     Mesh::Data meshData;
     const auto& srcMesh = mSrcModel.meshes[meshIdx];
+    std::size_t indexOffset = 0;
 
     for (const auto& srcPrim : srcMesh.primitives)
     {
         assert(srcPrim.mode == TINYGLTF_MODE_TRIANGLES);
         assert(srcPrim.material >= 0);
 
-        appendVertexBuffer(meshData.vertices, "POSITION", srcPrim.attributes);
+        auto primCount = appendIndexBuffer(meshData.prims, srcPrim, indexOffset);
+        for (uint32_t i = 0; i < primCount; ++i)
+        {
+            meshData.materials.push_back(mMaterials[srcPrim.material]);
+        }
+
+        auto vertexCount = appendVertexBuffer(meshData.vertices, "POSITION", srcPrim.attributes);
+        indexOffset += vertexCount;
+
         appendVertexBuffer(meshData.normals, "NORMAL", srcPrim.attributes);
         appendVertexBuffer(meshData.uvs, "TEXCOORD_0", srcPrim.attributes);
 
@@ -263,12 +274,6 @@ GltfLoader::createMesh(const float4x4& matrix, uint32_t meshIdx) const
                     dstTarget.tangents, dstTarget.bitangents, targetTangents4, dstTarget.normals);
             }
         }
-
-        std::size_t primCount = appendIndexBuffer(meshData.prims, srcPrim);
-        for (uint32_t i = 0; i < primCount; ++i)
-        {
-            meshData.materials.push_back(mMaterials[srcPrim.material]);
-        }
     }
 
     // transform
@@ -298,7 +303,7 @@ GltfLoader::createMesh(const float4x4& matrix, uint32_t meshIdx) const
 }
 
 template <typename T>
-void
+std::size_t
 GltfLoader::appendVertexBuffer(
     std::vector<T>& dst,
     const std::string& name,
@@ -307,15 +312,17 @@ GltfLoader::appendVertexBuffer(
     const auto itr = srcMap.find(name);
     if (itr == srcMap.end())
     {
-        return;
+        return 0;
     }
 
-    const auto& acc = mSrcModel.accessors[itr->second];;
+    const auto& acc = mSrcModel.accessors[itr->second];
     const auto* values = getBufferValues<T>(acc);
 
     assert(acc.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
 
     std::copy(values, values + acc.count, std::back_inserter(dst));
+
+    return acc.count;
 }
 
 template <typename T>
@@ -399,13 +406,18 @@ GltfLoader::appendTangentBuffer(
 }
 
 std::size_t
-GltfLoader::appendIndexBuffer(std::vector<uint3>& dst, const tinygltf::Primitive& srcPrim) const
+GltfLoader::appendIndexBuffer(
+    std::vector<uint3>& dst, const tinygltf::Primitive& srcPrim, std::size_t indexOffset) const
 {
-    const auto append = [&dst](const auto& values, std::size_t primCount) {
+    assert(indexOffset <= std::numeric_limits<uint32_t>::max());
+    uint32_t offset = static_cast<uint32_t>(indexOffset);
+
+    const auto append = [&dst, offset](const auto& values, std::size_t primCount) {
         for (uint32_t i = 0; i < primCount; ++i)
         {
             const auto* v = &values[3 * i];
-            dst.emplace_back(uint3(v[0], v[1], v[2]));
+            uint3 prim = uint3(v[0], v[1], v[2]) + uint3(offset);
+            dst.emplace_back(prim);
         }
     };
 
@@ -518,11 +530,12 @@ std::shared_ptr<Animation>
 GltfLoader::createAnimation(uint32_t animIdx) const
 {
     const auto& srcAnim = mSrcModel.animations[animIdx];
-    std::vector<Animation::Channel> channels(srcAnim.channels.size());
+    std::vector<Animation::Channel> channels;
+    channels.reserve(srcAnim.channels.size());
 
-    for (uint32_t channelIdx = 0; channelIdx < channels.size(); ++channelIdx)
+    for (uint32_t channelIdx = 0; channelIdx < srcAnim.channels.size(); ++channelIdx)
     {
-        auto& channel = channels[channelIdx];
+        Animation::Channel channel;
         const auto& srcChannel = srcAnim.channels[channelIdx];
 
         // TODO: support the animations other than "weights" as well
@@ -566,6 +579,8 @@ GltfLoader::createAnimation(uint32_t animIdx) const
             const auto end = weights + (frameIdx + 1) * morphCount;
             std::copy(begin, end, std::back_inserter(morph.weights));
         }
+
+        channels.push_back(channel);
     }
 
     return std::make_shared<Animation>(std::move(channels));
