@@ -17,8 +17,7 @@ public:
     {
         std::vector<float3> vertices;
         std::vector<float3> normals;
-        std::vector<float3> tangents;
-        std::vector<float3> bitangents;
+        std::vector<float4> tangents;
         std::vector<float2> uvs;
         std::vector<uint3> prims;
         std::vector<uint3> normalPrims;
@@ -30,24 +29,27 @@ public:
             std::vector<float3> vertices;
             std::vector<float3> normals;
             std::vector<float3> tangents;
-            std::vector<float3> bitangents;
         };
         std::vector<Target> targets;
     };
 
-    Mesh(Data&& data);
+    Mesh(Data&& data, uint32_t weightCount);
 
     void appendTo(Accelerator* accelerator) override;
 
-    void update(Accelerator* accelerator, float weight) override;
+    void update(
+        Accelerator* accelerator,
+        const std::vector<float>& weights0,
+        const std::vector<float>& weights1,
+        float t) override;
 
     IntersectionAttributes getIntersectionAttributes(
         const Intersection& isect) const override;
 
 private:
-    Data mData;
+    const Data mData;
     uint32_t mShapeId;
     float3* mVertexBuffer = nullptr;
-    float mWeight = 0.0f;
+    std::vector<float> mWeights;
 };
 }

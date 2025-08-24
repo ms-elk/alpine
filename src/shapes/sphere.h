@@ -24,7 +24,11 @@ public:
 
     void appendTo(Accelerator* accelerator) override;
 
-    void update(Accelerator* accelerator, float weight) override;
+    void update(
+        Accelerator* accelerator,
+        const std::vector<float>& weights0,
+        const std::vector<float>& weights1,
+        float t) override;
 
     IntersectionAttributes getIntersectionAttributes(
         const Intersection& isect) const override;

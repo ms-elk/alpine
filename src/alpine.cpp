@@ -393,7 +393,7 @@ Alpine::resolve(bool denoise)
 {
     for (uint32_t i = 0; i < mResolvedBuffer.size(); ++i)
     {
-        auto pixel = mAccumBuffer[i];
+        const auto& pixel = mAccumBuffer[i];
         mResolvedBuffer[i].color = pixel.color / float(mTotalSamples);
         mResolvedBuffer[i].albedo = pixel.albedo / float(mTotalSamples);
         mResolvedBuffer[i].normal = pixel.normal / float(mTotalSamples);
@@ -406,7 +406,7 @@ Alpine::resolve(bool denoise)
 
     for (uint32_t i = 0; i < mFrameBuffer.size(); ++i)
     {
-        auto pixel = mResolvedBuffer[i].color;
+        const auto& pixel = mResolvedBuffer[i].color;
 
         auto& fb = mFrameBuffer[i];
         fb.x = static_cast<uint8_t>(std::clamp(pixel.x, 0.0f, 1.0f) * 255.0f + 0.5f);

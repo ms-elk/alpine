@@ -12,7 +12,11 @@ Sphere::appendTo(Accelerator* accelerator)
 }
 
 void
-Sphere::update(Accelerator* accelerator, float weight)
+Sphere::update(
+    Accelerator* accelerator,
+    const std::vector<float>& weights0,
+    const std::vector<float>& weights1,
+    float t)
 {
     printf("ERROR: Sphere update has not been implemented yet.");
 }
