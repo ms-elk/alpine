@@ -39,17 +39,10 @@ private:
         const std::string& name,
         const std::map<std::string, int32_t>& srcMap) const;
 
-    template <typename T>
     void appendTargetVertexBuffer(
-        std::vector<T>& dst,
-        const std::vector<float3>& vertices,
+        std::vector<float3>& dst,
+        std::size_t vertexCount,
         const std::map<std::string, int32_t>& targetMap) const;
-
-    void appendTangentBuffer(
-        std::vector<float3>& tangents,
-        std::vector<float3>& bitangents,
-        const std::vector<float4>& tangents4,
-        const std::vector<float3>& normals) const;
 
     std::size_t appendIndexBuffer(
         std::vector<uint3>& dst,
@@ -234,10 +227,7 @@ GltfLoader::createMesh(const float4x4& matrix, uint32_t meshIdx) const
 
         appendVertexBuffer(meshData.normals, "NORMAL", srcPrim.attributes);
         appendVertexBuffer(meshData.uvs, "TEXCOORD_0", srcPrim.attributes);
-
-        std::vector<float4> tangents4;
-        appendVertexBuffer(tangents4, "TANGENT", srcPrim.attributes);
-        appendTangentBuffer(meshData.tangents, meshData.bitangents, tangents4, meshData.normals);
+        appendVertexBuffer(meshData.tangents, "TANGENT", srcPrim.attributes);
 
         // create targets
         if (!srcPrim.targets.empty())
@@ -253,25 +243,9 @@ GltfLoader::createMesh(const float4x4& matrix, uint32_t meshIdx) const
                 auto& dstTarget = meshData.targets[i];
                 const auto& srcTarget = srcPrim.targets[i];
 
-                appendTargetVertexBuffer(dstTarget.vertices, meshData.vertices, srcTarget);
-
+                appendTargetVertexBuffer(dstTarget.vertices, vertexCount, srcTarget);
                 appendVertexBuffer(dstTarget.normals, "NORMAL", srcTarget);
-                for (uint32_t j = 0; j < dstTarget.normals.size(); ++j)
-                {
-                    dstTarget.normals[j] = normalize(dstTarget.normals[j] + meshData.normals[j]);
-                }
-
-                std::vector<float4> targetTangents4(tangents4.size());
                 appendVertexBuffer(dstTarget.tangents, "TANGENT", srcTarget);
-                for (uint32_t j = 0; j < dstTarget.tangents.size(); ++j)
-                {
-                    float3 tan = normalize(tangents4[j].xyz() + dstTarget.tangents[j]);
-                    targetTangents4[j] = Vector4(tan, tangents4[j].w);
-                }
-
-                dstTarget.tangents.clear();
-                appendTangentBuffer(
-                    dstTarget.tangents, dstTarget.bitangents, targetTangents4, dstTarget.normals);
             }
         }
     }
@@ -291,15 +265,12 @@ GltfLoader::createMesh(const float4x4& matrix, uint32_t meshIdx) const
         if (!meshData.tangents.empty())
         {
             auto& t = meshData.tangents[i];
-            t = mul(matrix, float4(t.x, t.y, t.z, 0.0f)).xyz();
-
-            assert(!meshData.bitangents.empty());
-            auto& b = meshData.bitangents[i];
-            b = mul(matrix, float4(b.x, b.y, b.z, 0.0f)).xyz();
+            t = float4(mul(matrix, float4(t.x, t.y, t.z, 0.0f)).xyz(), t.w);
         }
     }
 
-    return std::make_shared<Mesh>(std::move(meshData));
+    uint32_t weightCount = static_cast<uint32_t>(srcMesh.weights.size());
+    return std::make_shared<Mesh>(std::move(meshData), weightCount);
 }
 
 template <typename T>
@@ -325,11 +296,10 @@ GltfLoader::appendVertexBuffer(
     return acc.count;
 }
 
-template <typename T>
 void
 GltfLoader::appendTargetVertexBuffer(
-    std::vector<T>& dst,
-    const std::vector<float3>& vertices,
+    std::vector<float3>& dst,
+    std::size_t vertexCount,
     const std::map<std::string, int32_t>& targetMap) const
 {
     const auto itr = targetMap.find("POSITION");
@@ -342,24 +312,21 @@ GltfLoader::appendTargetVertexBuffer(
     if (!sparse.isSparse)
     {
         appendVertexBuffer(dst, "POSITION", targetMap);
-        for (uint32_t i = 0; i < dst.size(); ++i)
-        {
-            dst[i] += vertices[i];
-        }
     }
     else
     {
-        dst = vertices;
+        dst.resize(vertexCount);
+        std::fill(dst.begin(), dst.end(), float3(0.0f));
 
         const auto append = [&dst, count = sparse.count](const auto& deltas, const auto& indices) {
             for (int32_t i = 0; i < count; ++i)
             {
                 auto index = indices[i];
-                dst[index] += deltas[i];
+                dst[index] = deltas[i];
             }
             };
 
-        const auto* deltas = getBufferValues<T>(sparse.values);
+        const auto* deltas = getBufferValues<float3>(sparse.values);
 
         if (sparse.indices.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
         {
@@ -375,33 +342,6 @@ GltfLoader::appendTargetVertexBuffer(
         {
             assert(false);
         }
-    }
-}
-
-void
-GltfLoader::appendTangentBuffer(
-    std::vector<float3>& tangents,
-    std::vector<float3>& bitangents,
-    const std::vector<float4>& tangents4,
-    const std::vector<float3>& normals) const
-{
-    if (tangents4.empty())
-    {
-        return;
-    }
-
-    assert(tangents4.size() == normals.size());
-
-    for (uint32_t i = 0; i < tangents4.size(); ++i)
-    {
-        const float4& tangent4 = tangents4[i];
-        const float3& normal = normals[i];
-
-        float3 bitangent = cross(normal, tangent4.xyz()) * tangent4.w;
-        bitangent = normalize(bitangent);
-
-        tangents.push_back(tangent4.xyz());
-        bitangents.push_back(bitangent);
     }
 }
 

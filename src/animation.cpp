@@ -34,14 +34,7 @@ Animation::update(Accelerator* accelerator, float time)
         float t1 = mkf1.time;
         float t = (channelTime - t0) / (t1 - t0);
 
-        // support weights where the size is more than 1.
-        assert(mkf0.weights.size() == 1 && mkf1.weights.size() == 1);
-        float w0 = mkf0.weights[0];
-        float w1 = mkf1.weights[0];
-
-        float w = std::lerp(w0, w1, t);
-
-        channel.shape->update(accelerator, w);
+        channel.shape->update(accelerator, mkf0.weights, mkf1.weights, t);
     }
 }
 }

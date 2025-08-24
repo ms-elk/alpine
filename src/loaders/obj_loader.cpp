@@ -116,7 +116,7 @@ loadObj(Scene* scene, std::string_view filename)
         }
     }
 
-    scene->shapes.push_back(std::make_shared<Mesh>(std::move(meshData)));
+    scene->shapes.push_back(std::make_shared<Mesh>(std::move(meshData), 0));
 
     return true;
 }

@@ -18,7 +18,7 @@ createDebugTriangle()
     triData.materials.push_back(std::make_shared<Matte>(
         float3(1.0f, 0.0f, 0.0f), nullptr, nullptr));
 
-    return std::make_shared<Mesh>(std::move(triData));
+    return std::make_shared<Mesh>(std::move(triData), 0);
 }
 
 std::shared_ptr<Sphere>
