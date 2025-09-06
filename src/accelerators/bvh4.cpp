@@ -15,7 +15,7 @@
 // - triangle intersection tests using SIMD
 
 namespace {
-static constexpr uint8_t CHILD_NODE_COUNT = 4;
+constexpr uint8_t CHILD_NODE_COUNT = 4;
 
 alpine::BvhStats gBvhStats;
 
@@ -65,7 +65,7 @@ namespace alpine {
 class Bvh4::Impl
 {
 public:
-    Impl();
+    Impl(std::span<std::byte> memoryArenaBuffer);
     ~Impl();
 
     uint32_t appendMesh(
@@ -136,12 +136,16 @@ private:
     std::vector<Primitive> mOrderedPrimitives;
     std::array<LinearNode, MAX_NODES> mLinearNodes;
     uint32_t mNodeCount = 0;
+
+    std::span<std::byte> mMemoryArenaBuffer;
 };
 
-Bvh4::Impl::Impl()
+Bvh4::Impl::Impl(std::span<std::byte> memoryArenaBuffer)
+    : mMemoryArenaBuffer(memoryArenaBuffer)
 {
     mShapes.reserve(MAX_SHAPES);
     mPrimitives.reserve(MAX_PRIMITIVES);
+    mOrderedPrimitives.reserve(MAX_PRIMITIVES);
 }
 
 Bvh4::Impl::~Impl()
@@ -200,11 +204,12 @@ Bvh4::Impl::updateScene()
         return;
     }
 
-    auto bvh = buildBvh(mPrimitives);
-    mOrderedPrimitives = std::move(bvh.orderedPrimitives);
+    std::pmr::monotonic_buffer_resource arena(
+        mMemoryArenaBuffer.data(), mMemoryArenaBuffer.size(), nullptr);
+    auto* bvh = buildBvh(mPrimitives, mOrderedPrimitives, &arena);
 
     mNodeCount = 0;
-    flatten(bvh.root.get(), mNodeCount);
+    flatten(bvh, mNodeCount);
 
     gBvhStats.countNodes(mNodeCount);
 }
@@ -262,7 +267,7 @@ Bvh4::Impl::flatten(const BuildNode* node, uint32_t& offset)
             if (child->isLeaf())
             {
                 uint8_t idx = 2 * i;
-                flattenChild(idx, child.get());
+                flattenChild(idx, child);
                 setBbox(idx, child->bbox);
             }
             else
@@ -273,7 +278,7 @@ Bvh4::Impl::flatten(const BuildNode* node, uint32_t& offset)
                     assert(grandchild);
 
                     uint8_t idx = 2 * i + j;
-                    flattenChild(idx, grandchild.get());
+                    flattenChild(idx, grandchild);
                     setBbox(idx, grandchild->bbox);
                 }
             }
@@ -400,8 +405,8 @@ Bvh4::Impl::traverse(const Ray& ray, float tFar, bool any) const
     return closestIsect;
 }
 
-Bvh4::Bvh4()
-    : mPimpl(std::make_unique<Impl>())
+Bvh4::Bvh4(std::span<std::byte> memoryArenaBuffer)
+    : mPimpl(std::make_unique<Impl>(memoryArenaBuffer))
 {}
 
 Bvh4::~Bvh4() = default;

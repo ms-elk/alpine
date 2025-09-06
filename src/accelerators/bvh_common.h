@@ -4,6 +4,7 @@
 
 #include <array>
 #include <memory>
+#include <memory_resource>
 #include <optional>
 #include <vector>
 
@@ -83,7 +84,7 @@ struct Primitive
 struct BuildNode
 {
     BoundingBox bbox;
-    std::array<std::unique_ptr<BuildNode>, 2> children{};
+    std::array<BuildNode*, 2> children{};
     uint32_t offset = 0;
     uint16_t primitiveCount = 0;
     uint8_t dim = 0;
@@ -91,12 +92,9 @@ struct BuildNode
     bool isLeaf() const { return primitiveCount > 0; }
 };
 
-struct BuildBvh
-{
-    std::unique_ptr<BuildNode> root;
-    std::vector<Primitive> orderedPrimitives;
-};
-
-BuildBvh
-buildBvh(const std::vector<Primitive>& primitives);
+BuildNode*
+buildBvh(
+    const std::vector<Primitive>& primitives,
+    std::vector<Primitive>& orderedPrimitives,
+    std::pmr::monotonic_buffer_resource* arena);
 }

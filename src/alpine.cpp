@@ -40,7 +40,12 @@ static constexpr uint32_t BATCH_HEIGHT = 16;
 class Alpine
 {
 public:
-    Alpine(uint32_t width, uint32_t height, uint32_t maxDepth, AcceleratorType acceleratorType);
+    Alpine(
+        uint32_t memoryArenaSize,
+        uint32_t width,
+        uint32_t height,
+        uint32_t maxDepth,
+        AcceleratorType acceleratorType);
 
     inline void setBackgroundColor(float r, float g, float b)
     {
@@ -84,6 +89,8 @@ private:
         const float3& wo, const IntersectionAttributes& isectAttr) const;
 
 private:
+    std::vector<std::byte> mMemoryArenaBuffer;
+
     uint32_t mWidth = 0;
     uint32_t mHeight = 0;
     uint32_t mMaxDepth = 0;
@@ -108,7 +115,16 @@ private:
     std::unique_ptr<LightSampler> mLightSampler;
 };
 
-Alpine::Alpine(uint32_t width, uint32_t height, uint32_t maxDepth, AcceleratorType acceleratorType)
+Alpine::Alpine(
+    uint32_t memoryArenaSize,
+    uint32_t width,
+    uint32_t height,
+    uint32_t maxDepth,
+    AcceleratorType acceleratorType)
+    : mMemoryArenaBuffer(memoryArenaSize)
+    , mWidth(width)
+    , mHeight(height)
+    , mMaxDepth(maxDepth)
 {
     denoiser::initialize();
 
@@ -133,11 +149,11 @@ Alpine::Alpine(uint32_t width, uint32_t height, uint32_t maxDepth, AcceleratorTy
         mAccelerator = std::make_unique<Embree>();
         break;
     case AcceleratorType::Bvh4:
-        mAccelerator = std::make_unique<Bvh4>();
+        mAccelerator = std::make_unique<Bvh4>(mMemoryArenaBuffer);
         break;
     case AcceleratorType::Bvh:
     default:
-        mAccelerator = std::make_unique<Bvh>();
+        mAccelerator = std::make_unique<Bvh>(mMemoryArenaBuffer);
         break;
     }
 
@@ -438,11 +454,17 @@ Alpine::addDebugScene()
 std::unique_ptr<Alpine> gAlpine;
 
 bool
-initialize(uint32_t width, uint32_t height, uint32_t maxDepth, AcceleratorType acceleratorType)
+initialize(
+    uint32_t memoryArenaSize,
+    uint32_t width,
+    uint32_t height,
+    uint32_t maxDepth,
+    AcceleratorType acceleratorType)
 {
     if (!gAlpine)
     {
-        gAlpine = std::make_unique<Alpine>(width, height, maxDepth, acceleratorType);
+        gAlpine = std::make_unique<Alpine>(
+            memoryArenaSize, width, height, maxDepth, acceleratorType);
         return true;
     }
     else
