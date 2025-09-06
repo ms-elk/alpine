@@ -3,6 +3,7 @@
 #include "accelerator.h"
 
 #include <memory>
+#include <span>
 
 namespace alpine {
 struct Ray;
@@ -10,7 +11,7 @@ struct Ray;
 class Bvh4 final : public Accelerator
 {
 public:
-    Bvh4();
+    Bvh4(std::span<std::byte> memoryArenaBuffer);
     ~Bvh4() override;
 
     uint32_t appendMesh(

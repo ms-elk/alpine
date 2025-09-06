@@ -101,6 +101,8 @@ main(int argc, char* argv[])
     CLI11_PARSE(app, argc, argv);
 
     // constant values
+    const uint32_t memoryArenaSize = 1024 * 1024 * 1024;
+
     const uint32_t width = 256;
     const uint32_t height = 256;
     const uint32_t maxDepth = 8;
@@ -114,7 +116,8 @@ main(int argc, char* argv[])
     const float fovy = std::numbers::pi_v<float> / 2.0f;
     const float aspect = float(width) / float(height);
 
-    alpine::initialize(width, height, maxDepth, acceleratorType);
+    alpine::initialize(memoryArenaSize, width, height, maxDepth, acceleratorType);
+
     alpine::addDiskLight(lightPower, lightColor, lightPos, lightRadius);
 
     bool loaded = alpine::load(inputPath.string(), fileType);

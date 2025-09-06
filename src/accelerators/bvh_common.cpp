@@ -6,12 +6,13 @@
 #include <array>
 #include <assert.h>
 #include <future>
+#include <span>
 
 namespace {
-static constexpr uint8_t LEAF_THRESHOLD = 8;
-static constexpr uint8_t SPLITS_PER_DIM = 8;
-static constexpr uint8_t BIN_COUNT = SPLITS_PER_DIM + 1;
-static constexpr uint32_t MIN_PRIMITIVES_FOR_PARALLELIZATION = 1024;
+constexpr uint8_t LEAF_THRESHOLD = 8;
+constexpr uint8_t SPLITS_PER_DIM = 8;
+constexpr uint8_t BIN_COUNT = SPLITS_PER_DIM + 1;
+constexpr uint32_t MIN_PRIMITIVES_FOR_PARALLELIZATION = 1024;
 }
 
 namespace alpine {
@@ -121,37 +122,56 @@ struct BuildPrimitive
     uint32_t index;
 };
 
-struct BvhBuilder
+class BvhBuilder
 {
 public:
-    BvhBuilder(const std::vector<Primitive>& primitives)
+    BvhBuilder(
+        const std::vector<Primitive>& primitives,
+        std::vector<Primitive>& orderedPrimitives,
+        std::pmr::monotonic_buffer_resource* arena)
         : mPrimitives(primitives)
+        , mOrderedPrimitives(orderedPrimitives)
+        , mAllocator(arena)
     {
         mOrderedPrimitives.resize(primitives.size());
     }
 
-    std::unique_ptr<BuildNode> buildNode(
-        const std::vector<BuildPrimitive>& buildPrimitives,
+    BuildNode* buildNode(
+        std::span<BuildPrimitive> buildPrimitives,
         std::atomic<uint32_t>& offset,
         std::atomic<uint32_t>& nodeCount);
 
-    std::unique_ptr<BuildNode> createLeaf(
-        const std::vector<BuildPrimitive>& buildPrimitives,
+private:
+    BuildNode* createLeaf(
+        std::span<BuildPrimitive> buildPrimitives,
         const BoundingBox& bbox,
         std::atomic<uint32_t>& offset);
 
-    std::vector<Primitive> takeOrderedPrimitives()
+    BuildNode* allocate()
     {
-        return std::move(mOrderedPrimitives);
+        BuildNode* p = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(mMutex);
+            p = mAllocator.allocate(1);
+        }
+
+        assert(p);
+        std::construct_at(p);
+
+        return p;
     }
 
 private:
     const std::vector<Primitive>& mPrimitives;
-    std::vector<Primitive> mOrderedPrimitives;
+    std::vector<Primitive>& mOrderedPrimitives;
+
+    std::pmr::polymorphic_allocator<BuildNode> mAllocator;
+    std::mutex mMutex;
 };
 
+namespace {
 std::pair<std::optional<bvh_util::Split>, float /* cost */>
-findSplit(const std::vector<BuildPrimitive>& buildPrimitives)
+findSplit(std::span<BuildPrimitive> buildPrimitives)
 {
     auto centroidBox = [&]() {
         BoundingBox cb;
@@ -238,10 +258,11 @@ findSplit(const std::vector<BuildPrimitive>& buildPrimitives)
 
     return { split, minCost };
 }
+}
 
-std::unique_ptr<BuildNode>
+BuildNode*
 BvhBuilder::buildNode(
-    const std::vector<BuildPrimitive>& buildPrimitives,
+    std::span<BuildPrimitive> buildPrimitives,
     std::atomic<uint32_t>& offset,
     std::atomic<uint32_t>& nodeCount)
 {
@@ -266,30 +287,27 @@ BvhBuilder::buildNode(
         return createLeaf(buildPrimitives, nodeBbox, offset);
     }
 
-    std::array<std::vector<BuildPrimitive>, 2> subsets;
-    for (auto& subset : subsets)
-    {
-        subset.reserve(buildPrimitives.size());
-    }
-
     const auto& s = split.value();
 
-    for (const auto& bp : buildPrimitives)
-    {
-        uint8_t subsetIdx = s.isBelow(bp.bbox.getCenter()) ? 0 : 1;
-        subsets[subsetIdx].push_back(bp);
-    }
+    auto midIter = std::partition(buildPrimitives.begin(), buildPrimitives.end(),
+        [&s](const auto& bp) {
+            return s.isBelow(bp.bbox.getCenter());
+        });
+
+    auto midIdx = std::distance(buildPrimitives.begin(), midIter);
+    std::array<std::span<BuildPrimitive>, 2> subsets {
+        buildPrimitives.first(midIdx), buildPrimitives.subspan(midIdx)};
 
     assert(!subsets[0].empty());
     assert(!subsets[1].empty());
 
-    auto node = std::make_unique<BuildNode>();
+    auto* node = allocate();
     node->bbox = nodeBbox;
     node->dim = s.dim;
 
     if (buildPrimitives.size() >= MIN_PRIMITIVES_FOR_PARALLELIZATION)
     {
-        std::array<std::future<std::unique_ptr<BuildNode>>, 2> children;
+        std::array<std::future<BuildNode*>, 2> children;
         for (uint8_t i = 0; i < children.size(); ++i)
         {
             children[i] = std::async([&, i]() {
@@ -313,13 +331,13 @@ BvhBuilder::buildNode(
     return node;
 }
 
-std::unique_ptr<BuildNode>
+BuildNode*
 BvhBuilder::createLeaf(
-    const std::vector<BuildPrimitive>& buildPrimitives,
+    std::span<BuildPrimitive> buildPrimitives,
     const BoundingBox& bbox,
     std::atomic<uint32_t>& offset)
 {
-    auto leaf = std::make_unique<BuildNode>();
+    auto* leaf = allocate();
 
     leaf->bbox = bbox;
     leaf->primitiveCount = static_cast<uint16_t>(buildPrimitives.size());
@@ -337,12 +355,16 @@ BvhBuilder::createLeaf(
 }
 }
 
-BuildBvh
-buildBvh(const std::vector<Primitive>& primitives)
+BuildNode*
+buildBvh(
+    const std::vector<Primitive>& primitives,
+    std::vector<Primitive>& orderedPrimitives,
+    std::pmr::monotonic_buffer_resource* arena)
 {
-    BvhBuilder bvhBuilder(primitives);
+    BvhBuilder bvhBuilder(primitives, orderedPrimitives, arena);
 
-    std::vector<BuildPrimitive> buildPrimitives(primitives.size());
+    std::pmr::vector<BuildPrimitive> buildPrimitives(arena);
+    buildPrimitives.resize(primitives.size());
     for (uint32_t i = 0; i < primitives.size(); ++i)
     {
         auto& bp = buildPrimitives[i];
@@ -353,10 +375,6 @@ buildBvh(const std::vector<Primitive>& primitives)
     std::atomic<uint32_t> buildNodeOffset = 0;
     std::atomic<uint32_t> nodeCount = 0;
 
-    BuildBvh buildBvh;
-    buildBvh.root = bvhBuilder.buildNode(buildPrimitives, buildNodeOffset, nodeCount);
-    buildBvh.orderedPrimitives = bvhBuilder.takeOrderedPrimitives();
-
-    return buildBvh;
+    return bvhBuilder.buildNode(buildPrimitives, buildNodeOffset, nodeCount);
 }
 }

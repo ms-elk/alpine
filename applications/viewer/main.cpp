@@ -4,8 +4,11 @@
 #include <GL/gl.h>
 #include <numbers>
 
+static constexpr uint32_t MEMORY_ARENA_SIZE = 1024 * 1024 * 1024;
+
 static constexpr uint32_t WIDTH = 512;
 static constexpr uint32_t HEIGHT = 512;
+static constexpr uint32_t MAX_DEPTH = 8;
 
 static constexpr float PAN_SPEED = 0.01f;
 static constexpr float ZOOM_SPEED = 0.5f;
@@ -131,8 +134,8 @@ int main(int argc, char* argv[])
     glfwSetCursorPosCallback(window, cursorPositionCallback);
     glfwSetScrollCallback(window, scrollCallback);
 
-    const uint32_t maxDepth = 8;
-    alpine::initialize(WIDTH, HEIGHT, maxDepth, alpine::AcceleratorType::Bvh);
+    alpine::initialize(
+        MEMORY_ARENA_SIZE, WIDTH, HEIGHT, MAX_DEPTH, alpine::AcceleratorType::Bvh);
 
     const float eye[] = { 0.0f, 0.0f, -3.0f };
     const float target[] = { 0.0f, 0.0f, 0.0f };
