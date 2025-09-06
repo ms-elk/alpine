@@ -3,7 +3,6 @@
 #include <utils/bounding_box.h>
 
 #include <array>
-#include <memory>
 #include <memory_resource>
 #include <optional>
 #include <vector>

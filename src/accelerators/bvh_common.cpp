@@ -169,7 +169,6 @@ private:
     std::mutex mMutex;
 };
 
-namespace {
 std::pair<std::optional<bvh_util::Split>, float /* cost */>
 findSplit(std::span<BuildPrimitive> buildPrimitives)
 {
@@ -257,7 +256,6 @@ findSplit(std::span<BuildPrimitive> buildPrimitives)
     }
 
     return { split, minCost };
-}
 }
 
 BuildNode*
