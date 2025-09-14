@@ -101,7 +101,7 @@ main(int argc, char* argv[])
     CLI11_PARSE(app, argc, argv);
 
     // constant values
-    const uint32_t memoryArenaSize = 1024 * 1024 * 1024;
+    const uint32_t memoryArenaSize = 512 * 1024 * 1024;
 
     const uint32_t width = 256;
     const uint32_t height = 256;
