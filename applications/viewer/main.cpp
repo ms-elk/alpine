@@ -4,7 +4,7 @@
 #include <GL/gl.h>
 #include <numbers>
 
-static constexpr uint32_t MEMORY_ARENA_SIZE = 1024 * 1024 * 1024;
+static constexpr uint32_t MEMORY_ARENA_SIZE = 512 * 1024 * 1024;
 
 static constexpr uint32_t WIDTH = 512;
 static constexpr uint32_t HEIGHT = 512;
