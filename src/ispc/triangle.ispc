@@ -50,7 +50,8 @@ intersectTriangle4(
     const uniform float rayDir[3],
     const uniform Triangle4& tri4)
 {
-    foreach(i = 0... TRIANGLE_COUNT){
+    foreach(i = 0... TRIANGLE_COUNT)
+    {
         float sx = rayOrg[0] - tri4.vx[i];
         float sy = rayOrg[1] - tri4.vy[i];
         float sz = rayOrg[2] - tri4.vz[i];
@@ -70,10 +71,11 @@ intersectTriangle4(
         float det = dot(sx1, sy1, sz1, tri4.ex0[i], tri4.ey0[i], tri4.ez0[i]);
         
         bool isIntersected = abs(det) >= EPSILON;
-    
-        float t = dot(sx2, sy2, sz2, tri4.ex1[i], tri4.ey1[i], tri4.ez1[i]) / det;
-        float b0 = dot(sx1, sy1, sz1, sx, sy, sz) / det;
-        float b1 = dot(rayDir[0], rayDir[1], rayDir[2], sx2, sy2, sz2) / det;
+
+        float rcpDet = 1.0f / det;
+        float t = dot(sx2, sy2, sz2, tri4.ex1[i], tri4.ey1[i], tri4.ez1[i]) * rcpDet;
+        float b0 = dot(sx1, sy1, sz1, sx, sy, sz) * rcpDet;
+        float b1 = dot(rayDir[0], rayDir[1], rayDir[2], sx2, sy2, sz2) * rcpDet;
 
         isIntersected &= t >= 0.0f;
         isIntersected &= (b0 >= 0.0f) & (b1 >= 0.0f) & (b0 + b1 <= 1.0f);
