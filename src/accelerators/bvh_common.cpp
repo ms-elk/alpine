@@ -62,7 +62,7 @@ Primitive::intersect(const Ray& ray) const
     float3 s2 = cross(s, edges[0]);
     float det = dot(s1, edges[0]);
 
-    if (det == 0.0f)
+    if (std::abs(det) < std::numeric_limits<float>::epsilon())
     {
         return {};
     }
@@ -73,7 +73,7 @@ Primitive::intersect(const Ray& ray) const
     isect.ng = ng;
 
     isect.t = dot(s2, edges[1]) / det;
-    if (isect.t < std::numeric_limits<float>::epsilon())
+    if (isect.t < 0.0f)
     {
         return {};
     }
