@@ -132,16 +132,30 @@ set(UTILS
 # ispc compile setting
 if (ALPINE_ENABLE_ISPC)
 set(ISPC_EXE ${CMAKE_CURRENT_SOURCE_DIR}/ext/ispc/bin/ispc.exe)
-set(ISPC_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/ispc/bounding_box.ispc)
-set(ISPC_OBJ ${CMAKE_CURRENT_BINARY_DIR}/ispc/bounding_box.obj)
-set(ISPC_H ${CMAKE_CURRENT_BINARY_DIR}/ispc/bounding_box.h)
 
-add_custom_command(
-    OUTPUT ${ISPC_OBJ} ${ISPC_H}
-    COMMAND ${ISPC_EXE} ${ISPC_SRC} -o ${ISPC_OBJ} -h ${ISPC_H}
-    DEPENDS ${ISPC_SRC}
-    COMMENT "Compiling ISPC file ${ISPC_SRC}"
-)
+set(ISPC_FILE_NAMES
+  bounding_box
+  triangle)
+
+set(ISPC_SRCS "")
+set(ISPC_OBJS "")
+
+foreach(ISPC_FILE_NAME ${ISPC_FILE_NAMES})
+  set(ISPC_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/ispc/${ISPC_FILE_NAME}.ispc)
+  set(ISPC_OBJ ${CMAKE_CURRENT_BINARY_DIR}/ispc/${ISPC_FILE_NAME}.obj)
+  set(ISPC_H ${CMAKE_CURRENT_BINARY_DIR}/ispc/${ISPC_FILE_NAME}.h)
+
+  add_custom_command(
+      OUTPUT ${ISPC_OBJ} ${ISPC_H}
+      COMMAND ${ISPC_EXE} ${ISPC_SRC} -o ${ISPC_OBJ} -h ${ISPC_H}
+      DEPENDS ${ISPC_SRC}
+      COMMENT "Compiling ISPC file ${ISPC_SRC}"
+  )
+  
+  list(APPEND ISPC_SRCS ${ISPC_SRC})
+  list(APPEND ISPC_OBJS ${ISPC_OBJ})
+endforeach()
+
 endif ()
 
 source_group("" FILES ${SOURCES})
@@ -155,7 +169,7 @@ source_group("math" FILES ${MATH})
 source_group("scene" FILES ${SCENE})
 source_group("shapes" FILES ${SHAPES})
 source_group("utils" FILES ${UTILS})
-source_group("ispc" FILES ${ISPC_SRC})
+source_group("ispc" FILES ${ISPC_SRCS})
 
 add_library(alpine STATIC
   ${SOURCES}
@@ -169,8 +183,8 @@ add_library(alpine STATIC
   ${SCENE}
   ${SHAPES}
   ${UTILS}
-  ${ISPC_OBJ}
-  ${ISPC_SRC}
+  ${ISPC_OBJS}
+  ${ISPC_SRCS}
 )
 
 target_include_directories(alpine

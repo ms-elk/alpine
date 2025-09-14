@@ -7,7 +7,6 @@
 #include <optional>
 #include <vector>
 
-#define USE_BVH_SIMD
 //#define ENABLE_BVH_STATS
 
 namespace alpine {

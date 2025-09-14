@@ -3,6 +3,7 @@
 #include "bvh_common.h"
 
 #include <ispc/bounding_box.h>
+#include <ispc/triangle.h>
 #include <utils/bounding_box.h>
 #include <alpine_config.h>
 #include <intersection.h>
@@ -11,11 +12,12 @@
 #include <array>
 #include <assert.h>
 
-// TODO: 
-// - triangle intersection tests using SIMD
+#define USE_BVH_SIMD
+#define USE_TRIANGLE_SIMD
 
 namespace {
 constexpr uint8_t CHILD_NODE_COUNT = 4;
+constexpr float NO_INTERSECT = FLT_MAX;
 
 alpine::BvhStats gBvhStats;
 
@@ -95,6 +97,10 @@ private:
 #endif
 
         static constexpr uint32_t INVALID_OFFSET = std::numeric_limits<uint32_t>::max();
+
+        // offset for leaf
+        // 0: index of mOrderedPrimitives
+        // 1: index of mTriangles
         std::array<uint32_t, CHILD_NODE_COUNT - 1> offset;
 
         uint16_t primitiveCount = 0;
@@ -134,6 +140,7 @@ private:
     std::vector<Shape> mShapes;
     std::vector<Primitive> mPrimitives;
     std::vector<Primitive> mOrderedPrimitives;
+    std::vector<ispc::Triangle4> mTriangle4;
     std::array<LinearNode, MAX_NODES> mLinearNodes;
     uint32_t mNodeCount = 0;
 
@@ -146,6 +153,7 @@ Bvh4::Impl::Impl(std::span<std::byte> memoryArenaBuffer)
     mShapes.reserve(MAX_SHAPES);
     mPrimitives.reserve(MAX_PRIMITIVES);
     mOrderedPrimitives.reserve(MAX_PRIMITIVES);
+    mTriangle4.reserve(MAX_PRIMITIVES);
 }
 
 Bvh4::Impl::~Impl()
@@ -208,6 +216,8 @@ Bvh4::Impl::updateScene()
         mMemoryArenaBuffer.data(), mMemoryArenaBuffer.size(), nullptr);
     auto* bvh = buildBvh(mPrimitives, mOrderedPrimitives, &arena);
 
+    mTriangle4.clear();
+
     mNodeCount = 0;
     flatten(bvh, mNodeCount);
 
@@ -227,6 +237,39 @@ Bvh4::Impl::flatten(const BuildNode* node, uint32_t& offset)
     {
         linearNode.offset[0] = node->offset;
         linearNode.primitiveCount = node->primitiveCount;
+#ifdef USE_BVH_SIMD
+        linearNode.offset[1] = mTriangle4.size();
+
+        uint16_t triGroupCount = (node->primitiveCount - 1) / CHILD_NODE_COUNT + 1;
+        for (uint16_t i = 0; i < triGroupCount; ++i)
+        {
+            ispc::Triangle4 tri4;
+            for (uint8_t j = 0; j < CHILD_NODE_COUNT; ++j)
+            {
+                uint16_t idx = i * CHILD_NODE_COUNT + j;
+                if (idx >= node->primitiveCount)
+                {
+                    break;
+                }
+
+                const auto& prim = mOrderedPrimitives[node->offset + idx];
+
+                tri4.vx[j] = prim.vertex.x;
+                tri4.vy[j] = prim.vertex.y;
+                tri4.vz[j] = prim.vertex.z;
+
+                tri4.ex0[j] = prim.edges[0].x;
+                tri4.ey0[j] = prim.edges[0].y;
+                tri4.ez0[j] = prim.edges[0].z;
+
+                tri4.ex1[j] = prim.edges[1].x;
+                tri4.ey1[j] = prim.edges[1].y;
+                tri4.ez1[j] = prim.edges[1].z;
+            }
+
+            mTriangle4.push_back(tri4);
+        }
+#endif
     }
     else
     {
@@ -322,6 +365,54 @@ Bvh4::Impl::traverse(const Ray& ray, float tFar, bool any) const
         const auto& linearNode = mLinearNodes[currentIdx];
         if (linearNode.isLeaf())
         {
+#ifdef USE_TRIANGLE_SIMD
+            uint16_t triGroupCount = (linearNode.primitiveCount - 1) / CHILD_NODE_COUNT + 1;
+            for (uint16_t i = 0; i < triGroupCount; ++i)
+            {
+                counter.incrementTriangle();
+
+                const auto& tri4 = mTriangle4[linearNode.offset[1] + i];
+
+                ispc::Intersection4 isect4;
+                ispc::intersectTriangle4(isect4, &ray.org[0], &ray.dir[0], tri4);
+
+                for (uint8_t j = 0; j < CHILD_NODE_COUNT; ++j)
+                {
+                    uint16_t idx = i * CHILD_NODE_COUNT + j;
+                    if (idx >= linearNode.primitiveCount)
+                    {
+                        break;
+                    }
+
+                    float t = isect4.t[j];
+                    if (t == NO_INTERSECT || t >= tNear)
+                    {
+                        continue;
+                    }
+
+                    if (any)
+                    {
+                        Intersection isect;
+                        return isect;
+                    }
+                    else
+                    {
+                        const auto& prim = mOrderedPrimitives[linearNode.offset[0] + idx];
+
+                        Intersection isect;
+                        isect.shapePtr = prim.ptr;
+                        isect.primId = prim.primId;
+                        isect.ng = prim.ng;
+                        isect.t = t;
+                        isect.barycentric = float2(isect4.b0[j], isect4.b1[j]);
+
+                        closestIsect = isect;
+                        tNear = t;
+                    }
+                }
+            }
+
+#else
             for (uint16_t i = 0; i < linearNode.primitiveCount; ++i)
             {
                 counter.incrementTriangle();
@@ -343,6 +434,7 @@ Bvh4::Impl::traverse(const Ray& ray, float tFar, bool any) const
                     tNear = isect.value().t;
                 }
             }
+#endif
         }
         else
         {
