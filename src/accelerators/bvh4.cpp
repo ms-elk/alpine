@@ -134,6 +134,10 @@ private:
 
     uint32_t flatten(const BuildNode* node, uint32_t& offset);
 
+    void createLeaf(const BuildNode* node, LinearNode& linearNode);
+
+    void createWideNode(const BuildNode* node, LinearNode& linearNode, uint32_t& offset);
+
     std::optional<Intersection> traverse(const Ray& ray, float tFar, bool any) const;
 
 private:
@@ -235,9 +239,24 @@ Bvh4::Impl::flatten(const BuildNode* node, uint32_t& offset)
 
     if (node->isLeaf())
     {
+        createLeaf(node, linearNode);
+    }
+    else
+    {
+        createWideNode(node, linearNode, offset);
+    }
+
+    return nodeOffset;
+}
+
+void
+Bvh4::Impl::createLeaf(const BuildNode* node, LinearNode& linearNode)
+{
+    assert(node->isLeaf());
+
         linearNode.offset[0] = node->offset;
         linearNode.primitiveCount = node->primitiveCount;
-#ifdef USE_BVH_SIMD
+#ifdef USE_TRIANGLE_SIMD
         linearNode.offset[1] = mTriangle4.size();
 
         uint16_t triGroupCount = (node->primitiveCount - 1) / CHILD_NODE_COUNT + 1;
@@ -267,68 +286,82 @@ Bvh4::Impl::flatten(const BuildNode* node, uint32_t& offset)
                 tri4.ez1[j] = prim.edges[1].z;
             }
 
-            mTriangle4.push_back(tri4);
+        mTriangle4.emplace_back(tri4);
         }
 #endif
     }
-    else
+
+void
+Bvh4::Impl::createWideNode(const BuildNode* node, LinearNode& linearNode, uint32_t& offset)
     {
+    assert(!node->isLeaf());
+
+    static constexpr uint8_t MAX_NODE_DEPTH = std::bit_width(CHILD_NODE_COUNT) - 2;
+
         linearNode.clearOffset();
         linearNode.dim[0] = node->dim;
         linearNode.primitiveCount = 0;
 
-        const auto flattenChild = [&](uint32_t idx, const auto* child) {
-            uint32_t childOffset = flatten(child, offset);
+    struct NodeInfo {
+        const BuildNode* node;
+        uint8_t nodeOffset;
+        uint8_t depth;
+    };
 
+    std::array<NodeInfo, STACK_SIZE> stack;
+    uint8_t stackIdx = 0;
+
+    stack[stackIdx++] = { node->children[1], 1, 0 };
+    stack[stackIdx++] = { node->children[0], 0, 0 };
+
+    while (stackIdx != 0)
+    {
+        NodeInfo info = stack[--stackIdx];
+
+        if (info.depth < MAX_NODE_DEPTH)
+        {
+            linearNode.dim[info.nodeOffset + 1] = info.node->dim;
+        }
+
+        if (info.node->isLeaf() || info.depth == MAX_NODE_DEPTH)
+        {
+            uint32_t childOffset = flatten(info.node, offset);
+
+            // map index depending on depth
+            uint8_t idx = (1 << (MAX_NODE_DEPTH - info.depth)) * info.nodeOffset;
             if (idx > 0)
             {
                 linearNode.offset[idx - 1] = childOffset;
             }
-        };
 
-        const auto setBbox = [&](uint32_t idx, const auto& bbox) {
 #ifdef USE_BVH_SIMD
-            linearNode.bbox4.minX[idx] = bbox.min.x;
-            linearNode.bbox4.minY[idx] = bbox.min.y;
-            linearNode.bbox4.minZ[idx] = bbox.min.z;
+            linearNode.bbox4.minX[idx] = info.node->bbox.min.x;
+            linearNode.bbox4.minY[idx] = info.node->bbox.min.y;
+            linearNode.bbox4.minZ[idx] = info.node->bbox.min.z;
 
-            linearNode.bbox4.maxX[idx] = bbox.max.x;
-            linearNode.bbox4.maxY[idx] = bbox.max.y;
-            linearNode.bbox4.maxZ[idx] = bbox.max.z;
+            linearNode.bbox4.maxX[idx] = info.node->bbox.max.x;
+            linearNode.bbox4.maxY[idx] = info.node->bbox.max.y;
+            linearNode.bbox4.maxZ[idx] = info.node->bbox.max.z;
 #else
-            linearNode.bbox[idx] = bbox;
+            linearNode.bbox[idx] = info.node->bbox;
 #endif
-        };
-
-        for (uint8_t i = 0; i < node->children.size(); ++i)
-        {
-            const auto& child = node->children[i];
-            assert(child);
-
-            linearNode.dim[i + 1] = child->dim;
-
-            if (child->isLeaf())
-            {
-                uint8_t idx = 2 * i;
-                flattenChild(idx, child);
-                setBbox(idx, child->bbox);
             }
             else
             {
-                for (uint8_t j = 0; j < child->children.size(); ++j)
-                {
-                    const auto& grandchild = child->children[j];
-                    assert(grandchild);
+            assert(stackIdx < STACK_SIZE - 2);
 
-                    uint8_t idx = 2 * i + j;
-                    flattenChild(idx, grandchild);
-                    setBbox(idx, grandchild->bbox);
-                }
-            }
+            stack[stackIdx++] = {
+                info.node->children[1],
+                static_cast<uint8_t>(2 * info.nodeOffset + 1),
+                static_cast<uint8_t>(info.depth + 1)
+            };
+            stack[stackIdx++] = {
+                info.node->children[0],
+                static_cast<uint8_t>(2 * info.nodeOffset),
+                static_cast<uint8_t>(info.depth + 1)
+            };
         }
     }
-
-    return nodeOffset;
 }
 
 std::optional<Intersection>
@@ -353,7 +386,7 @@ Bvh4::Impl::traverse(const Ray& ray, float tFar, bool any) const
     float tNear = tFar;
     float3 invRayDir = float3(1.0f / ray.dir.x, 1.0f / ray.dir.y, 1.0f / ray.dir.z);
 
-    uint32_t stack[STACK_SIZE];
+    std::array<uint32_t, STACK_SIZE> stack;
     uint8_t stackIdx = 0;
     uint32_t currentIdx = 0;
 
