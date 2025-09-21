@@ -11,6 +11,7 @@
 
 #include <array>
 #include <assert.h>
+#include <bit>
 
 #define USE_BVH_SIMD
 #define USE_TRIANGLE_SIMD
@@ -254,53 +255,53 @@ Bvh4::Impl::createLeaf(const BuildNode* node, LinearNode& linearNode)
 {
     assert(node->isLeaf());
 
-        linearNode.offset[0] = node->offset;
-        linearNode.primitiveCount = node->primitiveCount;
+    linearNode.offset[0] = node->offset;
+    linearNode.primitiveCount = node->primitiveCount;
 #ifdef USE_TRIANGLE_SIMD
-        linearNode.offset[1] = mTriangle4.size();
+    linearNode.offset[1] = mTriangle4.size();
 
-        uint16_t triGroupCount = (node->primitiveCount - 1) / CHILD_NODE_COUNT + 1;
-        for (uint16_t i = 0; i < triGroupCount; ++i)
+    uint16_t triGroupCount = (node->primitiveCount - 1) / CHILD_NODE_COUNT + 1;
+    for (uint16_t i = 0; i < triGroupCount; ++i)
+    {
+        ispc::Triangle4 tri4;
+        for (uint8_t j = 0; j < CHILD_NODE_COUNT; ++j)
         {
-            ispc::Triangle4 tri4;
-            for (uint8_t j = 0; j < CHILD_NODE_COUNT; ++j)
+            uint16_t idx = i * CHILD_NODE_COUNT + j;
+            if (idx >= node->primitiveCount)
             {
-                uint16_t idx = i * CHILD_NODE_COUNT + j;
-                if (idx >= node->primitiveCount)
-                {
-                    break;
-                }
-
-                const auto& prim = mOrderedPrimitives[node->offset + idx];
-
-                tri4.vx[j] = prim.vertex.x;
-                tri4.vy[j] = prim.vertex.y;
-                tri4.vz[j] = prim.vertex.z;
-
-                tri4.ex0[j] = prim.edges[0].x;
-                tri4.ey0[j] = prim.edges[0].y;
-                tri4.ez0[j] = prim.edges[0].z;
-
-                tri4.ex1[j] = prim.edges[1].x;
-                tri4.ey1[j] = prim.edges[1].y;
-                tri4.ez1[j] = prim.edges[1].z;
+                break;
             }
 
-        mTriangle4.emplace_back(tri4);
+            const auto& prim = mOrderedPrimitives[node->offset + idx];
+
+            tri4.vx[j] = prim.vertex.x;
+            tri4.vy[j] = prim.vertex.y;
+            tri4.vz[j] = prim.vertex.z;
+
+            tri4.ex0[j] = prim.edges[0].x;
+            tri4.ey0[j] = prim.edges[0].y;
+            tri4.ez0[j] = prim.edges[0].z;
+
+            tri4.ex1[j] = prim.edges[1].x;
+            tri4.ey1[j] = prim.edges[1].y;
+            tri4.ez1[j] = prim.edges[1].z;
         }
-#endif
+
+        mTriangle4.emplace_back(tri4);
     }
+#endif
+}
 
 void
 Bvh4::Impl::createWideNode(const BuildNode* node, LinearNode& linearNode, uint32_t& offset)
-    {
+{
     assert(!node->isLeaf());
 
     static constexpr uint8_t MAX_NODE_DEPTH = std::bit_width(CHILD_NODE_COUNT) - 2;
 
-        linearNode.clearOffset();
-        linearNode.dim[0] = node->dim;
-        linearNode.primitiveCount = 0;
+    linearNode.clearOffset();
+    linearNode.dim[0] = node->dim;
+    linearNode.primitiveCount = 0;
 
     struct NodeInfo {
         const BuildNode* node;
@@ -345,9 +346,9 @@ Bvh4::Impl::createWideNode(const BuildNode* node, LinearNode& linearNode, uint32
 #else
             linearNode.bbox[idx] = info.node->bbox;
 #endif
-            }
-            else
-            {
+        }
+        else
+        {
             assert(stackIdx < STACK_SIZE - 2);
 
             stack[stackIdx++] = {
