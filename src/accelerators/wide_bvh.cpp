@@ -1,8 +1,10 @@
-﻿#include "bvh4.h"
+﻿#include "wide_bvh.h"
 
 #include "bvh_common.h"
+#include "wide_bvh_builder.h"
 
 #include <ispc/bounding_box.h>
+#include <ispc/ispc_config.h>
 #include <ispc/triangle.h>
 #include <utils/bounding_box.h>
 #include <alpine_config.h>
@@ -15,57 +17,16 @@
 
 #define USE_BVH_SIMD
 #define USE_TRIANGLE_SIMD
+#define USE_BINARY_TO_WIDE
 
 namespace {
-constexpr uint8_t CHILD_NODE_COUNT = 4;
-constexpr float NO_INTERSECT = FLT_MAX;
+constexpr uint8_t LEAF_THRESHOLD = 2 * SIMD_WIDTH;
 
 alpine::BvhStats gBvhStats;
-
-consteval auto
-makeTraversalOrder(const std::array<bool, 3>& isDirNegative)
-{
-    std::array<uint8_t, CHILD_NODE_COUNT> traversalOrder{};
-
-    for (uint8_t i = 0; i < 2; ++i)
-    {
-        uint8_t parentOrder = isDirNegative[0] ? i : 1 - i;
-
-        for (uint8_t j = 0; j < 2; ++j)
-        {
-            bool n = parentOrder == 0 ? isDirNegative[1] : isDirNegative[2];
-            uint8_t childOrder = n ? j : 1 - j;
-
-            uint8_t idx = 2 * i + j;
-            traversalOrder[idx] = 2 * parentOrder + childOrder;
-        }
-    }
-
-    return traversalOrder;
-}
-
-consteval auto
-makeTraversalOrderTable() {
-    std::array<std::array<uint8_t, CHILD_NODE_COUNT>, 8> table{};
-    std::array<bool, 3> isDirNegative{};
-
-    for (uint8_t i = 0; i < 8; ++i) {
-        std::array<bool, 3> isDirNegative = {
-            static_cast<bool>((i >> 2) & 1),
-            static_cast<bool>((i >> 1) & 1),
-            static_cast<bool>((i >> 0) & 1)
-        };
-        table[i] = makeTraversalOrder(isDirNegative);
-    }
-
-    return table;
-}
-
-constexpr auto gTraversalOrderTable = makeTraversalOrderTable();
 }
 
 namespace alpine {
-class Bvh4::Impl
+class WideBvh::Impl
 {
 public:
     Impl(std::span<std::byte> memoryArenaBuffer);
@@ -92,9 +53,9 @@ private:
     struct alignas(32) LinearNode
     {
 #ifdef USE_BVH_SIMD
-        ispc::BoundingBox4 bbox4;
+        ispc::BoundingBoxN bboxN;
 #else
-        BoundingBox bbox[4];
+        BoundingBox bbox[SIMD_WIDTH];
 #endif
 
         static constexpr uint32_t INVALID_OFFSET = std::numeric_limits<uint32_t>::max();
@@ -102,10 +63,10 @@ private:
         // offset for leaf
         // 0: index of mOrderedPrimitives
         // 1: index of mTriangles
-        std::array<uint32_t, CHILD_NODE_COUNT - 1> offset;
+        std::array<uint32_t, SIMD_WIDTH - 1> offset;
 
         uint16_t primitiveCount = 0;
-        std::array<uint8_t, 3> dim{};
+        uint8_t dim = 0;
 
         bool isLeaf() const { return primitiveCount > 0; }
 
@@ -119,19 +80,21 @@ private:
             clearOffset();
 
 #ifdef USE_BVH_SIMD
-            for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
+            for (uint8_t i = 0; i < SIMD_WIDTH; ++i)
             {
-                bbox4.minX[i] = std::numeric_limits<float>::max();
-                bbox4.minY[i] = std::numeric_limits<float>::max();
-                bbox4.minZ[i] = std::numeric_limits<float>::max();
+                bboxN.minX[i] = std::numeric_limits<float>::max();
+                bboxN.minY[i] = std::numeric_limits<float>::max();
+                bboxN.minZ[i] = std::numeric_limits<float>::max();
 
-                bbox4.maxX[i] = -std::numeric_limits<float>::max();
-                bbox4.maxY[i] = -std::numeric_limits<float>::max();
-                bbox4.maxZ[i] = -std::numeric_limits<float>::max();
+                bboxN.maxX[i] = -std::numeric_limits<float>::max();
+                bboxN.maxY[i] = -std::numeric_limits<float>::max();
+                bboxN.maxZ[i] = -std::numeric_limits<float>::max();
             }
 #endif
         }
     };
+
+    uint32_t flattenWide(const BuildWideNode* node, uint32_t& offset);
 
     uint32_t flatten(const BuildNode* node, uint32_t& offset);
 
@@ -145,29 +108,29 @@ private:
     std::vector<Shape> mShapes;
     std::vector<Primitive> mPrimitives;
     std::vector<Primitive> mOrderedPrimitives;
-    std::vector<ispc::Triangle4> mTriangle4;
+    std::vector<ispc::TriangleN> mTriangleN;
     std::array<LinearNode, MAX_NODES> mLinearNodes;
     uint32_t mNodeCount = 0;
 
     std::span<std::byte> mMemoryArenaBuffer;
 };
 
-Bvh4::Impl::Impl(std::span<std::byte> memoryArenaBuffer)
+WideBvh::Impl::Impl(std::span<std::byte> memoryArenaBuffer)
     : mMemoryArenaBuffer(memoryArenaBuffer)
 {
     mShapes.reserve(MAX_SHAPES);
     mPrimitives.reserve(MAX_PRIMITIVES);
     mOrderedPrimitives.reserve(MAX_PRIMITIVES);
-    mTriangle4.reserve(MAX_PRIMITIVES);
+    mTriangleN.reserve(MAX_PRIMITIVES);
 }
 
-Bvh4::Impl::~Impl()
+WideBvh::Impl::~Impl()
 {
     gBvhStats.show();
 }
 
 uint32_t
-Bvh4::Impl::appendMesh(
+WideBvh::Impl::appendMesh(
     const std::vector<float3>& vertices,
     const std::vector<uint3>& prims,
     const void* ptr)
@@ -192,13 +155,13 @@ Bvh4::Impl::appendMesh(
 }
 
 void
-Bvh4::Impl::appendSphere(const std::vector<float4>& vertices, const void* ptr)
+WideBvh::Impl::appendSphere(const std::vector<float4>& vertices, const void* ptr)
 {
     printf("ERROR: Sphere intersection has not been implemented yet.");
 }
 
 void
-Bvh4::Impl::updateShape(uint32_t shapeId)
+WideBvh::Impl::updateShape(uint32_t shapeId)
 {
     const auto& shape = mShapes[shapeId];
 
@@ -210,7 +173,7 @@ Bvh4::Impl::updateShape(uint32_t shapeId)
 }
 
 void
-Bvh4::Impl::updateScene()
+WideBvh::Impl::updateScene()
 {
     if (mPrimitives.empty())
     {
@@ -219,18 +182,109 @@ Bvh4::Impl::updateScene()
 
     std::pmr::monotonic_buffer_resource arena(
         mMemoryArenaBuffer.data(), mMemoryArenaBuffer.size(), nullptr);
-    auto* bvh = buildBvh(mPrimitives, mOrderedPrimitives, &arena);
 
-    mTriangle4.clear();
-
+    mTriangleN.clear();
     mNodeCount = 0;
+
+#ifdef USE_BINARY_TO_WIDE
+    auto* bvh = buildBvh(mPrimitives, mOrderedPrimitives, LEAF_THRESHOLD, &arena);
     flatten(bvh, mNodeCount);
+#else
+    auto* bvh = buildWideBvh(mPrimitives, mOrderedPrimitives, LEAF_THRESHOLD, &arena);
+    flattenWide(bvh, mNodeCount);
+#endif
 
     gBvhStats.countNodes(mNodeCount);
 }
 
 uint32_t
-Bvh4::Impl::flatten(const BuildNode* node, uint32_t& offset)
+WideBvh::Impl::flattenWide(const BuildWideNode* node, uint32_t& offset)
+{
+    assert(node);
+    assert(offset < MAX_NODES);
+
+    auto& linearNode = mLinearNodes[offset];
+    uint32_t nodeOffset = offset++;
+
+    if (node->isLeaf())
+    {
+        assert(node->isLeaf());
+
+        linearNode.offset[0] = node->offset;
+        linearNode.primitiveCount = node->primitiveCount;
+#ifdef USE_TRIANGLE_SIMD
+        linearNode.offset[1] = mTriangleN.size();
+
+        uint16_t triGroupCount = (node->primitiveCount - 1) / SIMD_WIDTH + 1;
+        for (uint16_t i = 0; i < triGroupCount; ++i)
+        {
+            ispc::TriangleN triN;
+            for (uint8_t j = 0; j < SIMD_WIDTH; ++j)
+            {
+                uint16_t idx = i * SIMD_WIDTH + j;
+                if (idx >= node->primitiveCount)
+                {
+                    break;
+                }
+
+                const auto& prim = mOrderedPrimitives[node->offset + idx];
+
+                triN.vx[j] = prim.vertex.x;
+                triN.vy[j] = prim.vertex.y;
+                triN.vz[j] = prim.vertex.z;
+
+                triN.ex0[j] = prim.edges[0].x;
+                triN.ey0[j] = prim.edges[0].y;
+                triN.ez0[j] = prim.edges[0].z;
+
+                triN.ex1[j] = prim.edges[1].x;
+                triN.ey1[j] = prim.edges[1].y;
+                triN.ez1[j] = prim.edges[1].z;
+            }
+
+            mTriangleN.emplace_back(triN);
+        }
+#endif
+    }
+    else
+    {
+        linearNode.clearOffset();
+        linearNode.dim = node->dim;
+        linearNode.primitiveCount = 0;
+        for (uint8_t i = 0; i < node->children.size(); ++i)
+        {
+            const auto* child = node->children[i];
+            if (!child)
+            {
+                continue;
+            }
+
+            uint32_t childNodeOffset = flattenWide(child, offset);
+            if (i > 0)
+            {
+                linearNode.offset[i - 1] = childNodeOffset;
+            }
+
+#ifdef USE_BVH_SIMD
+            linearNode.bboxN.minX[i] = child->bbox.min.x;
+            linearNode.bboxN.minY[i] = child->bbox.min.y;
+            linearNode.bboxN.minZ[i] = child->bbox.min.z;
+
+            linearNode.bboxN.maxX[i] = child->bbox.max.x;
+            linearNode.bboxN.maxY[i] = child->bbox.max.y;
+            linearNode.bboxN.maxZ[i] = child->bbox.max.z;
+#else
+            linearNode.bbox[i] = child->bbox;
+#endif
+        }
+
+    }
+
+    return nodeOffset;
+}
+
+uint32_t
+WideBvh::Impl::flatten(const BuildNode* node, uint32_t& offset)
 {
     assert(node);
     assert(offset < MAX_NODES);
@@ -251,22 +305,22 @@ Bvh4::Impl::flatten(const BuildNode* node, uint32_t& offset)
 }
 
 void
-Bvh4::Impl::createLeaf(const BuildNode* node, LinearNode& linearNode)
+WideBvh::Impl::createLeaf(const BuildNode* node, LinearNode& linearNode)
 {
     assert(node->isLeaf());
 
     linearNode.offset[0] = node->offset;
     linearNode.primitiveCount = node->primitiveCount;
 #ifdef USE_TRIANGLE_SIMD
-    linearNode.offset[1] = mTriangle4.size();
+    linearNode.offset[1] = mTriangleN.size();
 
-    uint16_t triGroupCount = (node->primitiveCount - 1) / CHILD_NODE_COUNT + 1;
+    uint16_t triGroupCount = (node->primitiveCount - 1) / SIMD_WIDTH + 1;
     for (uint16_t i = 0; i < triGroupCount; ++i)
     {
-        ispc::Triangle4 tri4;
-        for (uint8_t j = 0; j < CHILD_NODE_COUNT; ++j)
+        ispc::TriangleN triN;
+        for (uint8_t j = 0; j < SIMD_WIDTH; ++j)
         {
-            uint16_t idx = i * CHILD_NODE_COUNT + j;
+            uint16_t idx = i * SIMD_WIDTH + j;
             if (idx >= node->primitiveCount)
             {
                 break;
@@ -274,33 +328,33 @@ Bvh4::Impl::createLeaf(const BuildNode* node, LinearNode& linearNode)
 
             const auto& prim = mOrderedPrimitives[node->offset + idx];
 
-            tri4.vx[j] = prim.vertex.x;
-            tri4.vy[j] = prim.vertex.y;
-            tri4.vz[j] = prim.vertex.z;
+            triN.vx[j] = prim.vertex.x;
+            triN.vy[j] = prim.vertex.y;
+            triN.vz[j] = prim.vertex.z;
 
-            tri4.ex0[j] = prim.edges[0].x;
-            tri4.ey0[j] = prim.edges[0].y;
-            tri4.ez0[j] = prim.edges[0].z;
+            triN.ex0[j] = prim.edges[0].x;
+            triN.ey0[j] = prim.edges[0].y;
+            triN.ez0[j] = prim.edges[0].z;
 
-            tri4.ex1[j] = prim.edges[1].x;
-            tri4.ey1[j] = prim.edges[1].y;
-            tri4.ez1[j] = prim.edges[1].z;
+            triN.ex1[j] = prim.edges[1].x;
+            triN.ey1[j] = prim.edges[1].y;
+            triN.ez1[j] = prim.edges[1].z;
         }
 
-        mTriangle4.emplace_back(tri4);
+        mTriangleN.emplace_back(triN);
     }
 #endif
 }
 
 void
-Bvh4::Impl::createWideNode(const BuildNode* node, LinearNode& linearNode, uint32_t& offset)
+WideBvh::Impl::createWideNode(const BuildNode* node, LinearNode& linearNode, uint32_t& offset)
 {
     assert(!node->isLeaf());
 
-    static constexpr uint8_t MAX_NODE_DEPTH = std::bit_width(CHILD_NODE_COUNT) - 2;
+    static constexpr uint8_t MAX_NODE_DEPTH = std::bit_width(static_cast<uint8_t>(SIMD_WIDTH)) - 2;
 
     linearNode.clearOffset();
-    linearNode.dim[0] = node->dim;
+    linearNode.dim = node->dim;
     linearNode.primitiveCount = 0;
 
     struct NodeInfo {
@@ -319,11 +373,6 @@ Bvh4::Impl::createWideNode(const BuildNode* node, LinearNode& linearNode, uint32
     {
         NodeInfo info = stack[--stackIdx];
 
-        if (info.depth < MAX_NODE_DEPTH)
-        {
-            linearNode.dim[info.nodeOffset + 1] = info.node->dim;
-        }
-
         if (info.node->isLeaf() || info.depth == MAX_NODE_DEPTH)
         {
             uint32_t childOffset = flatten(info.node, offset);
@@ -336,13 +385,13 @@ Bvh4::Impl::createWideNode(const BuildNode* node, LinearNode& linearNode, uint32
             }
 
 #ifdef USE_BVH_SIMD
-            linearNode.bbox4.minX[idx] = info.node->bbox.min.x;
-            linearNode.bbox4.minY[idx] = info.node->bbox.min.y;
-            linearNode.bbox4.minZ[idx] = info.node->bbox.min.z;
+            linearNode.bboxN.minX[idx] = info.node->bbox.min.x;
+            linearNode.bboxN.minY[idx] = info.node->bbox.min.y;
+            linearNode.bboxN.minZ[idx] = info.node->bbox.min.z;
 
-            linearNode.bbox4.maxX[idx] = info.node->bbox.max.x;
-            linearNode.bbox4.maxY[idx] = info.node->bbox.max.y;
-            linearNode.bbox4.maxZ[idx] = info.node->bbox.max.z;
+            linearNode.bboxN.maxX[idx] = info.node->bbox.max.x;
+            linearNode.bboxN.maxY[idx] = info.node->bbox.max.y;
+            linearNode.bboxN.maxZ[idx] = info.node->bbox.max.z;
 #else
             linearNode.bbox[idx] = info.node->bbox;
 #endif
@@ -366,20 +415,20 @@ Bvh4::Impl::createWideNode(const BuildNode* node, LinearNode& linearNode, uint32
 }
 
 std::optional<Intersection>
-Bvh4::Impl::intersect(const Ray& ray) const
+WideBvh::Impl::intersect(const Ray& ray) const
 {
     return traverse(ray, std::numeric_limits<float>::max(), false);
 }
 
 bool
-Bvh4::Impl::intersectAny(const Ray& ray, float tFar) const
+WideBvh::Impl::intersectAny(const Ray& ray, float tFar) const
 {
     const auto intersection = traverse(ray, tFar, true);
     return intersection.has_value();
 }
 
 std::optional<Intersection>
-Bvh4::Impl::traverse(const Ray& ray, float tFar, bool any) const
+WideBvh::Impl::traverse(const Ray& ray, float tFar, bool any) const
 {
     NodeAccessCounter counter(gBvhStats, any);
 
@@ -400,25 +449,25 @@ Bvh4::Impl::traverse(const Ray& ray, float tFar, bool any) const
         if (linearNode.isLeaf())
         {
 #ifdef USE_TRIANGLE_SIMD
-            uint16_t triGroupCount = (linearNode.primitiveCount - 1) / CHILD_NODE_COUNT + 1;
+            uint16_t triGroupCount = (linearNode.primitiveCount - 1) / SIMD_WIDTH + 1;
             for (uint16_t i = 0; i < triGroupCount; ++i)
             {
                 counter.incrementTriangle();
 
-                const auto& tri4 = mTriangle4[linearNode.offset[1] + i];
+                const auto& triN = mTriangleN[linearNode.offset[1] + i];
 
-                ispc::Intersection4 isect4;
-                ispc::intersectTriangle4(isect4, &ray.org[0], &ray.dir[0], tri4);
+                ispc::IntersectionN isectN;
+                ispc::intersectTriangleN(isectN, &ray.org[0], &ray.dir[0], triN);
 
-                for (uint8_t j = 0; j < CHILD_NODE_COUNT; ++j)
+                for (uint8_t j = 0; j < SIMD_WIDTH; ++j)
                 {
-                    uint16_t idx = i * CHILD_NODE_COUNT + j;
+                    uint16_t idx = i * SIMD_WIDTH + j;
                     if (idx >= linearNode.primitiveCount)
                     {
                         break;
                     }
 
-                    float t = isect4.t[j];
+                    float t = isectN.t[j];
                     if (t == NO_INTERSECT || t >= tNear)
                     {
                         continue;
@@ -438,7 +487,7 @@ Bvh4::Impl::traverse(const Ray& ray, float tFar, bool any) const
                         isect.primId = prim.primId;
                         isect.ng = prim.ng;
                         isect.t = t;
-                        isect.barycentric = float2(isect4.b0[j], isect4.b1[j]);
+                        isect.barycentric = float2(isectN.b0[j], isectN.b1[j]);
 
                         closestIsect = isect;
                         tNear = t;
@@ -472,12 +521,12 @@ Bvh4::Impl::traverse(const Ray& ray, float tFar, bool any) const
         }
         else
         {
-            std::array<bool, CHILD_NODE_COUNT> intersects{};
+            std::array<bool, SIMD_WIDTH> intersects{};
 #ifdef USE_BVH_SIMD
-            ispc::intersectBoundingBox4(intersects.data(),
-                &ray.org[0], &ray.dir[0], &invRayDir[0], tNear, linearNode.bbox4);
+            ispc::intersectBoundingBoxN(intersects.data(),
+                &ray.org[0], &ray.dir[0], &invRayDir[0], tNear, linearNode.bboxN);
 #else
-            for (uint8_t i = 0; i < CHILD_NODE_COUNT; ++i)
+            for (uint8_t i = 0; i < SIMD_WIDTH; ++i)
             {
                 intersects[i] = linearNode.bbox[i].intersect(ray, tNear, invRayDir);
             }
@@ -505,17 +554,10 @@ Bvh4::Impl::traverse(const Ray& ray, float tFar, bool any) const
                 }
             };
 
-            std::array<bool, 3> isNeg{};
-            for (uint8_t i = 0; i < isNeg.size(); ++i)
+            bool isDirNegative = ray.dir[linearNode.dim] < 0.0f;
+            for (uint8_t i = 0; i < SIMD_WIDTH; ++i)
             {
-                uint8_t dim = linearNode.dim[i];
-                isNeg[i] = ray.dir[dim] < 0.0f;
-            }
-
-            uint8_t tableIdx = (isNeg[0] << 2) | (isNeg[1] << 1) | (isNeg[2] << 0);
-            const auto& traversalOrder = gTraversalOrderTable[tableIdx];
-            for (uint8_t idx : traversalOrder)
-            {
+                uint8_t idx = !isDirNegative ? SIMD_WIDTH - 1 - i : i;
                 stackChild(idx);
             }
         }
@@ -531,14 +573,14 @@ Bvh4::Impl::traverse(const Ray& ray, float tFar, bool any) const
     return closestIsect;
 }
 
-Bvh4::Bvh4(std::span<std::byte> memoryArenaBuffer)
+WideBvh::WideBvh(std::span<std::byte> memoryArenaBuffer)
     : mPimpl(std::make_unique<Impl>(memoryArenaBuffer))
 {}
 
-Bvh4::~Bvh4() = default;
+WideBvh::~WideBvh() = default;
 
 uint32_t
-Bvh4::appendMesh(
+WideBvh::appendMesh(
     const std::vector<float3>& vertices,
     const std::vector<uint3>& prims,
     const void* ptr)
@@ -547,37 +589,37 @@ Bvh4::appendMesh(
 }
 
 void
-Bvh4::appendSphere(const std::vector<float4>& vertices, const void* ptr)
+WideBvh::appendSphere(const std::vector<float4>& vertices, const void* ptr)
 {
     mPimpl->appendSphere(vertices, ptr);
 }
 
 void*
-Bvh4::getVertexBuffer(uint32_t shapeId)
+WideBvh::getVertexBuffer(uint32_t shapeId)
 {
     return mPimpl->getVertexBuffer(shapeId);
 }
 
 void
-Bvh4::updateShape(uint32_t shapeId)
+WideBvh::updateShape(uint32_t shapeId)
 {
     mPimpl->updateShape(shapeId);
 }
 
 void
-Bvh4::updateScene()
+WideBvh::updateScene()
 {
     mPimpl->updateScene();
 }
 
 std::optional<Intersection>
-Bvh4::intersect(const Ray& ray) const
+WideBvh::intersect(const Ray& ray) const
 {
     return mPimpl->intersect(ray);
 }
 
 bool
-Bvh4::intersectAny(const Ray& ray, float tFar) const
+WideBvh::intersectAny(const Ray& ray, float tFar) const
 {
     return mPimpl->intersectAny(ray, tFar);
 }

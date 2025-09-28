@@ -9,10 +9,8 @@
 #include <span>
 
 namespace {
-constexpr uint8_t LEAF_THRESHOLD = 8;
 constexpr uint8_t SPLITS_PER_DIM = 8;
 constexpr uint8_t BIN_COUNT = SPLITS_PER_DIM + 1;
-constexpr uint32_t MIN_PRIMITIVES_FOR_PARALLELIZATION = 1024;
 }
 
 namespace alpine {
@@ -128,9 +126,11 @@ public:
     BvhBuilder(
         const std::vector<Primitive>& primitives,
         std::vector<Primitive>& orderedPrimitives,
+        uint8_t leafThreshold,
         std::pmr::monotonic_buffer_resource* arena)
         : mPrimitives(primitives)
         , mOrderedPrimitives(orderedPrimitives)
+        , mLeafThreshold(leafThreshold)
         , mAllocator(arena)
     {
         mOrderedPrimitives.resize(primitives.size());
@@ -164,6 +164,8 @@ private:
 private:
     const std::vector<Primitive>& mPrimitives;
     std::vector<Primitive>& mOrderedPrimitives;
+
+    uint8_t mLeafThreshold;
 
     std::pmr::polymorphic_allocator<BuildNode> mAllocator;
     std::mutex mMutex;
@@ -272,7 +274,7 @@ BvhBuilder::buildNode(
         nodeBbox = merge(nodeBbox, bp.bbox);
     }
 
-    if (buildPrimitives.size() <= LEAF_THRESHOLD)
+    if (buildPrimitives.size() <= mLeafThreshold)
     {
         return createLeaf(buildPrimitives, nodeBbox, offset);
     }
@@ -357,9 +359,10 @@ BuildNode*
 buildBvh(
     const std::vector<Primitive>& primitives,
     std::vector<Primitive>& orderedPrimitives,
+    uint8_t leafThreshold,
     std::pmr::monotonic_buffer_resource* arena)
 {
-    BvhBuilder bvhBuilder(primitives, orderedPrimitives, arena);
+    BvhBuilder bvhBuilder(primitives, orderedPrimitives, leafThreshold, arena);
 
     std::pmr::vector<BuildPrimitive> buildPrimitives(arena);
     buildPrimitives.resize(primitives.size());

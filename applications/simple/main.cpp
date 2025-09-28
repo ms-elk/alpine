@@ -31,7 +31,7 @@ private:
 
 const std::unordered_map<std::string, alpine::AcceleratorType> gAcceleratorTypeTable = {
     {"bvh", alpine::AcceleratorType::Bvh},
-    {"bvh4", alpine::AcceleratorType::Bvh4},
+    {"wideBvh", alpine::AcceleratorType::WideBvh},
     {"embree", alpine::AcceleratorType::Embree}
 };
 
@@ -89,7 +89,7 @@ main(int argc, char* argv[])
     app.add_option("--spp", spp, "Number of samples per pixel")
         ->required();
     app.add_option(
-        "--accelerator", acceleratorType, "Accelerator type: \"bvh\", \"bvh4\" or \"embree\"")
+        "--accelerator", acceleratorType, "Accelerator type: \"bvh\", \"wideBvh\" or \"embree\"")
         ->required()
         ->transform(CLI::CheckedTransformer(gAcceleratorTypeTable));
     app.add_option(

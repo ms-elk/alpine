@@ -1,14 +1,15 @@
-static const uniform uint CHILD_NODE_COUNT = 4;
+#include "ispc_config.h"
+
 static const uniform float CORRECTION = 1.0000004f; // 1.0f + 2.0f * gamma(3)
 
-struct BoundingBox4
+struct BoundingBoxN
 {
-    uniform float minX[CHILD_NODE_COUNT];
-    uniform float minY[CHILD_NODE_COUNT];
-    uniform float minZ[CHILD_NODE_COUNT];
-    uniform float maxX[CHILD_NODE_COUNT];
-    uniform float maxY[CHILD_NODE_COUNT];
-    uniform float maxZ[CHILD_NODE_COUNT];
+    uniform float minX[SIMD_WIDTH];
+    uniform float minY[SIMD_WIDTH];
+    uniform float minZ[SIMD_WIDTH];
+    uniform float maxX[SIMD_WIDTH];
+    uniform float maxY[SIMD_WIDTH];
+    uniform float maxZ[SIMD_WIDTH];
 };
 
 static bool
@@ -37,23 +38,24 @@ intersectBoundingBox(
     float tMax = min(min(max(tx0, tx1), max(ty0, ty1)), max(tz0, tz1));
 
     tMax *= CORRECTION; // ensure conservative intersection
-
+    
     return (tMin <= tMax) & (tMax > 0.0f) & (tMin < tFar);
 }
 
 export void
-intersectBoundingBox4(
-    uniform bool intersects[CHILD_NODE_COUNT],
+intersectBoundingBoxN(
+    uniform bool intersects[SIMD_WIDTH],
     const uniform float rayOrg[3],
     const uniform float rayDir[3],
     const uniform float invRayDir[3],
     uniform float tFar,
-    const uniform BoundingBox4& bbox4)
+    const uniform BoundingBoxN& bboxN)
 {
-    foreach(i = 0 ... CHILD_NODE_COUNT) {
+    foreach(i = 0 ... SIMD_WIDTH)
+    {
         intersects[i] = intersectBoundingBox(
             rayOrg, rayDir, invRayDir, tFar,
-            bbox4.minX[i], bbox4.minY[i], bbox4.minZ[i],
-            bbox4.maxX[i], bbox4.maxY[i], bbox4.maxZ[i]);
+            bboxN.minX[i], bboxN.minY[i], bboxN.minZ[i],
+            bboxN.maxX[i], bboxN.maxY[i], bboxN.maxZ[i]);
     }
 }

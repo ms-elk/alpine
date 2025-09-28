@@ -11,6 +11,7 @@
 #include <assert.h>
 
 namespace {
+constexpr uint8_t LEAF_THRESHOLD = 8;
 constexpr uint8_t CHILD_NODE_COUNT = 2;
 
 alpine::BvhStats gBvhStats;
@@ -131,7 +132,7 @@ Bvh::Impl::updateScene()
 
     std::pmr::monotonic_buffer_resource arena(
         mMemoryArenaBuffer.data(), mMemoryArenaBuffer.size(), nullptr);
-    auto* bvh = buildBvh(mPrimitives, mOrderedPrimitives, &arena);
+    auto* bvh = buildBvh(mPrimitives, mOrderedPrimitives, LEAF_THRESHOLD, &arena);
 
     mNodeCount = 0;
     flatten(bvh, mNodeCount);
