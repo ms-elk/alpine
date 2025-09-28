@@ -44,7 +44,7 @@ set(ACCELERATORS
   src/accelerators/accelerator.h
   src/accelerators/bvh.cpp
   src/accelerators/bvh.h
-  src/accelerators/bvh4.h
+  src/accelerators/wide_bvh.h
   src/accelerators/bvh_common.cpp
   src/accelerators/bvh_common.h
   src/accelerators/embree.h
@@ -57,9 +57,11 @@ list(APPEND ACCELERATORS src/accelerators/embree_dummy.cpp)
 endif()
 
 if (ALPINE_ENABLE_ISPC)
-list(APPEND ACCELERATORS src/accelerators/bvh4.cpp)
+list(APPEND ACCELERATORS src/accelerators/wide_bvh.cpp)
+list(APPEND ACCELERATORS src/accelerators/wide_bvh_builder.cpp)
+list(APPEND ACCELERATORS src/accelerators/wide_bvh_builder.h)
 else()
-list(APPEND ACCELERATORS src/accelerators/bvh4_dummy.cpp)
+list(APPEND ACCELERATORS src/accelerators/wide_bvh_dummy.cpp)
 endif()
 set(DENOISERS src/denoisers/denoiser.h)
 
@@ -156,6 +158,7 @@ foreach(ISPC_FILE_NAME ${ISPC_FILE_NAMES})
   list(APPEND ISPC_OBJS ${ISPC_OBJ})
 endforeach()
 
+list(APPEND ISPC_SRCS src/ispc/ispc_config.h)
 endif ()
 
 source_group("" FILES ${SOURCES})

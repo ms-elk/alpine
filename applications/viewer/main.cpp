@@ -135,7 +135,7 @@ int main(int argc, char* argv[])
     glfwSetScrollCallback(window, scrollCallback);
 
     alpine::initialize(
-        MEMORY_ARENA_SIZE, WIDTH, HEIGHT, MAX_DEPTH, alpine::AcceleratorType::Bvh);
+        MEMORY_ARENA_SIZE, WIDTH, HEIGHT, MAX_DEPTH, alpine::AcceleratorType::WideBvh);
 
     const float eye[] = { 0.0f, 0.0f, -3.0f };
     const float target[] = { 0.0f, 0.0f, 0.0f };

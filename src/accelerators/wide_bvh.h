@@ -8,11 +8,11 @@
 namespace alpine {
 struct Ray;
 
-class Bvh4 final : public Accelerator
+class WideBvh final : public Accelerator
 {
 public:
-    Bvh4(std::span<std::byte> memoryArenaBuffer);
-    ~Bvh4() override;
+    WideBvh(std::span<std::byte> memoryArenaBuffer);
+    ~WideBvh() override;
 
     uint32_t appendMesh(
         const std::vector<float3>& vertices,

@@ -2,7 +2,7 @@
 
 #include <accelerators/accelerator.h>
 #include <accelerators/bvh.h>
-#include <accelerators/bvh4.h>
+#include <accelerators/wide_bvh.h>
 #include <accelerators/embree.h>
 #include <denoisers/denoiser.h>
 #include <light_samplers/light_sampler.h>
@@ -148,8 +148,8 @@ Alpine::Alpine(
     case AcceleratorType::Embree:
         mAccelerator = std::make_unique<Embree>();
         break;
-    case AcceleratorType::Bvh4:
-        mAccelerator = std::make_unique<Bvh4>(mMemoryArenaBuffer);
+    case AcceleratorType::WideBvh:
+        mAccelerator = std::make_unique<WideBvh>(mMemoryArenaBuffer);
         break;
     case AcceleratorType::Bvh:
     default:

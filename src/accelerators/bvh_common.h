@@ -11,8 +11,9 @@
 
 namespace alpine {
 static constexpr uint32_t MAX_PRIMITIVES = 4 * 1024 * 1024;
-static constexpr uint32_t MAX_NODES = 2 * MAX_PRIMITIVES;
+static constexpr uint32_t MAX_NODES = MAX_PRIMITIVES;
 static constexpr uint8_t STACK_SIZE = 64;
+static constexpr uint32_t MIN_PRIMITIVES_FOR_PARALLELIZATION = 1024;
 
 struct Intersection;
 
@@ -94,5 +95,6 @@ BuildNode*
 buildBvh(
     const std::vector<Primitive>& primitives,
     std::vector<Primitive>& orderedPrimitives,
+    uint8_t leafThreshold,
     std::pmr::monotonic_buffer_resource* arena);
 }

@@ -38,7 +38,7 @@ Options:
 `-i, --input`: Input file (.obj|.glb)  
 `-o, --output`: Output image file (.ppm)  
 `--spp`: Number of samples per pixel  
-`--accelerator`: Accelerator type: "bvh", "bvh4" or "embree"  
+`--accelerator`: Accelerator type: "bvh", "wideBvh" or "embree"  
 `--lightSampler`: Light sampler type: "uniform", "power", or "bvh"  
 `--denoiser`: Enable denoiser  
 
