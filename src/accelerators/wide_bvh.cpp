@@ -109,7 +109,7 @@ private:
     std::vector<Primitive> mPrimitives;
     std::vector<Primitive> mOrderedPrimitives;
     std::vector<ispc::TriangleN> mTriangleN;
-    std::array<LinearNode, MAX_NODES> mLinearNodes;
+    std::vector<LinearNode> mLinearNodes;
     uint32_t mNodeCount = 0;
 
     std::span<std::byte> mMemoryArenaBuffer;
@@ -122,6 +122,8 @@ WideBvh::Impl::Impl(std::span<std::byte> memoryArenaBuffer)
     mPrimitives.reserve(MAX_PRIMITIVES);
     mOrderedPrimitives.reserve(MAX_PRIMITIVES);
     mTriangleN.reserve(MAX_PRIMITIVES);
+
+    mLinearNodes.resize(MAX_NODES);
 }
 
 WideBvh::Impl::~Impl()
@@ -346,71 +348,88 @@ WideBvh::Impl::createLeaf(const BuildNode* node, LinearNode& linearNode)
 #endif
 }
 
-void
-WideBvh::Impl::createWideNode(const BuildNode* node, LinearNode& linearNode, uint32_t& offset)
+namespace {
+std::array<const BuildNode*, SIMD_WIDTH> collapseNode(const BuildNode* node, uint8_t& nodeCount)
 {
-    assert(!node->isLeaf());
-
-    static constexpr uint8_t MAX_NODE_DEPTH = std::bit_width(static_cast<uint8_t>(SIMD_WIDTH)) - 2;
-
-    linearNode.clearOffset();
-    linearNode.dim = node->dim;
-    linearNode.primitiveCount = 0;
+    std::array<const BuildNode*, SIMD_WIDTH> nodes;
+    nodeCount = 0;
 
     struct NodeInfo {
         const BuildNode* node;
-        uint8_t nodeOffset;
         uint8_t depth;
     };
 
-    std::array<NodeInfo, STACK_SIZE> stack;
+    static constexpr uint8_t NODE_STACK_SIZE = static_cast<uint8_t>(SIMD_WIDTH) >> 1;
+    std::array<NodeInfo, NODE_STACK_SIZE> stack;
     uint8_t stackIdx = 0;
 
-    stack[stackIdx++] = { node->children[1], 1, 0 };
-    stack[stackIdx++] = { node->children[0], 0, 0 };
+    stack[stackIdx++] = { node->children[1], 0 };
+    stack[stackIdx++] = { node->children[0], 0 };
 
+    static constexpr uint8_t MAX_NODE_DEPTH = std::bit_width(static_cast<uint8_t>(SIMD_WIDTH)) - 2;
     while (stackIdx != 0)
     {
         NodeInfo info = stack[--stackIdx];
 
         if (info.node->isLeaf() || info.depth == MAX_NODE_DEPTH)
         {
-            uint32_t childOffset = flatten(info.node, offset);
-
-            // map index depending on depth
-            uint8_t idx = (1 << (MAX_NODE_DEPTH - info.depth)) * info.nodeOffset;
-            if (idx > 0)
-            {
-                linearNode.offset[idx - 1] = childOffset;
-            }
-
-#ifdef USE_BVH_SIMD
-            linearNode.bboxN.minX[idx] = info.node->bbox.min.x;
-            linearNode.bboxN.minY[idx] = info.node->bbox.min.y;
-            linearNode.bboxN.minZ[idx] = info.node->bbox.min.z;
-
-            linearNode.bboxN.maxX[idx] = info.node->bbox.max.x;
-            linearNode.bboxN.maxY[idx] = info.node->bbox.max.y;
-            linearNode.bboxN.maxZ[idx] = info.node->bbox.max.z;
-#else
-            linearNode.bbox[idx] = info.node->bbox;
-#endif
+            nodes[nodeCount++] = (info.node);
         }
         else
         {
-            assert(stackIdx < STACK_SIZE - 2);
-
             stack[stackIdx++] = {
                 info.node->children[1],
-                static_cast<uint8_t>(2 * info.nodeOffset + 1),
                 static_cast<uint8_t>(info.depth + 1)
             };
             stack[stackIdx++] = {
                 info.node->children[0],
-                static_cast<uint8_t>(2 * info.nodeOffset),
                 static_cast<uint8_t>(info.depth + 1)
             };
         }
+    }
+
+    return nodes;
+}
+}
+
+void
+WideBvh::Impl::createWideNode(const BuildNode* node, LinearNode& linearNode, uint32_t& offset)
+{
+    assert(!node->isLeaf());
+
+    linearNode.clearOffset();
+    linearNode.dim = node->dim;
+    linearNode.primitiveCount = 0;
+
+    uint8_t nodeCount = 0;
+    auto nodes = collapseNode(node, nodeCount);
+
+    std::sort(nodes.begin(), nodes.begin() + nodeCount,
+        [dim = linearNode.dim](const auto* a, const auto* b) {
+            return a->bbox.getCenter()[dim] < b->bbox.getCenter()[dim];
+        });
+
+    for (uint8_t i = 0; i < nodeCount; ++i)
+    {
+        const auto* node = nodes[i];
+        uint32_t childOffset = flatten(node, offset);
+
+        if (i > 0)
+        {
+            linearNode.offset[i - 1] = childOffset;
+        }
+
+#ifdef USE_BVH_SIMD
+        linearNode.bboxN.minX[i] = node->bbox.min.x;
+        linearNode.bboxN.minY[i] = node->bbox.min.y;
+        linearNode.bboxN.minZ[i] = node->bbox.min.z;
+
+        linearNode.bboxN.maxX[i] = node->bbox.max.x;
+        linearNode.bboxN.maxY[i] = node->bbox.max.y;
+        linearNode.bboxN.maxZ[i] = node->bbox.max.z;
+#else
+        linearNode.bbox[i] = node->bbox;
+#endif
     }
 }
 
@@ -557,7 +576,7 @@ WideBvh::Impl::traverse(const Ray& ray, float tFar, bool any) const
             bool isDirNegative = ray.dir[linearNode.dim] < 0.0f;
             for (uint8_t i = 0; i < SIMD_WIDTH; ++i)
             {
-                uint8_t idx = !isDirNegative ? SIMD_WIDTH - 1 - i : i;
+                uint8_t idx = isDirNegative ? i : SIMD_WIDTH - 1 - i;
                 stackChild(idx);
             }
         }
