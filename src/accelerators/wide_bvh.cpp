@@ -302,41 +302,43 @@ namespace {
 std::array<const BuildNode*, SIMD_WIDTH>
 collapseNode(const BuildNode* node, uint8_t& childNodeCount)
 {
-    std::array<const BuildNode*, SIMD_WIDTH> childNodes;
+    std::array<const BuildNode*, SIMD_WIDTH> childNodes{};
     childNodeCount = 0;
 
-    struct NodeInfo {
-        const BuildNode* node;
-        uint8_t depth;
-    };
+    childNodes[childNodeCount++] = node->children[0];
+    childNodes[childNodeCount++] = node->children[1];
 
-    static constexpr uint8_t NODE_STACK_SIZE = static_cast<uint8_t>(SIMD_WIDTH) >> 1;
-    std::array<NodeInfo, NODE_STACK_SIZE> stack;
-    uint8_t stackIdx = 0;
-
-    stack[stackIdx++] = { node->children[1], 0 };
-    stack[stackIdx++] = { node->children[0], 0 };
-
-    static constexpr uint8_t MAX_NODE_DEPTH = std::bit_width(static_cast<uint8_t>(SIMD_WIDTH)) - 2;
-    while (stackIdx != 0)
+    while (childNodeCount < childNodes.size())
     {
-        NodeInfo info = stack[--stackIdx];
+        uint8_t candidateCount = 0;
+        float maxSa = 0.0f;
+        uint8_t maxNodeIdx = 0;
 
-        if (info.node->isLeaf() || info.depth == MAX_NODE_DEPTH)
+        for (uint8_t i = 0; i < childNodeCount; ++i)
         {
-            childNodes[childNodeCount++] = (info.node);
+            const auto* childNode = childNodes[i];
+
+            if (!childNode->isLeaf())
+            {
+                float sa = childNode->bbox.computeSurfaceArea();
+                if (sa > maxSa)
+                {
+                    maxSa = sa;
+                    maxNodeIdx = i;
+                }
+
+                candidateCount++;
+            }
         }
-        else
+
+        if (candidateCount == 0)
         {
-            stack[stackIdx++] = {
-                info.node->children[1],
-                static_cast<uint8_t>(info.depth + 1)
-            };
-            stack[stackIdx++] = {
-                info.node->children[0],
-                static_cast<uint8_t>(info.depth + 1)
-            };
+            break;
         }
+
+        const auto* collapsedNode = childNodes[maxNodeIdx];
+        childNodes[childNodeCount++] = collapsedNode->children[0];
+        childNodes[maxNodeIdx] = collapsedNode->children[1];
     }
 
     return childNodes;
