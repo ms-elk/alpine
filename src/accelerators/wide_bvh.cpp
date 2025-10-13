@@ -18,6 +18,7 @@
 #define USE_BVH_SIMD
 #define USE_TRIANGLE_SIMD
 #define USE_BINARY_TO_WIDE
+//#define USE_BREADTH_FIRST
 
 namespace {
 constexpr uint8_t LEAF_THRESHOLD = 2 * SIMD_WIDTH;
@@ -57,7 +58,6 @@ private:
 #else
         BoundingBox bbox[SIMD_WIDTH];
 #endif
-
         static constexpr uint32_t INVALID_OFFSET = std::numeric_limits<uint32_t>::max();
 
         // offset for leaf
@@ -65,10 +65,13 @@ private:
         // 1: index of mTriangles
         std::array<uint32_t, SIMD_WIDTH - 1> offset;
 
-        uint16_t primitiveCount = 0;
+        // inner node: child node count
+        // leaf: primitive count
+        uint16_t childCount = 0;
+
         uint8_t dim = 0;
 
-        bool isLeaf() const { return primitiveCount > 0; }
+        bool isLeaf = false;
 
         void clearOffset()
         {
@@ -85,7 +88,7 @@ private:
                 bboxN.minX[i] = std::numeric_limits<float>::max();
                 bboxN.minY[i] = std::numeric_limits<float>::max();
                 bboxN.minZ[i] = std::numeric_limits<float>::max();
-
+            
                 bboxN.maxX[i] = -std::numeric_limits<float>::max();
                 bboxN.maxY[i] = -std::numeric_limits<float>::max();
                 bboxN.maxZ[i] = -std::numeric_limits<float>::max();
@@ -96,11 +99,13 @@ private:
 
     uint32_t flattenWide(const BuildWideNode* node, uint32_t& offset);
 
-    uint32_t flatten(const BuildNode* node, uint32_t& offset);
+    void flattenDepthFirst(const BuildNode* node, uint32_t& nodeCount,
+        std::pmr::monotonic_buffer_resource* arena);
+
+    void flattenBreadthFirst(const BuildNode* node, uint32_t& nodeCount,
+        std::pmr::monotonic_buffer_resource* arena);
 
     void createLeaf(const BuildNode* node, LinearNode& linearNode);
-
-    void createWideNode(const BuildNode* node, LinearNode& linearNode, uint32_t& offset);
 
     std::optional<Intersection> traverse(const Ray& ray, float tFar, bool any) const;
 
@@ -190,7 +195,11 @@ WideBvh::Impl::updateScene()
 
 #ifdef USE_BINARY_TO_WIDE
     auto* bvh = buildBvh(mPrimitives, mOrderedPrimitives, LEAF_THRESHOLD, &arena);
-    flatten(bvh, mNodeCount);
+#ifdef USE_BREADTH_FIRST
+    flattenBreadthFirst(bvh, mNodeCount, &arena);
+#else
+    flattenDepthFirst(bvh, mNodeCount, &arena);
+#endif
 #else
     auto* bvh = buildWideBvh(mPrimitives, mOrderedPrimitives, LEAF_THRESHOLD, &arena);
     flattenWide(bvh, mNodeCount);
@@ -213,7 +222,8 @@ WideBvh::Impl::flattenWide(const BuildWideNode* node, uint32_t& offset)
         assert(node->isLeaf());
 
         linearNode.offset[0] = node->offset;
-        linearNode.primitiveCount = node->primitiveCount;
+        linearNode.childCount = node->primitiveCount;
+        linearNode.isLeaf = true;
 #ifdef USE_TRIANGLE_SIMD
         linearNode.offset[1] = mTriangleN.size();
 
@@ -252,7 +262,9 @@ WideBvh::Impl::flattenWide(const BuildWideNode* node, uint32_t& offset)
     {
         linearNode.clearOffset();
         linearNode.dim = node->dim;
-        linearNode.primitiveCount = 0;
+        linearNode.isLeaf = false;
+        linearNode.childCount = 0;
+
         for (uint8_t i = 0; i < node->children.size(); ++i)
         {
             const auto* child = node->children[i];
@@ -271,13 +283,14 @@ WideBvh::Impl::flattenWide(const BuildWideNode* node, uint32_t& offset)
             linearNode.bboxN.minX[i] = child->bbox.min.x;
             linearNode.bboxN.minY[i] = child->bbox.min.y;
             linearNode.bboxN.minZ[i] = child->bbox.min.z;
-
+            
             linearNode.bboxN.maxX[i] = child->bbox.max.x;
             linearNode.bboxN.maxY[i] = child->bbox.max.y;
             linearNode.bboxN.maxZ[i] = child->bbox.max.z;
 #else
             linearNode.bbox[i] = child->bbox;
 #endif
+            linearNode.childCount++;
         }
 
     }
@@ -285,25 +298,225 @@ WideBvh::Impl::flattenWide(const BuildWideNode* node, uint32_t& offset)
     return nodeOffset;
 }
 
-uint32_t
-WideBvh::Impl::flatten(const BuildNode* node, uint32_t& offset)
+namespace {
+std::array<const BuildNode*, SIMD_WIDTH>
+collapseNode(const BuildNode* node, uint8_t& childNodeCount)
+{
+    std::array<const BuildNode*, SIMD_WIDTH> childNodes;
+    childNodeCount = 0;
+
+    struct NodeInfo {
+        const BuildNode* node;
+        uint8_t depth;
+    };
+
+    static constexpr uint8_t NODE_STACK_SIZE = static_cast<uint8_t>(SIMD_WIDTH) >> 1;
+    std::array<NodeInfo, NODE_STACK_SIZE> stack;
+    uint8_t stackIdx = 0;
+
+    stack[stackIdx++] = { node->children[1], 0 };
+    stack[stackIdx++] = { node->children[0], 0 };
+
+    static constexpr uint8_t MAX_NODE_DEPTH = std::bit_width(static_cast<uint8_t>(SIMD_WIDTH)) - 2;
+    while (stackIdx != 0)
+    {
+        NodeInfo info = stack[--stackIdx];
+
+        if (info.node->isLeaf() || info.depth == MAX_NODE_DEPTH)
+        {
+            childNodes[childNodeCount++] = (info.node);
+        }
+        else
+        {
+            stack[stackIdx++] = {
+                info.node->children[1],
+                static_cast<uint8_t>(info.depth + 1)
+            };
+            stack[stackIdx++] = {
+                info.node->children[0],
+                static_cast<uint8_t>(info.depth + 1)
+            };
+        }
+    }
+
+    return childNodes;
+}
+
+template<typename T>
+class RingBuffer {
+public:
+    RingBuffer(std::pmr::monotonic_buffer_resource* arena)
+        : mData(arena)
+    {
+        static constexpr uint32_t RING_BUFFER_SIZE = 128 * 1024;
+        mData.resize(RING_BUFFER_SIZE);
+    }
+
+    void push_back(const T& value)
+    {
+        assert(mSize < mData.size());
+
+        uint32_t tail = (mHead + mSize) % mData.size();
+        mData[tail] = value;
+        mSize++;
+    }
+
+    void pop()
+    {
+        assert(!empty());
+
+        mHead = (mHead + 1) % mData.size();
+        mSize--;
+    }
+
+    const T& front() const
+    {
+        assert(!empty());
+        return mData[mHead];
+    }
+
+    bool empty() const
+    {
+        return mSize == 0;
+    }
+
+private:
+    std::pmr::vector<T> mData;
+    uint32_t mHead = 0;
+    uint32_t mSize = 0;
+};
+}
+
+void
+WideBvh::Impl::flattenDepthFirst(
+    const BuildNode* node, uint32_t& nodeCount, std::pmr::monotonic_buffer_resource* arena)
 {
     assert(node);
-    assert(offset < MAX_NODES);
 
-    auto& linearNode = mLinearNodes[offset];
-    uint32_t nodeOffset = offset++;
+    struct NodeInfo {
+        const BuildNode* node;
+        uint32_t* offset;
+    };
 
-    if (node->isLeaf())
+    std::pmr::vector<NodeInfo> stack(arena);
+    stack.reserve(STACK_SIZE);
+    stack.push_back({ node, nullptr });
+
+    nodeCount = 0;
+
+    while (!stack.empty())
     {
-        createLeaf(node, linearNode);
-    }
-    else
-    {
-        createWideNode(node, linearNode, offset);
-    }
+        auto [node, offset] = stack.back();
+        stack.pop_back();
 
-    return nodeOffset;
+        if (offset)
+        {
+            *offset = nodeCount;
+        }
+
+        LinearNode& linearNode = mLinearNodes[nodeCount++];
+
+        if (node->isLeaf())
+        {
+            createLeaf(node, linearNode);
+        }
+        else
+        {
+            linearNode.clearOffset();
+            linearNode.dim = node->dim;
+            linearNode.isLeaf = false;
+
+            uint8_t childNodeCount = 0;
+            auto childNodes = collapseNode(node, childNodeCount);
+
+            linearNode.childCount = childNodeCount;
+
+            for (int8_t i = childNodeCount - 1; i >= 0; i--)
+            {
+                const auto* childNode = childNodes[i];
+
+#ifdef USE_BVH_SIMD
+                linearNode.bboxN.minX[i] = childNode->bbox.min.x;
+                linearNode.bboxN.minY[i] = childNode->bbox.min.y;
+                linearNode.bboxN.minZ[i] = childNode->bbox.min.z;
+
+                linearNode.bboxN.maxX[i] = childNode->bbox.max.x;
+                linearNode.bboxN.maxY[i] = childNode->bbox.max.y;
+                linearNode.bboxN.maxZ[i] = childNode->bbox.max.z;
+#else
+                linearNode.bbox[i] = childNode->bbox;
+#endif
+                assert(stack.size() < STACK_SIZE);
+                uint32_t* offset = i > 0 ? &linearNode.offset[i - 1] : nullptr;
+                stack.push_back({ childNode, offset });
+            }
+        }
+    }
+}
+
+void
+WideBvh::Impl::flattenBreadthFirst(
+    const BuildNode* node, uint32_t& nodeCount, std::pmr::monotonic_buffer_resource* arena)
+{
+    assert(node);
+
+    struct NodeInfo {
+        const BuildNode* node;
+        uint32_t* offset;
+    };
+
+    RingBuffer<NodeInfo> queue(arena);
+
+    queue.push_back({ node, nullptr });
+
+    nodeCount = 0;
+
+    while (!queue.empty())
+    {
+        auto [node, offset] = queue.front();
+        queue.pop();
+
+        if (offset)
+        {
+            *offset = nodeCount;
+        }
+        LinearNode& linearNode = mLinearNodes[nodeCount++];
+
+        if (node->isLeaf())
+        {
+            createLeaf(node, linearNode);
+        }
+        else
+        {
+            linearNode.clearOffset();
+            linearNode.dim = node->dim;
+            linearNode.isLeaf = false;
+
+            uint8_t childNodeCount = 0;
+            auto childNodes = collapseNode(node, childNodeCount);
+
+            linearNode.childCount = childNodeCount;
+
+            for (uint8_t i = 0; i < childNodeCount; ++i)
+            {
+                const auto* childNode = childNodes[i];
+
+#ifdef USE_BVH_SIMD
+                linearNode.bboxN.minX[i] = childNode->bbox.min.x;
+                linearNode.bboxN.minY[i] = childNode->bbox.min.y;
+                linearNode.bboxN.minZ[i] = childNode->bbox.min.z;
+
+                linearNode.bboxN.maxX[i] = childNode->bbox.max.x;
+                linearNode.bboxN.maxY[i] = childNode->bbox.max.y;
+                linearNode.bboxN.maxZ[i] = childNode->bbox.max.z;
+#else
+                linearNode.bbox[i] = childNode->bbox;
+#endif
+                uint32_t* offset = i == 0 ? &linearNode.offset[0] : nullptr;
+                queue.push_back({ childNode, offset });
+            }
+        }
+    }
 }
 
 void
@@ -312,7 +525,9 @@ WideBvh::Impl::createLeaf(const BuildNode* node, LinearNode& linearNode)
     assert(node->isLeaf());
 
     linearNode.offset[0] = node->offset;
-    linearNode.primitiveCount = node->primitiveCount;
+    linearNode.childCount = node->primitiveCount;
+    linearNode.isLeaf = true;
+
 #ifdef USE_TRIANGLE_SIMD
     linearNode.offset[1] = mTriangleN.size();
 
@@ -348,91 +563,6 @@ WideBvh::Impl::createLeaf(const BuildNode* node, LinearNode& linearNode)
 #endif
 }
 
-namespace {
-std::array<const BuildNode*, SIMD_WIDTH> collapseNode(const BuildNode* node, uint8_t& nodeCount)
-{
-    std::array<const BuildNode*, SIMD_WIDTH> nodes;
-    nodeCount = 0;
-
-    struct NodeInfo {
-        const BuildNode* node;
-        uint8_t depth;
-    };
-
-    static constexpr uint8_t NODE_STACK_SIZE = static_cast<uint8_t>(SIMD_WIDTH) >> 1;
-    std::array<NodeInfo, NODE_STACK_SIZE> stack;
-    uint8_t stackIdx = 0;
-
-    stack[stackIdx++] = { node->children[1], 0 };
-    stack[stackIdx++] = { node->children[0], 0 };
-
-    static constexpr uint8_t MAX_NODE_DEPTH = std::bit_width(static_cast<uint8_t>(SIMD_WIDTH)) - 2;
-    while (stackIdx != 0)
-    {
-        NodeInfo info = stack[--stackIdx];
-
-        if (info.node->isLeaf() || info.depth == MAX_NODE_DEPTH)
-        {
-            nodes[nodeCount++] = (info.node);
-        }
-        else
-        {
-            stack[stackIdx++] = {
-                info.node->children[1],
-                static_cast<uint8_t>(info.depth + 1)
-            };
-            stack[stackIdx++] = {
-                info.node->children[0],
-                static_cast<uint8_t>(info.depth + 1)
-            };
-        }
-    }
-
-    return nodes;
-}
-}
-
-void
-WideBvh::Impl::createWideNode(const BuildNode* node, LinearNode& linearNode, uint32_t& offset)
-{
-    assert(!node->isLeaf());
-
-    linearNode.clearOffset();
-    linearNode.dim = node->dim;
-    linearNode.primitiveCount = 0;
-
-    uint8_t nodeCount = 0;
-    auto nodes = collapseNode(node, nodeCount);
-
-    std::sort(nodes.begin(), nodes.begin() + nodeCount,
-        [dim = linearNode.dim](const auto* a, const auto* b) {
-            return a->bbox.getCenter()[dim] < b->bbox.getCenter()[dim];
-        });
-
-    for (uint8_t i = 0; i < nodeCount; ++i)
-    {
-        const auto* node = nodes[i];
-        uint32_t childOffset = flatten(node, offset);
-
-        if (i > 0)
-        {
-            linearNode.offset[i - 1] = childOffset;
-        }
-
-#ifdef USE_BVH_SIMD
-        linearNode.bboxN.minX[i] = node->bbox.min.x;
-        linearNode.bboxN.minY[i] = node->bbox.min.y;
-        linearNode.bboxN.minZ[i] = node->bbox.min.z;
-
-        linearNode.bboxN.maxX[i] = node->bbox.max.x;
-        linearNode.bboxN.maxY[i] = node->bbox.max.y;
-        linearNode.bboxN.maxZ[i] = node->bbox.max.z;
-#else
-        linearNode.bbox[i] = node->bbox;
-#endif
-    }
-}
-
 std::optional<Intersection>
 WideBvh::Impl::intersect(const Ray& ray) const
 {
@@ -455,20 +585,22 @@ WideBvh::Impl::traverse(const Ray& ray, float tFar, bool any) const
     float tNear = tFar;
     float3 invRayDir = float3(1.0f / ray.dir.x, 1.0f / ray.dir.y, 1.0f / ray.dir.z);
 
-    std::array<uint32_t, STACK_SIZE> stack;
+    std::array<uint32_t, STACK_SIZE> stack {};
     uint8_t stackIdx = 0;
-    uint32_t currentIdx = 0;
+    stack[stackIdx++] = 0;
 
-    while (true)
+    while (stackIdx != 0)
     {
         counter.incrementNode();
 
+        uint32_t currentIdx = stack[--stackIdx];
         assert(currentIdx < mNodeCount);
         const auto& linearNode = mLinearNodes[currentIdx];
-        if (linearNode.isLeaf())
+
+        if (linearNode.isLeaf)
         {
 #ifdef USE_TRIANGLE_SIMD
-            uint16_t triGroupCount = (linearNode.primitiveCount - 1) / SIMD_WIDTH + 1;
+            uint16_t triGroupCount = (linearNode.childCount - 1) / SIMD_WIDTH + 1;
             for (uint16_t i = 0; i < triGroupCount; ++i)
             {
                 counter.incrementTriangle();
@@ -481,7 +613,7 @@ WideBvh::Impl::traverse(const Ray& ray, float tFar, bool any) const
                 for (uint8_t j = 0; j < SIMD_WIDTH; ++j)
                 {
                     uint16_t idx = i * SIMD_WIDTH + j;
-                    if (idx >= linearNode.primitiveCount)
+                    if (idx >= linearNode.childCount)
                     {
                         break;
                     }
@@ -494,8 +626,7 @@ WideBvh::Impl::traverse(const Ray& ray, float tFar, bool any) const
 
                     if (any)
                     {
-                        Intersection isect;
-                        return isect;
+                        return Intersection {};
                     }
                     else
                     {
@@ -515,7 +646,7 @@ WideBvh::Impl::traverse(const Ray& ray, float tFar, bool any) const
             }
 
 #else
-            for (uint16_t i = 0; i < linearNode.primitiveCount; ++i)
+            for (uint16_t i = 0; i < linearNode.childCount; ++i)
             {
                 counter.incrementTriangle();
 
@@ -551,42 +682,25 @@ WideBvh::Impl::traverse(const Ray& ray, float tFar, bool any) const
             }
 #endif
 
-            const auto stackChild = [&](uint8_t idx) {
-                if (!intersects[idx])
+            for (uint8_t i = 0; i < linearNode.childCount; ++i)
+            {
+                if (!intersects[i])
                 {
-                    return;
+                    continue;
                 }
 
                 assert(stackIdx < STACK_SIZE - 1);
 
-                if (idx == 0)
-                {
-                    stack[stackIdx++] = currentIdx + 1;
-                }
-                else
-                {
-                    uint32_t offset = linearNode.offset[idx - 1];
-                    if (offset != LinearNode::INVALID_OFFSET)
-                    {
-                        stack[stackIdx++] = offset;
-                    }
-                }
-            };
+#ifdef USE_BREADTH_FIRST
+                stack[stackIdx] = linearNode.offset[0] + i;
+#else
+                stack[stackIdx] = i == 0 ? currentIdx + 1 : linearNode.offset[i - 1];
+#endif
+                assert(stack[stackIdx] != LinearNode::INVALID_OFFSET);
 
-            bool isDirNegative = ray.dir[linearNode.dim] < 0.0f;
-            for (uint8_t i = 0; i < SIMD_WIDTH; ++i)
-            {
-                uint8_t idx = isDirNegative ? i : SIMD_WIDTH - 1 - i;
-                stackChild(idx);
+                stackIdx++;
             }
         }
-
-        if (stackIdx == 0)
-        {
-            break;
-        }
-
-        currentIdx = stack[--stackIdx];
     }
 
     return closestIsect;
