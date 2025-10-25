@@ -69,8 +69,6 @@ private:
         // leaf: primitive count
         uint16_t childCount = 0;
 
-        uint8_t dim = 0;
-
         bool isLeaf = false;
 
         void clearOffset()
@@ -261,7 +259,6 @@ WideBvh::Impl::flattenWide(const BuildWideNode* node, uint32_t& offset)
     else
     {
         linearNode.clearOffset();
-        linearNode.dim = node->dim;
         linearNode.isLeaf = false;
         linearNode.childCount = 0;
 
@@ -299,10 +296,12 @@ WideBvh::Impl::flattenWide(const BuildWideNode* node, uint32_t& offset)
 }
 
 namespace {
-std::array<const BuildNode*, SIMD_WIDTH>
-collapseNode(const BuildNode* node, uint8_t& childNodeCount)
+void
+collapseNode(
+    const BuildNode* node,
+    uint8_t& childNodeCount,
+    std::array<const BuildNode*, SIMD_WIDTH>& childNodes)
 {
-    std::array<const BuildNode*, SIMD_WIDTH> childNodes{};
     childNodeCount = 0;
 
     childNodes[childNodeCount++] = node->children[0];
@@ -340,8 +339,6 @@ collapseNode(const BuildNode* node, uint8_t& childNodeCount)
         childNodes[childNodeCount++] = collapsedNode->children[0];
         childNodes[maxNodeIdx] = collapsedNode->children[1];
     }
-
-    return childNodes;
 }
 
 template<typename T>
@@ -406,6 +403,8 @@ WideBvh::Impl::flattenDepthFirst(
 
     nodeCount = 0;
 
+    std::array<const BuildNode*, SIMD_WIDTH> childNodes{};
+
     while (!stack.empty())
     {
         auto [node, offset] = stack.back();
@@ -425,13 +424,18 @@ WideBvh::Impl::flattenDepthFirst(
         else
         {
             linearNode.clearOffset();
-            linearNode.dim = node->dim;
             linearNode.isLeaf = false;
 
             uint8_t childNodeCount = 0;
-            auto childNodes = collapseNode(node, childNodeCount);
+            collapseNode(node, childNodeCount, childNodes);
 
             linearNode.childCount = childNodeCount;
+
+            // sort nodes by surface area to optimize traversal order
+            std::sort(childNodes.begin(), childNodes.begin() + childNodeCount,
+                [](const auto* a, const auto* b) {
+                    return a->bbox.computeSurfaceArea() < b->bbox.computeSurfaceArea();
+                });
 
             for (int8_t i = childNodeCount - 1; i >= 0; i--)
             {
@@ -473,6 +477,8 @@ WideBvh::Impl::flattenBreadthFirst(
 
     nodeCount = 0;
 
+    std::array<const BuildNode*, SIMD_WIDTH> childNodes{};
+
     while (!queue.empty())
     {
         auto [node, offset] = queue.front();
@@ -491,13 +497,18 @@ WideBvh::Impl::flattenBreadthFirst(
         else
         {
             linearNode.clearOffset();
-            linearNode.dim = node->dim;
             linearNode.isLeaf = false;
 
             uint8_t childNodeCount = 0;
-            auto childNodes = collapseNode(node, childNodeCount);
+            collapseNode(node, childNodeCount, childNodes);
 
             linearNode.childCount = childNodeCount;
+
+            // sort nodes by surface area to optimize traversal order
+            std::sort(childNodes.begin(), childNodes.begin() + childNodeCount,
+                [](const auto* a, const auto* b) {
+                    return a->bbox.computeSurfaceArea() < b->bbox.computeSurfaceArea();
+                });
 
             for (uint8_t i = 0; i < childNodeCount; ++i)
             {
@@ -683,8 +694,7 @@ WideBvh::Impl::traverse(const Ray& ray, float tFar, bool any) const
                 intersects[i] = linearNode.bbox[i].intersect(ray, tNear, invRayDir);
             }
 #endif
-
-            for (uint8_t i = 0; i < linearNode.childCount; ++i)
+            for (int8_t i = linearNode.childCount - 1; i >= 0; --i)
             {
                 if (!intersects[i])
                 {
