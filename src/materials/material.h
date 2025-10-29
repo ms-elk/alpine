@@ -1,7 +1,8 @@
 ﻿#pragma once
 
+#include "bsdf.h"
+
 #include <math/vector.h>
-#include <texture.h>
 
 #include <optional>
 
@@ -14,13 +15,7 @@ public:
     Material() = default;
     virtual ~Material() = default;
 
-    struct Sample {
-        float3 estimator; // bsdf * cosTerm / pdf
-        float3 wi;
-        float pdf;
-    };
-
-    virtual std::optional<Sample> sample(
+    virtual std::optional<Bsdf::Sample> sample(
         const float3& wo, const float2& u, const IntersectionAttributes& isectAttr) const = 0;
 
     virtual float3 computeBsdf(

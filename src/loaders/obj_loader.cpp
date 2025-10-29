@@ -1,7 +1,6 @@
 ﻿#include "file_loader.h"
 
-#include <materials/matte.h>
-#include <materials/metal.h>
+#include <materials/dielectric.h>
 #include <scenes/scene.h>
 #include <shapes/mesh.h>
 #include <texture.h>
@@ -72,7 +71,8 @@ loadObj(Scene* scene, std::string_view filename)
         }
 
         const auto& d = om.diffuse;
-        materials.push_back(std::make_shared<Matte>(float3(d[0], d[1], d[2]), baseColorTex, nullptr));
+        materials.push_back(std::make_shared<Dielectric>(
+            float2(1.0f), float3(d[0], d[1], d[2]), baseColorTex, nullptr));
     }
 
     Mesh::Data meshData;
