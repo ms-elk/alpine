@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "material.h"
 
@@ -7,19 +7,22 @@
 #include <memory>
 
 namespace alpine {
-class Matte final : public Material
+class Bsdf;
+
+class Conductor final : public Material
 {
 public:
-    Matte(const float3& baseColor,
+    Conductor(
+        const float2& alpha,
+        const float3& baseColor,
         const std::shared_ptr<Texture4f>& baseColorTex,
-        const std::shared_ptr<Texture4f>& normalTex)
-        : mBaseColor(baseColor), mBaseColorTex(baseColorTex), mNormalTex(normalTex) {}
+        const std::shared_ptr<Texture4f>& normalTex);
 
-    std::optional<Sample> sample(
+    std::optional<Bsdf::Sample> sample(
         const float3& wo, const float2& u, const IntersectionAttributes& isectAttr) const override;
 
     float3 computeBsdf(
-        const float3& wo,const float3& wi, const IntersectionAttributes& isectAttr) const override;
+        const float3& wo, const float3& wi, const IntersectionAttributes& isectAttr) const override;
 
     float computePdf(const float3& wo, const float3& wi) const override;
 
@@ -28,6 +31,7 @@ public:
     float3 getNormal(const float2& uv) const override;
 
 private:
+    std::unique_ptr<Bsdf> mBsdf;
     float3 mBaseColor;
     std::shared_ptr<Texture4f> mBaseColorTex;
     std::shared_ptr<Texture4f> mNormalTex;

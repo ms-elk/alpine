@@ -4,23 +4,22 @@
 
 #include <texture.h>
 
+#include <array>
 #include <memory>
 
 namespace alpine {
-class Metal final : public Material
+class Bsdf;
+
+class Dielectric final : public Material
 {
 public:
-    Metal(const float2& alpha, const float3& baseColor,
+    Dielectric(
+        const float2& alpha,
+        const float3& baseColor,
         const std::shared_ptr<Texture4f>& baseColorTex,
-        const std::shared_ptr<Texture4f>& normalTex,
-        bool useVndfSampling = true)
-        : mAlpha({ std::max(0.001f, alpha.x), std::max(0.001f, alpha.y) })
-        , mBaseColor(baseColor)
-        , mBaseColorTex(baseColorTex)
-        , mNormalTex(normalTex)
-        , mUseVndfSampling(useVndfSampling) {};
+        const std::shared_ptr<Texture4f>& normalTex);
 
-    std::optional<Sample> sample(
+    std::optional<Bsdf::Sample> sample(
         const float3& wo, const float2& u, const IntersectionAttributes& isectAttr) const override;
 
     float3 computeBsdf(
@@ -33,17 +32,9 @@ public:
     float3 getNormal(const float2& uv) const override;
 
 private:
-    float computeDistribution(const float3& wh) const;
-
-    float lambda(const float3& v) const;
-
-    float computeMaskingShadowing(const float3& wo, const float3& wi) const;
-
-private:
-    float2 mAlpha;
+    std::array<std::unique_ptr<Bsdf>, 2> mBsdfs;
     float3 mBaseColor;
     std::shared_ptr<Texture4f> mBaseColorTex;
     std::shared_ptr<Texture4f> mNormalTex;
-    bool mUseVndfSampling;
 };
 }

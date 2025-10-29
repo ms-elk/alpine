@@ -1,8 +1,8 @@
 #include "file_loader.h"
 
 #include <lights/point_light.h>
-#include <materials/matte.h>
-#include <materials/metal.h>
+#include <materials/conductor.h>
+#include <materials/dielectric.h>
 #include <math/matrix.h>
 #include <scenes/scene.h>
 #include <shapes/mesh.h>
@@ -402,15 +402,16 @@ GltfLoader::createMaterial(uint32_t matIdx) const
     const auto& d = srcMat.pbrMetallicRoughness.baseColorFactor;
     float3 baseColor(static_cast<float>(d[0]), static_cast<float>(d[1]), static_cast<float>(d[2]));
 
+    float roughness = static_cast<float>(srcMat.pbrMetallicRoughness.roughnessFactor);
     if (srcMat.pbrMetallicRoughness.metallicFactor > 0.0)
     {
-        float roughness = static_cast<float>(srcMat.pbrMetallicRoughness.roughnessFactor);
-        return std::make_shared<Metal>(
+        return std::make_shared<Conductor>(
             float2(roughness), baseColor, baseColorTex, normalTex);
     }
     else
     {
-        return std::make_shared<Matte>(baseColor, baseColorTex, normalTex);
+        return std::make_shared<Dielectric>(
+            float2(roughness), baseColor, baseColorTex, normalTex);
     }
 }
 

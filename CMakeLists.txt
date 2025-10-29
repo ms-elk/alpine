@@ -96,11 +96,16 @@ set(LOADERS
 )
 
 set(MATERIALS
-  src/materials/matte.cpp
-  src/materials/matte.h
+  src/materials/bsdf.h
+  src/materials/conductor.cpp
+  src/materials/conductor.h
+  src/materials/dielectric.cpp
+  src/materials/dielectric.h
+  src/materials/lambertian.cpp
+  src/materials/lambertian.h
   src/materials/material.h
-  src/materials/metal.cpp
-  src/materials/metal.h
+  src/materials/microfacet.cpp
+  src/materials/microfacet.h
 )
 
 set(MATH
