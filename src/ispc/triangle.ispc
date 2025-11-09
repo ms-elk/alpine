@@ -1,6 +1,6 @@
 #include "ispc_config.h"
 
-static const uniform float EPSILON = 1e-5f;
+static const uniform float EPSILON = 1e-6f;
 
 struct IntersectionN
 {
@@ -69,7 +69,7 @@ intersectTriangleN(
             sx2, sy2, sz2);
 
         float det = dot(sx1, sy1, sz1, triN.ex0[i], triN.ey0[i], triN.ez0[i]);
-        
+
         bool isIntersected = abs(det) >= EPSILON;
 
         float rcpDet = 1.0f / det;
