@@ -42,7 +42,8 @@ public:
     bool intersectAny(const Ray& ray, float tFar) const;
 
 private:
-    uint32_t flatten(const BuildNode* node, uint32_t& offset);
+    void flatten(
+        const BuildNode* node, uint32_t& nodeCount, std::pmr::monotonic_buffer_resource* arena);
 
     std::optional<Intersection> traverse(const Ray& ray, float tFar, bool any) const;
 
@@ -135,34 +136,56 @@ Bvh::Impl::updateScene()
     auto* bvh = buildBvh(mPrimitives, mOrderedPrimitives, LEAF_THRESHOLD, &arena);
 
     mNodeCount = 0;
-    flatten(bvh, mNodeCount);
+    flatten(bvh, mNodeCount, &arena);
 
     gBvhStats.countNodes(mNodeCount);
 }
 
-uint32_t
-Bvh::Impl::flatten(const BuildNode* node, uint32_t& offset)
+void
+Bvh::Impl::flatten(
+    const BuildNode* node, uint32_t& nodeCount, std::pmr::monotonic_buffer_resource* arena)
 {
     assert(node);
-    assert(offset < MAX_NODES);
 
-    auto& linearNode = mLinearNodes[offset];
-    uint32_t nodeOffset = offset++;
-    linearNode.bbox = node->bbox;
-    if (node->isLeaf())
-    {
-        linearNode.offset = node->offset;
-        linearNode.primitiveCount = node->primitiveCount;
-    }
-    else
-    {
-        linearNode.dim = node->dim;
-        flatten(node->children[0], offset);
-        linearNode.offset = flatten(node->children[1], offset);
-        linearNode.primitiveCount = 0;
-    }
+    struct NodeInfo {
+        const BuildNode* node;
+        uint32_t* offset;
+    };
 
-    return nodeOffset;
+    std::pmr::vector<NodeInfo> stack(arena);
+    stack.reserve(STACK_SIZE);
+    stack.push_back({ node, nullptr });
+
+    nodeCount = 0;
+
+    std::array<const BuildNode*, CHILD_NODE_COUNT> childNodes{};
+
+    while (!stack.empty())
+    {
+        auto [node, offset] = stack.back();
+        stack.pop_back();
+
+        if (offset)
+        {
+            *offset = nodeCount;
+        }
+
+        auto& linearNode = mLinearNodes[nodeCount++];
+        linearNode.bbox = node->bbox;
+
+        if (node->isLeaf())
+        {
+            linearNode.offset = node->offset;
+            linearNode.primitiveCount = node->primitiveCount;
+        }
+        else
+        {
+            linearNode.dim = node->dim;
+            linearNode.primitiveCount = 0;
+            stack.push_back({ node->children[1], &linearNode.offset });
+            stack.push_back({ node->children[0], nullptr });
+        }
+    }
 }
 
 std::optional<Intersection>
