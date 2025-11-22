@@ -1,7 +1,6 @@
 ﻿#include "wide_bvh.h"
 
 #include "bvh_common.h"
-#include "wide_bvh_builder.h"
 
 #include <ispc/bounding_box.h>
 #include <ispc/ispc_config.h>
@@ -13,11 +12,9 @@
 
 #include <array>
 #include <assert.h>
-#include <bit>
 
 #define USE_BVH_SIMD
 #define USE_TRIANGLE_SIMD
-#define USE_BINARY_TO_WIDE
 //#define USE_BREADTH_FIRST
 
 namespace {
@@ -94,8 +91,6 @@ private:
 #endif
         }
     };
-
-    uint32_t flattenWide(const BuildWideNode* node, uint32_t& offset);
 
     void flattenDepthFirst(const BuildNode* node, uint32_t& nodeCount,
         std::pmr::monotonic_buffer_resource* arena);
@@ -191,108 +186,14 @@ WideBvh::Impl::updateScene()
     mTriangleN.clear();
     mNodeCount = 0;
 
-#ifdef USE_BINARY_TO_WIDE
     auto* bvh = buildBvh(mPrimitives, mOrderedPrimitives, LEAF_THRESHOLD, &arena);
 #ifdef USE_BREADTH_FIRST
     flattenBreadthFirst(bvh, mNodeCount, &arena);
 #else
     flattenDepthFirst(bvh, mNodeCount, &arena);
 #endif
-#else
-    auto* bvh = buildWideBvh(mPrimitives, mOrderedPrimitives, LEAF_THRESHOLD, &arena);
-    flattenWide(bvh, mNodeCount);
-#endif
 
     gBvhStats.countNodes(mNodeCount);
-}
-
-uint32_t
-WideBvh::Impl::flattenWide(const BuildWideNode* node, uint32_t& offset)
-{
-    assert(node);
-    assert(offset < MAX_NODES);
-
-    auto& linearNode = mLinearNodes[offset];
-    uint32_t nodeOffset = offset++;
-
-    if (node->isLeaf())
-    {
-        assert(node->isLeaf());
-
-        linearNode.offset[0] = node->offset;
-        linearNode.childCount = node->primitiveCount;
-        linearNode.isLeaf = true;
-#ifdef USE_TRIANGLE_SIMD
-        linearNode.offset[1] = mTriangleN.size();
-
-        uint16_t triGroupCount = (node->primitiveCount - 1) / SIMD_WIDTH + 1;
-        for (uint16_t i = 0; i < triGroupCount; ++i)
-        {
-            ispc::TriangleN triN;
-            for (uint8_t j = 0; j < SIMD_WIDTH; ++j)
-            {
-                uint16_t idx = i * SIMD_WIDTH + j;
-                if (idx >= node->primitiveCount)
-                {
-                    break;
-                }
-
-                const auto& prim = mOrderedPrimitives[node->offset + idx];
-
-                triN.vx[j] = prim.vertex.x;
-                triN.vy[j] = prim.vertex.y;
-                triN.vz[j] = prim.vertex.z;
-
-                triN.ex0[j] = prim.edges[0].x;
-                triN.ey0[j] = prim.edges[0].y;
-                triN.ez0[j] = prim.edges[0].z;
-
-                triN.ex1[j] = prim.edges[1].x;
-                triN.ey1[j] = prim.edges[1].y;
-                triN.ez1[j] = prim.edges[1].z;
-            }
-
-            mTriangleN.emplace_back(triN);
-        }
-#endif
-    }
-    else
-    {
-        linearNode.clearOffset();
-        linearNode.isLeaf = false;
-        linearNode.childCount = 0;
-
-        for (uint8_t i = 0; i < node->children.size(); ++i)
-        {
-            const auto* child = node->children[i];
-            if (!child)
-            {
-                continue;
-            }
-
-            uint32_t childNodeOffset = flattenWide(child, offset);
-            if (i > 0)
-            {
-                linearNode.offset[i - 1] = childNodeOffset;
-            }
-
-#ifdef USE_BVH_SIMD
-            linearNode.bboxN.minX[i] = child->bbox.min.x;
-            linearNode.bboxN.minY[i] = child->bbox.min.y;
-            linearNode.bboxN.minZ[i] = child->bbox.min.z;
-            
-            linearNode.bboxN.maxX[i] = child->bbox.max.x;
-            linearNode.bboxN.maxY[i] = child->bbox.max.y;
-            linearNode.bboxN.maxZ[i] = child->bbox.max.z;
-#else
-            linearNode.bbox[i] = child->bbox;
-#endif
-            linearNode.childCount++;
-        }
-
-    }
-
-    return nodeOffset;
 }
 
 namespace {
@@ -415,7 +316,7 @@ WideBvh::Impl::flattenDepthFirst(
             *offset = nodeCount;
         }
 
-        LinearNode& linearNode = mLinearNodes[nodeCount++];
+        auto& linearNode = mLinearNodes[nodeCount++];
 
         if (node->isLeaf())
         {
@@ -430,12 +331,6 @@ WideBvh::Impl::flattenDepthFirst(
             collapseNode(node, childNodeCount, childNodes);
 
             linearNode.childCount = childNodeCount;
-
-            // sort nodes by surface area to optimize traversal order
-            std::sort(childNodes.begin(), childNodes.begin() + childNodeCount,
-                [](const auto* a, const auto* b) {
-                    return a->bbox.computeSurfaceArea() < b->bbox.computeSurfaceArea();
-                });
 
             for (int8_t i = childNodeCount - 1; i >= 0; i--)
             {
