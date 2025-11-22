@@ -4,8 +4,8 @@
 
 #include <texture.h>
 
-#include <array>
 #include <memory>
+#include <vector>
 
 namespace alpine {
 class Bsdf;
@@ -32,7 +32,7 @@ public:
     float3 getNormal(const float2& uv) const override;
 
 private:
-    std::array<std::unique_ptr<Bsdf>, 2> mBsdfs;
+    std::vector<std::unique_ptr<Bsdf>> mBsdfs;
     float3 mBaseColor;
     std::shared_ptr<Texture4f> mBaseColorTex;
     std::shared_ptr<Texture4f> mNormalTex;

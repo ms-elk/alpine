@@ -19,8 +19,11 @@ Dielectric::Dielectric(const float2& alpha, const float3& baseColor,
     , mBaseColorTex(baseColorTex)
     , mNormalTex(normalTex)
 {
-    mBsdfs[0] = std::make_unique<Lambertian>();
-    mBsdfs[1] = std::make_unique<Microfacet>(alpha, F0);
+    mBsdfs.reserve(2);
+    mBsdfs.push_back(std::make_unique<Lambertian>());
+    if (dot(alpha, alpha) < 1.0f) {
+        mBsdfs.push_back(std::make_unique<Microfacet>(alpha, F0));
+    }
 }
 
 std::optional<Bsdf::Sample>
