@@ -60,17 +60,19 @@ public:
 
     bool load(std::string_view filename, FileType fileType);
 
-    void buildAccelerator();
+    void updateScene(float time);
 
     api::Light* addPointLight(
         float power, const float color[3], const float position[3]);
 
     api::Light* addDiskLight(
-        float power, const float color[3], const float position[3], float radius);
+        float power,
+        const float color[3],
+        const float position[3],
+        const float target[3],
+        float radius);
 
     void buildLightSampler(LightSamplerType lightSamplerType);
-
-    void updateScene(float time);
 
     void resetAccumulation();
 
@@ -176,16 +178,23 @@ Alpine::load(std::string_view filename, FileType fileType)
     };
 
     bool isLoaded = load();
-    return isLoaded;
-}
 
-void
-Alpine::buildAccelerator()
-{
     for (auto& shape : mScene.shapes)
     {
         shape->appendTo(mAccelerator.get());
     }
+
+    return isLoaded;
+}
+
+void
+Alpine::updateScene(float time)
+{
+    for (auto& animation : mScene.animations)
+    {
+        animation->update(mAccelerator.get(), time);
+    }
+
     mAccelerator->updateScene();
 }
 
@@ -197,10 +206,16 @@ Alpine::addPointLight(float power, const float color[3], const float position[3]
 }
 
 api::Light*
-Alpine::addDiskLight(float power, const float color[3], const float position[3], float radius)
+Alpine::addDiskLight(
+    float power,
+    const float color[3],
+    const float position[3],
+    const float target[3],
+    float radius)
 {
+    float3 normal = normalize(float3(target) - float3(position));
     mScene.lights.push_back(std::make_shared<DiskLight>(
-        power, float3(color), float3(position), normalize(float3(0.0, -1.0f, 0.0f)), radius));
+        power, float3(color), float3(position), normal, radius));
     return mScene.lights.back().get();
 }
 
@@ -220,17 +235,6 @@ Alpine::buildLightSampler(LightSamplerType lightSamplerType)
         mLightSampler = std::make_unique<UniformLightSampler>(mScene.lights);
         break;
     }
-}
-
-void
-Alpine::updateScene(float time)
-{
-    for (auto& animation : mScene.animations)
-    {
-        animation->update(mAccelerator.get(), time);
-    }
-
-    mAccelerator->updateScene();
 }
 
 void
@@ -481,10 +485,17 @@ load(std::string_view filename, FileType fileType)
 }
 
 void
-buildAccelerator()
+updateScene(float time)
 {
     assert(gAlpine);
-    gAlpine->buildAccelerator();
+    gAlpine->updateScene(time);
+}
+
+bool
+isDynamicScene()
+{
+    assert(gAlpine);
+    return gAlpine->isDynamicScene();
 }
 
 api::Light*
@@ -495,10 +506,15 @@ addPointLight(float power, const float color[3], const float position[3])
 }
 
 api::Light*
-addDiskLight(float power, const float color[3], const float position[3], float radius)
+addDiskLight(
+    float power,
+    const float color[3],
+    const float position[3],
+    const float target[3],
+    float radius)
 {
     assert(gAlpine);
-    return gAlpine->addDiskLight(power, color, position, radius);
+    return gAlpine->addDiskLight(power, color, position, target, radius);
 }
 
 void
@@ -520,20 +536,6 @@ getCamera()
 {
     assert(gAlpine);
     return gAlpine->getCamera();
-}
-
-void
-updateScene(float time)
-{
-    assert(gAlpine);
-    gAlpine->updateScene(time);
-}
-
-bool
-isDynamicScene()
-{
-    assert(gAlpine);
-    return gAlpine->isDynamicScene();
 }
 
 void

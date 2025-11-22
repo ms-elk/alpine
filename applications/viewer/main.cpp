@@ -148,7 +148,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    alpine::buildAccelerator();
+    alpine::updateScene(gTime);
 
     alpine::buildLightSampler(alpine::LightSamplerType::Bvh);
 

@@ -106,10 +106,13 @@ main(int argc, char* argv[])
     const uint32_t width = 256;
     const uint32_t height = 256;
     const uint32_t maxDepth = 8;
+
     const float lightPower = 100.0f;
     const float lightColor[] = { 1.0f, 1.0f, 1.0f };
     const float lightPos[] = { 0.0f, 10.0f, 0.0f };
+    const float lightTarget[] = { 0.0f, 0.0f, 0.0f };
     const float lightRadius = 5.0f;
+
     const float eye[] = { 0.0f, 0.0f, -3.0f };
     const float target[] = { 0.0f, 0.0f, 0.0f };
     const float up[] = { 0.0f, 1.0f, 0.0f };
@@ -118,7 +121,7 @@ main(int argc, char* argv[])
 
     alpine::initialize(memoryArenaSize, width, height, maxDepth, acceleratorType);
 
-    alpine::addDiskLight(lightPower, lightColor, lightPos, lightRadius);
+    alpine::addDiskLight(lightPower, lightColor, lightPos, lightTarget, lightRadius);
 
     bool loaded = alpine::load(inputPath.string(), fileType);
     if (!loaded)
@@ -129,7 +132,7 @@ main(int argc, char* argv[])
 
     {
         Timer timer("Accelerator Build");
-        alpine::buildAccelerator();
+        alpine::updateScene(0.0f);
     }
 
     {

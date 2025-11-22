@@ -26,11 +26,18 @@ enum class FileType {
 };
 bool load(std::string_view filename, FileType fileType);
 
-void buildAccelerator();
+void updateScene(float time);
+
+bool isDynamicScene();
 
 api::Light* addPointLight(float power, const float color[3], const float position[3]);
 
-api::Light* addDiskLight(float power, const float color[3], const float position[3], float radius);
+api::Light* addDiskLight(
+    float power,
+    const float color[3],
+    const float position[3],
+    const float target[3],
+    float radius);
 
 enum class LightSamplerType {
     Uniform,
@@ -44,10 +51,6 @@ void buildLightSampler(LightSamplerType lightSamplerType);
 void setBackgroundColor(float r, float g, float b);
 
 api::Camera* getCamera();
-
-void updateScene(float time);
-
-bool isDynamicScene();
 
 // Render
 void resetAccumulation();
