@@ -62,3 +62,4 @@ The camera can be manipulated by a mouse.
 ## Images
 ![room](images/room.png)  
 ![galaxy](images/galaxy.png)  
+![bands](images/bands.png)  
