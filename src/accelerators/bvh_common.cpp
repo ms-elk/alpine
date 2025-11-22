@@ -11,16 +11,19 @@
 namespace {
 constexpr uint8_t SPLITS_PER_DIM = 8;
 constexpr uint8_t BIN_COUNT = SPLITS_PER_DIM + 1;
+constexpr uint32_t MIN_PRIMITIVES_FOR_PARALLELIZATION = 1024;
 }
 
 namespace alpine {
 void
 BvhStats::show()
 {
+#ifdef ENABLE_BVH_STATS
     printf("BVH Total Node Count: %zu\n", mNodeCount);
     printf("BVH Node Access Count (Closest): %zu\n", mClosestCount.load());
     printf("BVH Node Access Count (Any): %zu\n", mAnyCount.load());
     printf("BVH Triangle Access Count: %zu\n", mTriangleCount.load());
+#endif
 }
 
 void
@@ -49,6 +52,14 @@ BvhStats::addTriangleAccessCount(uint32_t count)
 {
 #ifdef ENABLE_BVH_STATS
     mTriangleCount += count;
+#endif
+}
+
+NodeAccessCounter::~NodeAccessCounter()
+{
+#ifdef ENABLE_BVH_STATS
+    mBvhStats.addNodeAccessCount(mNodeCounter, mAny);
+    mBvhStats.addTriangleAccessCount(mTriCounter);
 #endif
 }
 
@@ -295,8 +306,8 @@ BvhBuilder::buildNode(
         });
 
     auto midIdx = std::distance(buildPrimitives.begin(), midIter);
-    std::array<std::span<BuildPrimitive>, 2> subsets {
-        buildPrimitives.first(midIdx), buildPrimitives.subspan(midIdx)};
+    std::array<std::span<BuildPrimitive>, 2> subsets{
+        buildPrimitives.first(midIdx), buildPrimitives.subspan(midIdx) };
 
     assert(!subsets[0].empty());
     assert(!subsets[1].empty());
@@ -314,7 +325,7 @@ BvhBuilder::buildNode(
                 return buildNode(subsets[i], offset, nodeCount);
                 });
         }
-
+    
         for (uint8_t i = 0; i < node->children.size(); ++i)
         {
             node->children[i] = children[i].get();

@@ -58,8 +58,6 @@ endif()
 
 if (ALPINE_ENABLE_ISPC)
 list(APPEND ACCELERATORS src/accelerators/wide_bvh.cpp)
-list(APPEND ACCELERATORS src/accelerators/wide_bvh_builder.cpp)
-list(APPEND ACCELERATORS src/accelerators/wide_bvh_builder.h)
 else()
 list(APPEND ACCELERATORS src/accelerators/wide_bvh_dummy.cpp)
 endif()
