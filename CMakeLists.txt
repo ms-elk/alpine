@@ -152,7 +152,7 @@ foreach(ISPC_FILE_NAME ${ISPC_FILE_NAMES})
 
   add_custom_command(
       OUTPUT ${ISPC_OBJ} ${ISPC_H}
-      COMMAND ${ISPC_EXE} ${ISPC_SRC} -o ${ISPC_OBJ} -h ${ISPC_H}
+      COMMAND ${ISPC_EXE} ${ISPC_SRC} -O2 -o ${ISPC_OBJ} -h ${ISPC_H}
       DEPENDS ${ISPC_SRC}
       COMMENT "Compiling ISPC file ${ISPC_SRC}"
   )
