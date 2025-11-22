@@ -60,6 +60,10 @@ The camera can be manipulated by a mouse.
 `Middle Wheel`: Zoom  
 
 ## Images
-![room](images/room.png)  
-![galaxy](images/galaxy.png)  
-![bands](images/bands.png)  
+<p align="center">
+  <img src="images/room.png" width="45%">
+  <img src="images/galaxy.png" width="45%">
+</p>
+<p align="center">
+  <img src="images/bands.png" width="40%">
+</p>
