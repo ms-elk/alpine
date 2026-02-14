@@ -1,13 +1,20 @@
 #include <alpine/alpine.h>
 
 #include <GLFW/glfw3.h>
-#include <GL/gl.h>
+
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
+
 #include <numbers>
 
 static constexpr uint32_t MEMORY_ARENA_SIZE = 512 * 1024 * 1024;
 
-static constexpr uint32_t WIDTH = 512;
-static constexpr uint32_t HEIGHT = 512;
+static constexpr uint32_t WINDOW_WIDTH = 578;
+static constexpr uint32_t WINDOW_HEIGHT = 578;
+
+static constexpr uint32_t IMAGE_WIDTH = 512;
+static constexpr uint32_t IMAGE_HEIGHT = 512;
 static constexpr uint32_t MAX_DEPTH = 8;
 
 static constexpr float PAN_SPEED = 0.01f;
@@ -64,8 +71,8 @@ void cursorPositionCallback(GLFWwindow* window, double xpos, double ypos)
 
         if (gMouseAction == MouseAction::LeftPressed)
         {
-            float theta = deltaX / static_cast<float>(WIDTH) * std::numbers::pi_v<float>;
-            float phi = deltaY / static_cast<float>(HEIGHT) * std::numbers::pi_v<float>;
+            float theta = deltaX / static_cast<float>(WINDOW_WIDTH) * std::numbers::pi_v<float>;
+            float phi = deltaY / static_cast<float>(WINDOW_HEIGHT) * std::numbers::pi_v<float>;
             gCamera->orbit(theta, phi);
         }
         else if (gMouseAction == MouseAction::MiddlePressed)
@@ -82,6 +89,55 @@ void scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
     float zoom = -static_cast<float>(yoffset) * ZOOM_SPEED;
     gCamera->zoom(zoom);
     alpine::resetAccumulation();
+}
+
+GLuint createRenderTexture()
+{
+    GLuint rt;
+    glGenTextures(1, &rt);
+    glBindTexture(GL_TEXTURE_2D, rt);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+
+    glTexImage2D(
+        GL_TEXTURE_2D,
+        0,
+        GL_RGB8,
+        IMAGE_WIDTH,
+        IMAGE_HEIGHT,
+        0,
+        GL_RGB,
+        GL_UNSIGNED_BYTE,
+        nullptr
+    );
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    return rt;
+}
+
+void updateRenderTexture(GLuint rt, const void* pixels)
+{
+    glBindTexture(GL_TEXTURE_2D, rt);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+    glTexImage2D(
+        GL_TEXTURE_2D,
+        0,
+        GL_RGB8,
+        IMAGE_WIDTH,
+        IMAGE_HEIGHT,
+        0,
+        GL_RGB,
+        GL_UNSIGNED_BYTE,
+        pixels
+    );
+
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void updateScene(GLFWwindow* window)
@@ -116,11 +172,12 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     auto* window = glfwCreateWindow(
-        WIDTH, HEIGHT, "alpine viewer", nullptr, nullptr);
+        WINDOW_WIDTH, WINDOW_HEIGHT, "alpine viewer", nullptr, nullptr);
     if (!window)
     {
         glfwTerminate();
@@ -134,8 +191,15 @@ int main(int argc, char* argv[])
     glfwSetCursorPosCallback(window, cursorPositionCallback);
     glfwSetScrollCallback(window, scrollCallback);
 
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 330");
+
     alpine::initialize(
-        MEMORY_ARENA_SIZE, WIDTH, HEIGHT, MAX_DEPTH, alpine::AcceleratorType::WideBvh);
+        MEMORY_ARENA_SIZE, IMAGE_WIDTH, IMAGE_HEIGHT, MAX_DEPTH, alpine::AcceleratorType::WideBvh);
 
     const float eye[] = { 0.0f, 0.0f, -3.0f };
     const float target[] = { 0.0f, 0.0f, 0.0f };
@@ -153,27 +217,67 @@ int main(int argc, char* argv[])
     alpine::buildLightSampler(alpine::LightSamplerType::Bvh);
 
     const float fovy = std::numbers::pi_v<float> / 2.0f;
-    float aspect = float(WIDTH) / float(HEIGHT);
+    float aspect = float(IMAGE_WIDTH) / float(IMAGE_HEIGHT);
     gCamera = alpine::getCamera();
     gCamera->setLookAt(eye, target, up, fovy, aspect);
 
     const void* pixels = alpine::getFrameBuffer();
 
+    GLuint rt = createRenderTexture();
+
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
+
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        ImGui::SetNextWindowPos(ImVec2(32, 32), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(IMAGE_WIDTH, IMAGE_HEIGHT), ImGuiCond_Always);
+
+        ImGuiWindowFlags flags =
+            ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoTitleBar;
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+        ImGui::Begin("Path Tracer", nullptr, flags);
 
         updateScene(window);
 
         alpine::render(1);
         alpine::resolve(false);
 
-        glRasterPos2i(-1, 1);
-        glPixelZoom(1.0f, -1.0f);
-        glDrawPixels(WIDTH, HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, pixels);
+        updateRenderTexture(rt, pixels);
+
+        ImGui::Image(
+            (ImTextureID)(intptr_t)rt,
+            ImVec2(IMAGE_WIDTH, IMAGE_HEIGHT),
+            ImVec2(0, 0),
+            ImVec2(1, 1)
+        );
+
+        ImGui::End();
+        ImGui::PopStyleVar();
+
+        ImGui::Render();
+
+        glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+        glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         glfwSwapBuffers(window);
     }
+
+    glDeleteTextures(1, &rt);
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
 
     // cleanup
     glfwDestroyWindow(window);
