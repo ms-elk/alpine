@@ -1,7 +1,21 @@
-add_executable(viewer main.cpp)
+set(IMGUI_SRCS
+  ../../ext/imgui/imgui.cpp
+  ../../ext/imgui/imgui_draw.cpp
+  ../../ext/imgui/imgui_tables.cpp
+  ../../ext/imgui/imgui_widgets.cpp
+  ../../ext/imgui/backends/imgui_impl_glfw.cpp
+  ../../ext/imgui/backends/imgui_impl_opengl3.cpp
+)
+
+add_executable(viewer
+  main.cpp
+  ${IMGUI_SRCS}
+)
 
 target_include_directories(viewer PRIVATE
   ../../ext/glfw/include
+  ../../ext/imgui
+  ../../ext/imgui/backends
 )
 
 target_link_directories(viewer PRIVATE
