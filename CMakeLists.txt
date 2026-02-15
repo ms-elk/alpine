@@ -13,23 +13,29 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 endif()
 
-if (MSVC)
-  add_compile_options(/WX)
-else()
-  add_compile_options(-Werror)
-endif()
-
 option(ALPINE_BUILD_APPS "Builds alpine sample applications" OFF)
 option(ALPINE_ENABLE_EMBREE "Enables Embree as an accelerator backend option" OFF)
 option(ALPINE_ENABLE_OIDN "Enables a denoising option via OIDN" OFF)
 option(ALPINE_ENABLE_ISPC "Enables ISPC-based SIMD code generation" OFF)
 
+if (MSVC)
+  add_compile_options(/WX)
+
+if (ALPINE_BUILD_APPS)
+  # set directory for output executables
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+  # set directory for output libraries
+  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+endif()
+else()
+  add_compile_options(-Werror)
+  
 if (ALPINE_BUILD_APPS)
   # set directory for output executables
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/${CMAKE_BUILD_TYPE})
-
   # set directory for output libraries
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/${CMAKE_BUILD_TYPE})
+endif()
 endif()
 
 set(SOURCES
