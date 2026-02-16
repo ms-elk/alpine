@@ -10,9 +10,6 @@
 
 static constexpr uint32_t MEMORY_ARENA_SIZE = 512 * 1024 * 1024;
 
-static constexpr uint32_t WINDOW_WIDTH = 578;
-static constexpr uint32_t WINDOW_HEIGHT = 578;
-
 static constexpr uint32_t IMAGE_WIDTH = 512;
 static constexpr uint32_t IMAGE_HEIGHT = 512;
 static constexpr uint32_t MAX_DEPTH = 8;
@@ -71,8 +68,8 @@ void cursorPositionCallback(GLFWwindow* window, double xpos, double ypos)
 
         if (gMouseAction == MouseAction::LeftPressed)
         {
-            float theta = deltaX / static_cast<float>(WINDOW_WIDTH) * std::numbers::pi_v<float>;
-            float phi = deltaY / static_cast<float>(WINDOW_HEIGHT) * std::numbers::pi_v<float>;
+            float theta = deltaX / static_cast<float>(IMAGE_WIDTH) * std::numbers::pi_v<float>;
+            float phi = deltaY / static_cast<float>(IMAGE_HEIGHT) * std::numbers::pi_v<float>;
             gCamera->orbit(theta, phi);
         }
         else if (gMouseAction == MouseAction::MiddlePressed)
@@ -177,7 +174,7 @@ int main(int argc, char* argv[])
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     auto* window = glfwCreateWindow(
-        WINDOW_WIDTH, WINDOW_HEIGHT, "alpine viewer", nullptr, nullptr);
+        IMAGE_WIDTH, IMAGE_HEIGHT, "alpine viewer", nullptr, nullptr);
     if (!window)
     {
         glfwTerminate();
@@ -233,7 +230,7 @@ int main(int argc, char* argv[])
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::SetNextWindowPos(ImVec2(32, 32), ImGuiCond_Always);
+        ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(IMAGE_WIDTH, IMAGE_HEIGHT), ImGuiCond_Always);
 
         ImGuiWindowFlags flags =
@@ -264,7 +261,7 @@ int main(int argc, char* argv[])
 
         ImGui::Render();
 
-        glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+        glViewport(0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
         glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
