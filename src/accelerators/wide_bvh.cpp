@@ -37,7 +37,7 @@ public:
 
     void appendSphere(const std::vector<float4>& vertices, const void* ptr);
 
-    inline void* getVertexBuffer(uint32_t shapeId) { return mShapes[shapeId].vertices.data(); }
+    inline void* getVertexBuffer(uint32_t shapeId) { return mBvhShapes[shapeId].vertices.data(); }
 
     void updateShape(uint32_t shapeId);
 
@@ -103,7 +103,7 @@ private:
     std::optional<Intersection> traverse(const Ray& ray, float tFar, bool any) const;
 
 private:
-    std::vector<Shape> mShapes;
+    std::vector<BvhShape> mBvhShapes;
     std::vector<Primitive> mPrimitives;
     std::vector<Primitive> mOrderedPrimitives;
     std::vector<ispc::TriangleN> mTriangleN;
@@ -116,7 +116,7 @@ private:
 WideBvh::Impl::Impl(std::span<std::byte> memoryArenaBuffer)
     : mMemoryArenaBuffer(memoryArenaBuffer)
 {
-    mShapes.reserve(MAX_SHAPES);
+    mBvhShapes.reserve(MAX_SHAPES);
     mPrimitives.reserve(MAX_PRIMITIVES);
     mOrderedPrimitives.reserve(MAX_PRIMITIVES);
     mTriangleN.reserve(MAX_PRIMITIVES);
@@ -135,10 +135,10 @@ WideBvh::Impl::appendMesh(
     const std::vector<uint3>& prims,
     const void* ptr)
 {
-    assert(mShapes.size() < MAX_SHAPES);
-    uint32_t shapeId = mShapes.size();
-    mShapes.emplace_back(vertices, prims, static_cast<uint32_t>(mPrimitives.size()));
-    const auto& shape = mShapes.back();
+    assert(mBvhShapes.size() < MAX_SHAPES);
+    uint32_t shapeId = mBvhShapes.size();
+    mBvhShapes.emplace_back(vertices, prims, static_cast<uint32_t>(mPrimitives.size()));
+    const auto& shape = mBvhShapes.back();
 
     for (uint32_t primId = 0; primId < prims.size(); ++primId)
     {
@@ -163,12 +163,12 @@ WideBvh::Impl::appendSphere(const std::vector<float4>& vertices, const void* ptr
 void
 WideBvh::Impl::updateShape(uint32_t shapeId)
 {
-    const auto& shape = mShapes[shapeId];
+    const auto& bvhShape = mBvhShapes[shapeId];
 
-    for (uint32_t primId = 0; primId < shape.prims.size(); ++primId)
+    for (uint32_t primId = 0; primId < bvhShape.prims.size(); ++primId)
     {
-        auto& prim = mPrimitives[primId + shape.primOffset];
-        prim.updateVertices(shape);
+        auto& prim = mPrimitives[primId + bvhShape.primOffset];
+        prim.updateVertices(bvhShape);
     }
 }
 
