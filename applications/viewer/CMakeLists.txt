@@ -27,8 +27,10 @@ if(MSVC)
     glfw3dll
   )
 
-  set(DYNAMIC_LIBS
+  add_custom_command(TARGET viewer POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
     ${PROJECT_SOURCE_DIR}/ext/glfw/lib-vc2022/glfw3.dll
+    $<TARGET_FILE_DIR:viewer>
   )
 elseif(APPLE)
   set(DIRS
@@ -48,10 +50,6 @@ elseif(APPLE)
     ${COREVIDEO_FRAMEWORK}
   )
 
-  set(DYNAMIC_LIBS
-    ${PROJECT_SOURCE_DIR}/ext/glfw/lib-arm64/libglfw.3.dylib
-  )
-
   target_compile_definitions(viewer PRIVATE GL_SILENCE_DEPRECATION)
 endif()
 
@@ -65,10 +63,4 @@ target_link_libraries(viewer
   alpine
   OpenGL::GL
   ${LIBS}
-)
-
-add_custom_command(TARGET viewer POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different
-  ${DYNAMIC_LIBS}
-  $<TARGET_FILE_DIR:viewer>
 )

@@ -21,21 +21,31 @@ option(ALPINE_ENABLE_ISPC "Enables ISPC-based SIMD code generation" OFF)
 if (MSVC)
   add_compile_options(/WX)
 
-if (ALPINE_BUILD_APPS)
-  # set directory for output executables
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
-  # set directory for output libraries
-  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
-endif()
-else()
+  set(BIN_DIR
+    ${CMAKE_SOURCE_DIR}/bin
+  )
+
+  set(EMBREE_LIBS
+    embree4
+    tbb12
+  )
+elseif(APPLE)
   add_compile_options(-Werror)
   
+  set(BIN_DIR
+    ${CMAKE_SOURCE_DIR}/bin/${CMAKE_BUILD_TYPE}
+  )
+
+  set(EMBREE_LIBS
+    libembree4.dylib
+  )
+endif()
+
 if (ALPINE_BUILD_APPS)
   # set directory for output executables
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/${CMAKE_BUILD_TYPE})
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${BIN_DIR})
   # set directory for output libraries
-  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/${CMAKE_BUILD_TYPE})
-endif()
+  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${BIN_DIR})
 endif()
 
 set(SOURCES
@@ -220,8 +230,9 @@ target_include_directories(alpine
 if (ALPINE_ENABLE_EMBREE)
 target_include_directories(alpine PRIVATE ext/embree/include)
 target_link_directories(alpine PUBLIC ext/embree/lib)
-target_link_libraries(alpine PUBLIC embree4 tbb12)
+target_link_libraries(alpine PUBLIC ${EMBREE_LIBS})
 
+if (MSVC)
 add_custom_command(TARGET alpine POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
   ${CMAKE_CURRENT_SOURCE_DIR}/ext/embree/bin/embree4.dll
@@ -231,6 +242,7 @@ add_custom_command(TARGET alpine POST_BUILD
   ${CMAKE_CURRENT_SOURCE_DIR}/ext/embree/bin/tbb12.dll
   $<TARGET_FILE_DIR:alpine>
 )
+endif()
 endif()
 
 # oidn libraries
