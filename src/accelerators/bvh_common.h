@@ -60,7 +60,7 @@ private:
     uint32_t mTriCounter = 0;
 };
 
-struct Shape
+struct BvhShape
 {
     std::vector<float3> vertices;
     std::vector<uint3> prims;
@@ -81,7 +81,7 @@ struct Primitive
 
     std::optional<Intersection> intersect(const Ray& ray) const;
 
-    void updateVertices(const Shape& shape);
+    void updateVertices(const BvhShape& bvhShape);
 };
 
 struct BuildNode
