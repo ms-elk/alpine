@@ -155,6 +155,34 @@ void updateScene(GLFWwindow* window)
     }
 }
 
+void showRenderTexturePanel(GLuint rt)
+{
+    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(IMAGE_WIDTH, IMAGE_HEIGHT), ImGuiCond_Always);
+
+    ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoTitleBar;
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+
+    ImGui::Begin("Path Tracer", nullptr, flags);
+
+    ImGui::Image(
+        (ImTextureID)(intptr_t)rt,
+        ImVec2(IMAGE_WIDTH, IMAGE_HEIGHT),
+        ImVec2(0, 0),
+        ImVec2(1, 1)
+    );
+
+    ImGui::End();
+
+    ImGui::PopStyleVar(2);
+}
+
 int main(int argc, char* argv[])
 {
     if (argc < 2)
@@ -226,22 +254,6 @@ int main(int argc, char* argv[])
     {
         glfwPollEvents();
 
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-
-        ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
-        ImGui::SetNextWindowSize(ImVec2(IMAGE_WIDTH, IMAGE_HEIGHT), ImGuiCond_Always);
-
-        ImGuiWindowFlags flags =
-            ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoCollapse |
-            ImGuiWindowFlags_NoTitleBar;
-
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-        ImGui::Begin("Path Tracer", nullptr, flags);
-
         updateScene(window);
 
         alpine::render(1);
@@ -249,15 +261,11 @@ int main(int argc, char* argv[])
 
         updateRenderTexture(rt, pixels);
 
-        ImGui::Image(
-            (ImTextureID)(intptr_t)rt,
-            ImVec2(IMAGE_WIDTH, IMAGE_HEIGHT),
-            ImVec2(0, 0),
-            ImVec2(1, 1)
-        );
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
 
-        ImGui::End();
-        ImGui::PopStyleVar();
+        showRenderTexturePanel(rt);
 
         ImGui::Render();
 
