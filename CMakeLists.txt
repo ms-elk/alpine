@@ -27,7 +27,6 @@ if (MSVC)
 
   set(EMBREE_LIBS
     embree4
-    tbb12
   )
 elseif(APPLE)
   add_compile_options(-Werror)
