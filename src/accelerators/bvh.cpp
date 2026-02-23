@@ -89,14 +89,14 @@ Bvh::Impl::appendMesh(
     assert(mBvhShapes.size() < MAX_SHAPES);
     uint32_t shapeId = mBvhShapes.size();
     mBvhShapes.emplace_back(vertices, prims, static_cast<uint32_t>(mPrimitives.size()));
-    const auto& shape = mBvhShapes.back();
+    const auto& bvhShape = mBvhShapes.back();
 
     for (uint32_t primId = 0; primId < prims.size(); ++primId)
     {
         Primitive prim;
         prim.ptr = ptr;
         prim.primId = primId;
-        prim.updateVertices(shape);
+        prim.updateVertices(bvhShape);
 
         assert(mPrimitives.size() < MAX_PRIMITIVES);
         mPrimitives.push_back(prim);

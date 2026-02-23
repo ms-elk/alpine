@@ -7,6 +7,8 @@ set(IMGUI_SRCS
   ../../ext/imgui/backends/imgui_impl_opengl3.cpp
 )
 
+source_group("imgui" FILES ${IMGUI_SRCS})
+
 add_executable(viewer
   main.cpp
   ${IMGUI_SRCS}
@@ -59,7 +61,7 @@ target_link_directories(viewer PRIVATE
 
 find_package(OpenGL REQUIRED)
 
-target_link_libraries(viewer
+target_link_libraries(viewer PRIVATE
   alpine
   OpenGL::GL
   ${LIBS}
