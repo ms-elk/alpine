@@ -1,6 +1,16 @@
 # alpine
 **alpine** is a CPU path tracer developed for experimenting with various rendering algorithms.
 
+## Features
+- Sampling
+  - Multiple importance sampling (BSDF sampling + light sampling)
+  - Microfacet BSDF sampling using the distribution of visible normals (VNDF)
+  - Many-light sampling using a light BVH
+- Acceleration structures
+  - Wide BVH with SIMD (implemented in ISPC)
+  - Selectable acceleration structure (binary BVH / wide BVH / Embree)
+  - Animation support with BVH reconstruction
+
 ## Supported Platforms
 - Windows
 - macOS
