@@ -8,7 +8,7 @@
   - Many-light sampling using a light BVH
 - Acceleration structures
   - Wide BVH with SIMD (implemented in ISPC)
-  - Selectable acceleration structure (binary BVH / wide BVH / Embree)
+  - Selectable acceleration structure: Built-in (Binary BVH / Wide BVH) or Embree
   - Animation support with BVH reconstruction
 
 ## Supported Platforms
