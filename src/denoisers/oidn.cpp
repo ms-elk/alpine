@@ -8,7 +8,7 @@ oidn::DeviceRef gDenoiser;
 void
 initialize()
 {
-    gDenoiser = oidn::newDevice();
+    gDenoiser = oidn::newDevice(oidn::DeviceType::CPU);
     gDenoiser.commit();
 }
 
@@ -23,5 +23,9 @@ denoise(RenderTarget* renderTarget, uint32_t width, uint32_t height)
     filter.set("hdr", true);
     filter.commit();
     filter.execute();
-}
+
+    const char* error = nullptr;
+    if (oidnGetDeviceError(gDenoiser.getHandle(), &error) != OIDN_ERROR_NONE)
+        printf("OIDN ERROR: %s\n", error ? error : "");
+    }
 }
