@@ -1,23 +1,44 @@
 # alpine
-**alpine** is a CPU path tracer, and is developed to experiment with various rendering algorithms.
+**alpine** is a CPU path tracer developed for experimenting with various rendering algorithms.
+
+## Supported Platforms
+- Windows
+- macOS
 
 ## Requirements
-- Visual Studio 2022
 - C++ 20
-- CMake 3.15
-- OpenGL 4.6 (optional, required for [viewer](#viewer))
+- CMake 3.15 or later
+- OpenGL (optional; required for [viewer](#viewer))
+
+### Windows
+- Visual Studio 2022
 
 ## Build Instructions
 1. Fetch git submodules
-    ```
+    ```bash
     git submodule update --init
     ```
 
-2. Generate build files using CMake in the root directory
-    ```
+2. Configure and build using CMake in the root directory
+    ### Windows
+    ```bash
     cmake -S . -B build
     ```
-    You can enable optional features via the following CMake options.  
+    Then open `build/alpine.sln` in Visual Studio and build the solution.
+
+    ### macOS
+    ```bash
+    cmake -S . -B build
+    cmake --build build -j
+    ```
+    **Note:** The default build type is `Release`.  
+    To build in `Debug`, add `-DCMAKE_BUILD_TYPE=Debug`.
+    ```bash
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+    cmake --build build -j
+    ```
+
+3. Optionally enable the features via the following CMake options (Windows / macOS)  
     For each option, make sure to manually download the required library and place it in the specified directory under `ext/`:  
 
     | CMake Option | Description | Required Library | Place in |
@@ -25,10 +46,7 @@
     | `ALPINE_BUILD_APPS`    | Builds alpine [sample applications](#sample-applications). | [GLFW](https://www.glfw.org/) 3.4 (for [viewer](#viewer)) | `ext/glfw` |
     | `ALPINE_ENABLE_EMBREE` | Enables Embree as an accelerator backend option. | [Intel Embree](https://www.embree.org/) 4.3.3             | `ext/embree` |
     | `ALPINE_ENABLE_OIDN`   | Enables a denoising option via OIDN. | [Intel Open Image Denoise](https://www.openimagedenoise.org/) 2.3.0 | `ext/oidn`   |
-    | `ALPINE_ENABLE_ISPC`   | Enables ISPC-based SIMD code generation. | [Intel ISPC](https://ispc.github.io/) 1.26.0              | `ext/ispc`   |
-
-
-3. Open the solution file `alpine.sln` generated in the `build` directory, and build it in Visual Studio
+    | `ALPINE_ENABLE_ISPC`   | Enables ISPC-based SIMD code generation. This enables Wide BVH as an accelerator backend option. | [Intel ISPC](https://ispc.github.io/) 1.26.0              | `ext/ispc`   |
 
 ## Sample Applications
 ### simple
@@ -43,13 +61,13 @@ Options:
 `--denoiser`: Enable denoiser  
 
 Example:  
-```
+```bash
 simple -i input.glb -o output.ppm --spp 64 --accelerator bvh --lightSampler bvh --denoiser
 ```
 
 ### viewer
 *viewer* is a progressive path tracer, and takes a glb file as input.
-```
+```bash
 viewer input.glb
 ```
 <img src="images/viewer.png" width="30%">  
