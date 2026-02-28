@@ -28,6 +28,10 @@ if (MSVC)
   set(EMBREE_LIBS
     embree4
   )
+
+  set(OIDN_LIBS
+    OpenImageDenoise
+  )
 elseif(APPLE)
   add_compile_options(-Werror)
   
@@ -37,6 +41,10 @@ elseif(APPLE)
 
   set(EMBREE_LIBS
     libembree4.dylib
+  )
+
+  set(OIDN_LIBS
+    libOpenImageDenoise.dylib
   )
 endif()
 
@@ -159,7 +167,7 @@ set(UTILS
 
 # ispc compile setting
 if (ALPINE_ENABLE_ISPC)
-set(ISPC_EXE ${CMAKE_CURRENT_SOURCE_DIR}/ext/ispc/bin/ispc.exe)
+set(ISPC_EXE ${CMAKE_CURRENT_SOURCE_DIR}/ext/ispc/bin/ispc)
 
 set(ISPC_FILE_NAMES
   bounding_box
@@ -170,11 +178,13 @@ set(ISPC_OBJS "")
 
 foreach(ISPC_FILE_NAME ${ISPC_FILE_NAMES})
   set(ISPC_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/ispc/${ISPC_FILE_NAME}.ispc)
-  set(ISPC_OBJ ${CMAKE_CURRENT_BINARY_DIR}/ispc/${ISPC_FILE_NAME}.obj)
-  set(ISPC_H ${CMAKE_CURRENT_BINARY_DIR}/ispc/${ISPC_FILE_NAME}.h)
+  set(ISPC_OUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/ispc)
+  set(ISPC_OBJ ${ISPC_OUT_DIR}/${ISPC_FILE_NAME}.obj)
+  set(ISPC_H ${ISPC_OUT_DIR}/${ISPC_FILE_NAME}.h)
 
   add_custom_command(
       OUTPUT ${ISPC_OBJ} ${ISPC_H}
+      COMMAND ${CMAKE_COMMAND} -E make_directory "${ISPC_OUT_DIR}"
       COMMAND ${ISPC_EXE} ${ISPC_SRC} -O2 -o ${ISPC_OBJ} -h ${ISPC_H}
       DEPENDS ${ISPC_SRC}
       COMMENT "Compiling ISPC file ${ISPC_SRC}"
@@ -248,8 +258,9 @@ endif()
 if (ALPINE_ENABLE_OIDN)
 target_include_directories(alpine PRIVATE ext/oidn/include)
 target_link_directories(alpine PUBLIC ext/oidn/lib)
-target_link_libraries(alpine PUBLIC OpenImageDenoise)
+target_link_libraries(alpine PUBLIC ${OIDN_LIBS})
 
+if (MSVC)
 add_custom_command(TARGET alpine POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
   ${CMAKE_CURRENT_SOURCE_DIR}/ext/oidn/bin/OpenImageDenoise.dll
@@ -263,6 +274,7 @@ add_custom_command(TARGET alpine POST_BUILD
   ${CMAKE_CURRENT_SOURCE_DIR}/ext/oidn/bin/OpenImageDenoise_device_cpu.dll
   $<TARGET_FILE_DIR:alpine>
 )
+endif()
 endif()
 
 # applications
