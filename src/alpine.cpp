@@ -34,8 +34,10 @@
 #include <vector>
 
 namespace alpine {
-static constexpr uint32_t BATCH_WIDTH = 16;
-static constexpr uint32_t BATCH_HEIGHT = 16;
+namespace {
+constexpr uint32_t BATCH_WIDTH = 16;
+constexpr uint32_t BATCH_HEIGHT = 16;
+}
 
 class Alpine
 {
@@ -59,6 +61,8 @@ public:
     inline bool isDynamicScene() const{ return !mScene.animations.empty(); }
 
     bool load(std::string_view filename, FileType fileType);
+
+    void unload();
 
     void updateScene(float time);
 
@@ -85,6 +89,8 @@ public:
     void addDebugScene();
 
 private:
+    void resetAccelerator();
+
     void traceRayBatch(uint32_t batchId, uint32_t spp);
 
     float3 estimateDirectIllumination(Sampler& sampler, const float3& hit,
@@ -109,6 +115,7 @@ private:
     std::vector<std::future<void>> mBatches;
 
     std::unique_ptr<Accelerator> mAccelerator;
+    AcceleratorType mAcceleratorType;
 
     Scene mScene;
 
@@ -127,6 +134,7 @@ Alpine::Alpine(
     , mWidth(width)
     , mHeight(height)
     , mMaxDepth(maxDepth)
+    , mAcceleratorType(acceleratorType)
 {
     denoiser::initialize();
 
@@ -145,7 +153,15 @@ Alpine::Alpine(
     uint32_t batchCount = mBatchWidthCount * batchHeightCount;
     mBatches.resize(batchCount);
 
-    switch (acceleratorType)
+    resetAccelerator();
+
+    resetAccumulation();
+}
+
+void
+Alpine::resetAccelerator()
+{
+    switch (mAcceleratorType)
     {
     case AcceleratorType::Embree:
         mAccelerator = std::make_unique<Embree>();
@@ -158,8 +174,6 @@ Alpine::Alpine(
         mAccelerator = std::make_unique<Bvh>(mMemoryArenaBuffer);
         break;
     }
-
-    resetAccumulation();
 }
 
 bool
@@ -185,6 +199,13 @@ Alpine::load(std::string_view filename, FileType fileType)
     }
 
     return isLoaded;
+}
+
+void
+Alpine::unload()
+{
+    mScene.reset();
+    resetAccelerator();
 }
 
 void
@@ -455,7 +476,9 @@ Alpine::addDebugScene()
 }
 
 ///////////////////////////////////////////////////////////////
-std::unique_ptr<Alpine> gAlpine;
+namespace {
+std::unique_ptr<Alpine> sAlpine;
+}
 
 bool
 initialize(
@@ -465,9 +488,9 @@ initialize(
     uint32_t maxDepth,
     AcceleratorType acceleratorType)
 {
-    if (!gAlpine)
+    if (!sAlpine)
     {
-        gAlpine = std::make_unique<Alpine>(
+        sAlpine = std::make_unique<Alpine>(
             memoryArenaSize, width, height, maxDepth, acceleratorType);
         return true;
     }
@@ -480,29 +503,36 @@ initialize(
 bool
 load(std::string_view filename, FileType fileType)
 {
-    assert(gAlpine);
-    return gAlpine->load(filename, fileType);
+    assert(sAlpine);
+    return sAlpine->load(filename, fileType);
+}
+
+void
+unload()
+{
+    assert(sAlpine);
+    return sAlpine->unload();
 }
 
 void
 updateScene(float time)
 {
-    assert(gAlpine);
-    gAlpine->updateScene(time);
+    assert(sAlpine);
+    sAlpine->updateScene(time);
 }
 
 bool
 isDynamicScene()
 {
-    assert(gAlpine);
-    return gAlpine->isDynamicScene();
+    assert(sAlpine);
+    return sAlpine->isDynamicScene();
 }
 
 api::Light*
 addPointLight(float power, const float color[3], const float position[3])
 {
-    assert(gAlpine);
-    return gAlpine->addPointLight(power, color, position);
+    assert(sAlpine);
+    return sAlpine->addPointLight(power, color, position);
 }
 
 api::Light*
@@ -513,70 +543,70 @@ addDiskLight(
     const float target[3],
     float radius)
 {
-    assert(gAlpine);
-    return gAlpine->addDiskLight(power, color, position, target, radius);
+    assert(sAlpine);
+    return sAlpine->addDiskLight(power, color, position, target, radius);
 }
 
 void
 buildLightSampler(LightSamplerType lightSamplerType)
 {
-    assert(gAlpine);
-    gAlpine->buildLightSampler(lightSamplerType);
+    assert(sAlpine);
+    sAlpine->buildLightSampler(lightSamplerType);
 }
 
 void
 setBackgroundColor(float r, float g, float b)
 {
-    assert(gAlpine);
-    gAlpine->setBackgroundColor(r, g, b);
+    assert(sAlpine);
+    sAlpine->setBackgroundColor(r, g, b);
 }
 
 api::Camera*
 getCamera()
 {
-    assert(gAlpine);
-    return gAlpine->getCamera();
+    assert(sAlpine);
+    return sAlpine->getCamera();
 }
 
 void
 resetAccumulation()
 {
-    assert(gAlpine);
-    gAlpine->resetAccumulation();
+    assert(sAlpine);
+    sAlpine->resetAccumulation();
 }
 
 void
 render(uint32_t spp)
 {
-    assert(gAlpine);
-    gAlpine->render(spp);
+    assert(sAlpine);
+    sAlpine->render(spp);
 }
 
 void
 resolve(bool denoise)
 {
-    assert(gAlpine);
-    gAlpine->resolve(denoise);
+    assert(sAlpine);
+    sAlpine->resolve(denoise);
 }
 
 const void*
 getFrameBuffer()
 {
-    assert(gAlpine);
-    return gAlpine->getFrameBuffer();
+    assert(sAlpine);
+    return sAlpine->getFrameBuffer();
 }
 
 void
 saveImage(std::string_view filename)
 {
-    assert(gAlpine);
-    gAlpine->saveImage(filename);
+    assert(sAlpine);
+    sAlpine->saveImage(filename);
 }
 
 void
 addDebugScene()
 {
-    assert(gAlpine);
-    gAlpine->addDebugScene();
+    assert(sAlpine);
+    sAlpine->addDebugScene();
 }
 }

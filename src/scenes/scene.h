@@ -20,5 +20,12 @@ struct Scene
     {
         shapes.reserve(MAX_SHAPES);
     }
+
+    void reset()
+    {
+        shapes.clear();
+        lights.clear();
+        animations.clear();
+    }
 };
 }

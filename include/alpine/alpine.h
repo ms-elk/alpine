@@ -26,6 +26,8 @@ enum class FileType {
 };
 bool load(std::string_view filename, FileType fileType);
 
+void unload();
+
 void updateScene(float time);
 
 bool isDynamicScene();
