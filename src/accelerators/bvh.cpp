@@ -204,7 +204,10 @@ Bvh::Impl::intersectAny(const Ray& ray, float tFar) const
 std::optional<Intersection>
 Bvh::Impl::traverse(const Ray& ray, float tFar, bool any) const
 {
-    assert(!mLinearNodes.empty());
+    if (mNodeCount == 0)
+    {
+        return {};
+    }
 
     NodeAccessCounter counter(gBvhStats, any);
 

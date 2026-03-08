@@ -487,6 +487,11 @@ WideBvh::Impl::intersectAny(const Ray& ray, float tFar) const
 std::optional<Intersection>
 WideBvh::Impl::traverse(const Ray& ray, float tFar, bool any) const
 {
+    if (mNodeCount == 0)
+    {
+        return {};
+    }
+
     NodeAccessCounter counter(gBvhStats, any);
 
     std::optional<Intersection> closestIsect;
