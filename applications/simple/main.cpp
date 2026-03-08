@@ -119,7 +119,9 @@ main(int argc, char* argv[])
     const float fovy = std::numbers::pi_v<float> / 2.0f;
     const float aspect = float(width) / float(height);
 
-    alpine::initialize(memoryArenaSize, width, height, maxDepth, acceleratorType);
+    alpine::initialize(memoryArenaSize, width, height, maxDepth);
+
+    alpine::resetScene(acceleratorType);
 
     alpine::addDiskLight(lightPower, lightColor, lightPos, lightTarget, lightRadius);
 

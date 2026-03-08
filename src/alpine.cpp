@@ -46,8 +46,7 @@ public:
         uint32_t memoryArenaSize,
         uint32_t width,
         uint32_t height,
-        uint32_t maxDepth,
-        AcceleratorType acceleratorType);
+        uint32_t maxDepth);
 
     inline void setBackgroundColor(float r, float g, float b)
     {
@@ -60,9 +59,9 @@ public:
 
     inline bool isDynamicScene() const{ return !mScene.animations.empty(); }
 
-    bool load(std::string_view filename, FileType fileType);
+    void resetScene(AcceleratorType acceleratorType);
 
-    void unload();
+    bool load(std::string_view filename, FileType fileType);
 
     void updateScene(float time);
 
@@ -89,8 +88,6 @@ public:
     void addDebugScene();
 
 private:
-    void resetAccelerator();
-
     void traceRayBatch(uint32_t batchId, uint32_t spp);
 
     float3 estimateDirectIllumination(Sampler& sampler, const float3& hit,
@@ -115,7 +112,6 @@ private:
     std::vector<std::future<void>> mBatches;
 
     std::unique_ptr<Accelerator> mAccelerator;
-    AcceleratorType mAcceleratorType;
 
     Scene mScene;
 
@@ -128,13 +124,11 @@ Alpine::Alpine(
     uint32_t memoryArenaSize,
     uint32_t width,
     uint32_t height,
-    uint32_t maxDepth,
-    AcceleratorType acceleratorType)
+    uint32_t maxDepth)
     : mMemoryArenaBuffer(memoryArenaSize)
     , mWidth(width)
     , mHeight(height)
     , mMaxDepth(maxDepth)
-    , mAcceleratorType(acceleratorType)
 {
     denoiser::initialize();
 
@@ -153,15 +147,15 @@ Alpine::Alpine(
     uint32_t batchCount = mBatchWidthCount * batchHeightCount;
     mBatches.resize(batchCount);
 
-    resetAccelerator();
-
     resetAccumulation();
 }
 
 void
-Alpine::resetAccelerator()
+Alpine::resetScene(AcceleratorType acceleratorType)
 {
-    switch (mAcceleratorType)
+    mScene.reset();
+
+    switch (acceleratorType)
     {
     case AcceleratorType::Embree:
         mAccelerator = std::make_unique<Embree>();
@@ -199,13 +193,6 @@ Alpine::load(std::string_view filename, FileType fileType)
     }
 
     return isLoaded;
-}
-
-void
-Alpine::unload()
-{
-    mScene.reset();
-    resetAccelerator();
 }
 
 void
@@ -273,6 +260,11 @@ Alpine::resetAccumulation()
 void
 Alpine::render(uint32_t spp)
 {
+    if (!mAccelerator)
+    {
+        return;
+    }
+
     for (uint32_t batchId = 0; batchId < mBatches.size(); ++batchId)
     {
         mBatches[batchId] = std::async(
@@ -485,13 +477,12 @@ initialize(
     uint32_t memoryArenaSize,
     uint32_t width,
     uint32_t height,
-    uint32_t maxDepth,
-    AcceleratorType acceleratorType)
+    uint32_t maxDepth)
 {
     if (!sAlpine)
     {
         sAlpine = std::make_unique<Alpine>(
-            memoryArenaSize, width, height, maxDepth, acceleratorType);
+            memoryArenaSize, width, height, maxDepth);
         return true;
     }
     else
@@ -500,18 +491,18 @@ initialize(
     }
 }
 
+void
+resetScene(AcceleratorType acceleratorType)
+{
+    assert(sAlpine);
+    sAlpine->resetScene(acceleratorType);
+}
+
 bool
 load(std::string_view filename, FileType fileType)
 {
     assert(sAlpine);
     return sAlpine->load(filename, fileType);
-}
-
-void
-unload()
-{
-    assert(sAlpine);
-    return sAlpine->unload();
 }
 
 void
