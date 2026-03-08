@@ -167,7 +167,7 @@ void showLoadButton()
     ImGui::Begin("UI");
 
     static char file[512] = "";
-    ImGui::InputText("GLTF file", file, sizeof(file));
+    ImGui::InputText("GLB file", file, sizeof(file));
 
     if (ImGui::Button("Load"))
     {
