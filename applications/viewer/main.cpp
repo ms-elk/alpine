@@ -161,18 +161,17 @@ void showRenderTexturePanel(GLuint rt)
 
 void showLoadButton()
 {
-    static char file[512] = "";
-
     ImGui::SetNextWindowPos(ImVec2(IMAGE_WIDTH + 16, 16), ImGuiCond_Once);
     ImGui::SetNextWindowSize(ImVec2(256, 80), ImGuiCond_Once);
 
     ImGui::Begin("UI");
 
+    static char file[512] = "";
     ImGui::InputText("GLTF file", file, sizeof(file));
 
     if (ImGui::Button("Load"))
     {
-        alpine::unload();
+        alpine::resetScene(alpine::AcceleratorType::WideBvh);
 
         bool loaded = alpine::load(file, alpine::FileType::Gltf);
         if (loaded)
@@ -218,7 +217,7 @@ int main(int argc, char* argv[])
     ImGui_ImplOpenGL3_Init("#version 330");
 
     alpine::initialize(
-        MEMORY_ARENA_SIZE, IMAGE_WIDTH, IMAGE_HEIGHT, MAX_DEPTH, alpine::AcceleratorType::WideBvh);
+        MEMORY_ARENA_SIZE, IMAGE_WIDTH, IMAGE_HEIGHT, MAX_DEPTH);
 
     const float eye[] = { 0.0f, 0.0f, -3.0f };
     const float target[] = { 0.0f, 0.0f, 0.0f };

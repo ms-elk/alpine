@@ -7,26 +7,24 @@
 #include <string_view>
 
 namespace alpine {
+bool initialize(
+    uint32_t memoryArenaSize,
+    uint32_t width,
+    uint32_t height,
+    uint32_t maxDepth);
+
 enum class AcceleratorType {
     Bvh,
     WideBvh,
     Embree,
 };
-
-bool initialize(
-    uint32_t memoryArenaSize,
-    uint32_t width,
-    uint32_t height,
-    uint32_t maxDepth,
-    AcceleratorType acceleratorType);
+void resetScene(AcceleratorType acceleratorType);
 
 enum class FileType {
     Gltf,
     Obj,
 };
 bool load(std::string_view filename, FileType fileType);
-
-void unload();
 
 void updateScene(float time);
 
