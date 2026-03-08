@@ -10,6 +10,9 @@
 
 static constexpr uint32_t MEMORY_ARENA_SIZE = 512 * 1024 * 1024;
 
+static constexpr uint32_t WINDOW_WIDTH = 800;
+static constexpr uint32_t WINDOW_HEIGHT = 512;
+
 static constexpr uint32_t IMAGE_WIDTH = 512;
 static constexpr uint32_t IMAGE_HEIGHT = 512;
 static constexpr uint32_t MAX_DEPTH = 8;
@@ -19,74 +22,9 @@ static constexpr float ZOOM_SPEED = 0.5f;
 
 static constexpr float DELTA_TIME = 1.0f / 60.0f;
 
-enum class MouseAction
-{
-    Released,
-    LeftPressed,
-    MiddlePressed,
-} gMouseAction = MouseAction::Released;
-float gMousePos[2] = { 0.0f };
-
 alpine::api::Camera* gCamera = nullptr;
 
 float gTime = 0.0f;
-
-void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
-{
-    if (action == GLFW_PRESS)
-    {
-        double cx, cy;
-        glfwGetCursorPos(window, &cx, &cy);
-        gMousePos[0] = static_cast<float>(cx);
-        gMousePos[1] = static_cast<float>(cy);
-
-        switch (button)
-        {
-        case GLFW_MOUSE_BUTTON_LEFT:
-            gMouseAction = MouseAction::LeftPressed;
-            break;
-        case GLFW_MOUSE_BUTTON_MIDDLE:
-            gMouseAction = MouseAction::MiddlePressed;
-            break;
-        default:
-            gMouseAction = MouseAction::Released;
-            break;
-        }
-    }
-    else
-    {
-        gMouseAction = MouseAction::Released;
-    }
-}
-
-void cursorPositionCallback(GLFWwindow* window, double xpos, double ypos)
-{
-    if (gMouseAction != MouseAction::Released)
-    {
-        float deltaX = static_cast<float>(xpos) - gMousePos[0];
-        float deltaY = static_cast<float>(ypos) - gMousePos[1];
-
-        if (gMouseAction == MouseAction::LeftPressed)
-        {
-            float theta = deltaX / static_cast<float>(IMAGE_WIDTH) * std::numbers::pi_v<float>;
-            float phi = deltaY / static_cast<float>(IMAGE_HEIGHT) * std::numbers::pi_v<float>;
-            gCamera->orbit(theta, phi);
-        }
-        else if (gMouseAction == MouseAction::MiddlePressed)
-        {
-            gCamera->pan(deltaX * PAN_SPEED, deltaY * PAN_SPEED);
-        }
-
-        alpine::resetAccumulation();
-    }
-}
-
-void scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
-{
-    float zoom = -static_cast<float>(yoffset) * ZOOM_SPEED;
-    gCamera->zoom(zoom);
-    alpine::resetAccumulation();
-}
 
 GLuint createRenderTexture()
 {
@@ -155,6 +93,38 @@ void updateScene(GLFWwindow* window)
     }
 }
 
+void updateCamera()
+{
+    ImGui::SetItemKeyOwner(ImGuiKey_MouseLeft);
+    ImGui::SetItemKeyOwner(ImGuiKey_MouseMiddle);
+    ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY);
+
+    const auto& io = ImGui::GetIO();
+    auto delta = io.MouseDelta;
+
+    if (ImGui::IsMouseDown(ImGuiMouseButton_Left))
+    {
+        float theta = delta.x / static_cast<float>(IMAGE_WIDTH) * std::numbers::pi_v<float>;
+        float phi = delta.y / static_cast<float>(IMAGE_HEIGHT) * std::numbers::pi_v<float>;
+        gCamera->orbit(theta, phi);
+        alpine::resetAccumulation();
+    }
+    else if (ImGui::IsMouseDown(ImGuiMouseButton_Middle))
+    {
+        gCamera->pan(delta.x * PAN_SPEED, delta.y * PAN_SPEED);
+        alpine::resetAccumulation();
+    }
+
+    float wheel = io.MouseWheel;
+
+    if (wheel != 0.0f)
+    {
+        float zoom = -wheel * ZOOM_SPEED;
+        gCamera->zoom(zoom);
+        alpine::resetAccumulation();
+    }
+}
+
 void showRenderTexturePanel(GLuint rt)
 {
     ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
@@ -178,19 +148,47 @@ void showRenderTexturePanel(GLuint rt)
         ImVec2(1, 1)
     );
 
+    bool isHovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+    if (isHovered)
+    {
+        updateCamera();
+    }
+
     ImGui::End();
 
     ImGui::PopStyleVar(2);
 }
 
-int main(int argc, char* argv[])
+void showLoadButton()
 {
-    if (argc < 2)
+    static char file[512] = "";
+
+    ImGui::SetNextWindowPos(ImVec2(IMAGE_WIDTH + 16, 16), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(256, 80), ImGuiCond_Once);
+
+    ImGui::Begin("UI");
+
+    ImGui::InputText("GLTF file", file, sizeof(file));
+
+    if (ImGui::Button("Load"))
     {
-        printf("ERROR: invalid input parameters\n");
-        return 1;
+        alpine::unload();
+
+        bool loaded = alpine::load(file, alpine::FileType::Gltf);
+        if (loaded)
+        {
+            gTime = 0.0f;
+            alpine::updateScene(gTime);
+            alpine::buildLightSampler(alpine::LightSamplerType::Bvh);
+            alpine::resetAccumulation();
+        }
     }
 
+    ImGui::End();
+}
+
+int main(int argc, char* argv[])
+{
     if (!glfwInit())
     {
         printf("ERROR: failed to initialize GLFW\n");
@@ -202,7 +200,7 @@ int main(int argc, char* argv[])
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     auto* window = glfwCreateWindow(
-        IMAGE_WIDTH, IMAGE_HEIGHT, "alpine viewer", nullptr, nullptr);
+        WINDOW_WIDTH, WINDOW_HEIGHT, "alpine viewer", nullptr, nullptr);
     if (!window)
     {
         glfwTerminate();
@@ -211,10 +209,6 @@ int main(int argc, char* argv[])
 
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
-
-    glfwSetMouseButtonCallback(window, mouseButtonCallback);
-    glfwSetCursorPosCallback(window, cursorPositionCallback);
-    glfwSetScrollCallback(window, scrollCallback);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -229,17 +223,6 @@ int main(int argc, char* argv[])
     const float eye[] = { 0.0f, 0.0f, -3.0f };
     const float target[] = { 0.0f, 0.0f, 0.0f };
     const float up[] = { 0.0f, 1.0f, 0.0f };
-
-    bool loaded = alpine::load(argv[1], alpine::FileType::Gltf);
-    if (!loaded)
-    {
-        printf("ERROR: failed to load %s\n", argv[1]);
-        return 1;
-    }
-
-    alpine::updateScene(gTime);
-
-    alpine::buildLightSampler(alpine::LightSamplerType::Bvh);
 
     const float fovy = std::numbers::pi_v<float> / 2.0f;
     float aspect = float(IMAGE_WIDTH) / float(IMAGE_HEIGHT);
@@ -266,6 +249,8 @@ int main(int argc, char* argv[])
         ImGui::NewFrame();
 
         showRenderTexturePanel(rt);
+
+        showLoadButton();
 
         ImGui::Render();
 
