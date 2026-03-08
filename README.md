@@ -76,9 +76,9 @@ simple -i input.glb -o output.ppm --spp 64 --accelerator bvh --lightSampler bvh 
 ```
 
 ### viewer
-*viewer* is a progressive path tracer, and takes a glb file as input.
+*viewer* is a progressive path tracer, and can load a glb file through the UI.
 ```bash
-viewer input.glb
+viewer
 ```
 <img src="images/viewer.png" width="30%">  
 
