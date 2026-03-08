@@ -54,9 +54,9 @@
     | CMake Option | Description | Required Library | Place in |
     | - | - | - | - |
     | `ALPINE_BUILD_APPS`    | Builds alpine [sample applications](#sample-applications). | [GLFW](https://www.glfw.org/) 3.4 (for [viewer](#viewer)) | `ext/glfw` |
-    | `ALPINE_ENABLE_EMBREE` | Enables Embree as an accelerator backend option. | [Intel Embree](https://www.embree.org/) 4.3.3             | `ext/embree` |
+    | `ALPINE_ENABLE_EMBREE` | Enables Embree as an accelerator option. | [Intel Embree](https://www.embree.org/) 4.3.3             | `ext/embree` |
     | `ALPINE_ENABLE_OIDN`   | Enables a denoising option via OIDN. | [Intel Open Image Denoise](https://www.openimagedenoise.org/) 2.3.0 | `ext/oidn`   |
-    | `ALPINE_ENABLE_ISPC`   | Enables ISPC-based SIMD code generation. This enables Wide BVH as an accelerator backend option. | [Intel ISPC](https://ispc.github.io/) 1.26.0              | `ext/ispc`   |
+    | `ALPINE_ENABLE_ISPC`   | Enables ISPC-based SIMD code generation. This enables Wide BVH as an accelerator option. | [Intel ISPC](https://ispc.github.io/) 1.26.0              | `ext/ispc`   |
 
 ## Sample Applications
 ### simple
