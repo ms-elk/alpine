@@ -150,12 +150,12 @@ void showRenderTexturePanel(GLuint rt)
     ImGui::PopStyleVar(2);
 }
 
-void showLoader()
+void showSceneLoader()
 {
-    ImGui::SeparatorText("Loader");
+    ImGui::SeparatorText("Scene");
 
-    static char sFile[512] = "";
-    ImGui::InputText("GLB file", sFile, sizeof(sFile));
+    static char sFilename[512] = "";
+    ImGui::InputText("GLB file", sFilename, sizeof(sFilename));
 
     static const char* kAcceleratorLabels[] = {
         "BVH",
@@ -169,16 +169,33 @@ void showLoader()
         gAcceleratorType = static_cast<alpine::AcceleratorType>(acceleratorType);
     }
 
-    if (ImGui::Button("Load"))
+    if (ImGui::Button("Load##Glb"))
     {
         alpine::resetScene(gAcceleratorType);
 
-        bool loaded = alpine::load(sFile, alpine::FileType::Gltf);
+        bool loaded = alpine::loadScene(sFilename, alpine::FileType::Gltf);
         if (loaded)
         {
             gFrame = 0;
             alpine::buildLightSampler(alpine::LightSamplerType::Bvh);
             updateScene();
+        }
+    }
+}
+
+void showEnvironmentMapLoader()
+{
+    ImGui::SeparatorText("Environment Map");
+
+    static char sFilename[512] = "";
+    ImGui::InputText("HDR file", sFilename, sizeof(sFilename));
+
+    if (ImGui::Button("Load##Hdr"))
+    {
+        bool loaded = alpine::loadEnvironmentMap(sFilename);
+        if (loaded)
+        {
+            alpine::resetAccumulation();
         }
     }
 }
@@ -222,11 +239,12 @@ void showAnimationController()
 void showUi()
 {
     ImGui::SetNextWindowPos(ImVec2(IMAGE_WIDTH + 16, 16), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(260, 250), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(260, 300), ImGuiCond_Once);
 
     ImGui::Begin("UI");
 
-    showLoader();
+    showSceneLoader();
+    showEnvironmentMapLoader();
     showAnimationController();
 
     ImGui::End();

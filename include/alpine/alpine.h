@@ -24,7 +24,7 @@ enum class FileType {
     Gltf,
     Obj,
 };
-bool load(std::string_view filename, FileType fileType);
+bool loadScene(std::string_view filename, FileType fileType);
 
 void updateScene(float time);
 
@@ -49,6 +49,8 @@ enum class LightSamplerType {
 void buildLightSampler(LightSamplerType lightSamplerType);
 
 void setBackgroundColor(float r, float g, float b);
+
+bool loadEnvironmentMap(std::string_view filename);
 
 api::Camera* getCamera();
 
