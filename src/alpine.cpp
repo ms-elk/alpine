@@ -260,10 +260,7 @@ Alpine::resetAccumulation()
 void
 Alpine::render(uint32_t spp)
 {
-    if (!mAccelerator)
-    {
-        return;
-    }
+    assert(mAccelerator);
 
     for (uint32_t batchId = 0; batchId < mBatches.size(); ++batchId)
     {
