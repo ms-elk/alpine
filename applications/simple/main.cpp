@@ -125,7 +125,7 @@ main(int argc, char* argv[])
 
     alpine::addDiskLight(lightPower, lightColor, lightPos, lightTarget, lightRadius);
 
-    bool loaded = alpine::load(inputPath.string(), fileType);
+    bool loaded = alpine::loadScene(inputPath.string(), fileType);
     if (!loaded)
     {
         printf("ERROR: failed to load %s\n", inputPath.string().c_str());
