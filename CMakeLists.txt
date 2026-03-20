@@ -62,6 +62,8 @@ set(SOURCES
   src/animation.h
   src/camera.cpp
   src/camera.h
+  src/environment_map.cpp
+  src/environment_map.h
   src/sampler.cpp
   src/sampler.h
   src/image.cpp
@@ -121,6 +123,7 @@ set(LIGHTS
 set(LOADERS
   src/loaders/file_loader.h
   src/loaders/gltf_loader.cpp
+  src/loaders/hdr_loader.cpp
   src/loaders/obj_loader.cpp
 )
 

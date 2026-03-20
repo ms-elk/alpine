@@ -22,6 +22,7 @@
 #include <alpine_config.h>
 #include <animation.h>
 #include <camera.h>
+#include <environment_map.h>
 #include <image.h>
 #include <intersection.h>
 #include <ray.h>
@@ -61,7 +62,7 @@ public:
 
     void resetScene(AcceleratorType acceleratorType);
 
-    bool load(std::string_view filename, FileType fileType);
+    bool loadScene(std::string_view filename, FileType fileType);
 
     void updateScene(float time);
 
@@ -76,6 +77,8 @@ public:
         float radius);
 
     void buildLightSampler(LightSamplerType lightSamplerType);
+
+    bool loadEnvironmentMap(std::string_view filename);
 
     void resetAccumulation();
 
@@ -171,7 +174,7 @@ Alpine::resetScene(AcceleratorType acceleratorType)
 }
 
 bool
-Alpine::load(std::string_view filename, FileType fileType)
+Alpine::loadScene(std::string_view filename, FileType fileType)
 {
     const auto load = [&]() {
         switch (fileType)
@@ -245,6 +248,12 @@ Alpine::buildLightSampler(LightSamplerType lightSamplerType)
     }
 }
 
+bool
+Alpine::loadEnvironmentMap(std::string_view filename)
+{
+    return loadHdr(&mScene, filename);
+}
+
 void
 Alpine::resetAccumulation()
 {
@@ -306,7 +315,8 @@ Alpine::traceRayBatch(uint32_t batchId, uint32_t spp)
 
                     if (!oi.has_value())
                     {
-                        radiance += throughput * mBackgroundColor;
+                        const auto& env = mScene.environmentMap;
+                        radiance += throughput * (env ? env->sample(ray.dir) : mBackgroundColor);
                         break;
                     }
 
@@ -496,10 +506,10 @@ resetScene(AcceleratorType acceleratorType)
 }
 
 bool
-load(std::string_view filename, FileType fileType)
+loadScene(std::string_view filename, FileType fileType)
 {
     assert(sAlpine);
-    return sAlpine->load(filename, fileType);
+    return sAlpine->loadScene(filename, fileType);
 }
 
 void
@@ -547,6 +557,13 @@ setBackgroundColor(float r, float g, float b)
 {
     assert(sAlpine);
     sAlpine->setBackgroundColor(r, g, b);
+}
+
+bool
+loadEnvironmentMap(std::string_view filename)
+{
+    assert(sAlpine);
+    return sAlpine->loadEnvironmentMap(filename);
 }
 
 api::Camera*
