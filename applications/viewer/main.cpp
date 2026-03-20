@@ -23,8 +23,10 @@ static constexpr float ZOOM_SPEED = 0.5f;
 static constexpr float DELTA_TIME = 1.0f / 60.0f;
 
 alpine::api::Camera* gCamera = nullptr;
+alpine::AcceleratorType gAcceleratorType = alpine::AcceleratorType::Bvh;
 
-float gTime = 0.0f;
+int gFrame = 0;
+int gEndFrame = 60;
 
 GLuint createRenderTexture()
 {
@@ -75,22 +77,11 @@ void updateRenderTexture(GLuint rt, const void* pixels)
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void updateScene(GLFWwindow* window)
+void updateScene()
 {
-    if (!alpine::isDynamicScene())
-    {
-        return;
-    }
-
-    bool isRightPressed = glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS;
-    bool isLeftPressed = glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS;
-
-    if (isRightPressed || isLeftPressed)
-    {
-        gTime = isRightPressed ? gTime + DELTA_TIME : std::max(gTime - DELTA_TIME, 0.0f);
-        alpine::updateScene(gTime);
-        alpine::resetAccumulation();
-    }
+    float time = static_cast<float>(gFrame) * DELTA_TIME;
+    alpine::updateScene(time);
+    alpine::resetAccumulation();
 }
 
 void updateCamera()
@@ -159,29 +150,84 @@ void showRenderTexturePanel(GLuint rt)
     ImGui::PopStyleVar(2);
 }
 
-void showLoadButton()
+void showLoader()
 {
-    ImGui::SetNextWindowPos(ImVec2(IMAGE_WIDTH + 16, 16), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(256, 80), ImGuiCond_Once);
+    ImGui::SeparatorText("Loader");
 
-    ImGui::Begin("UI");
+    static char sFile[512] = "";
+    ImGui::InputText("GLB file", sFile, sizeof(sFile));
 
-    static char file[512] = "";
-    ImGui::InputText("GLB file", file, sizeof(file));
+    static const char* kAcceleratorLabels[] = {
+        "BVH",
+        "Wide BVH",
+        "Embree",
+    };
+
+    int acceleratorType = static_cast<int>(gAcceleratorType);
+    if (ImGui::Combo("Accelerator", &acceleratorType, kAcceleratorLabels, IM_ARRAYSIZE(kAcceleratorLabels)))
+    {
+        gAcceleratorType = static_cast<alpine::AcceleratorType>(acceleratorType);
+    }
 
     if (ImGui::Button("Load"))
     {
-        alpine::resetScene(alpine::AcceleratorType::WideBvh);
+        alpine::resetScene(gAcceleratorType);
 
-        bool loaded = alpine::load(file, alpine::FileType::Gltf);
+        bool loaded = alpine::load(sFile, alpine::FileType::Gltf);
         if (loaded)
         {
-            gTime = 0.0f;
-            alpine::updateScene(gTime);
+            gFrame = 0;
             alpine::buildLightSampler(alpine::LightSamplerType::Bvh);
-            alpine::resetAccumulation();
+            updateScene();
         }
     }
+}
+
+void showAnimationController()
+{
+    ImGui::SeparatorText("Animation (60 FPS)");
+
+    bool updated = false;
+
+    if (ImGui::InputInt("End frame", &gEndFrame))
+    {
+        gFrame = std::min(gFrame, gEndFrame);
+        updated = true;
+    }
+
+    if (ImGui::SliderInt("Frame", &gFrame, 0, gEndFrame))
+    {
+        updated = true;
+    }
+
+    if (ImGui::Button("<"))
+    {
+        gFrame = std::max(gFrame - 1, 0);
+        updated = true;
+    }
+    ImGui::SameLine();
+
+    if (ImGui::Button(">"))
+    {
+        gFrame = std::min(gFrame + 1, gEndFrame);
+        updated = true;
+    }
+
+    if (updated && alpine::isDynamicScene())
+    {
+        updateScene();
+    }
+}
+
+void showUi()
+{
+    ImGui::SetNextWindowPos(ImVec2(IMAGE_WIDTH + 16, 16), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(260, 250), ImGuiCond_Once);
+
+    ImGui::Begin("UI");
+
+    showLoader();
+    showAnimationController();
 
     ImGui::End();
 }
@@ -219,6 +265,8 @@ int main(int argc, char* argv[])
     alpine::initialize(
         MEMORY_ARENA_SIZE, IMAGE_WIDTH, IMAGE_HEIGHT, MAX_DEPTH);
 
+    alpine::resetScene(gAcceleratorType);
+
     const float eye[] = { 0.0f, 0.0f, -3.0f };
     const float target[] = { 0.0f, 0.0f, 0.0f };
     const float up[] = { 0.0f, 1.0f, 0.0f };
@@ -236,8 +284,6 @@ int main(int argc, char* argv[])
     {
         glfwPollEvents();
 
-        updateScene(window);
-
         alpine::render(1);
         alpine::resolve(false);
 
@@ -249,7 +295,7 @@ int main(int argc, char* argv[])
 
         showRenderTexturePanel(rt);
 
-        showLoadButton();
+        showUi();
 
         ImGui::Render();
 
