@@ -26,26 +26,26 @@
 ## Build Instructions
 1. Fetch git submodules
     ```bash
-    git submodule update --init
+    $ git submodule update --init
     ```
 
 2. Configure and build using CMake in the root directory
     ### Windows
     ```bash
-    cmake -S . -B build
+    $ cmake -S . -B build
     ```
     Then open `build/alpine.sln` in Visual Studio and build the solution.
 
     ### macOS
     ```bash
-    cmake -S . -B build
-    cmake --build build -j
+    $ cmake -S . -B build
+    $ cmake --build build -j
     ```
     **Note:** The default build type is `Release`.  
     To build in `Debug`, add `-DCMAKE_BUILD_TYPE=Debug`.
     ```bash
-    cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
-    cmake --build build -j
+    $ cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+    $ cmake --build build -j
     ```
 
 3. Optionally enable the features via the following CMake options (Windows / macOS)  
@@ -72,13 +72,13 @@ Options:
 
 Example:  
 ```bash
-simple -i input.glb -o output.ppm --spp 64 --accelerator bvh --lightSampler bvh --denoiser
+$ simple -i input.glb -o output.ppm --spp 64 --accelerator bvh --lightSampler bvh --denoiser
 ```
 
 ### viewer
 *viewer* is a progressive path tracer, and can load a glb file through the UI.
 ```bash
-viewer
+$ viewer
 ```
 <img src="images/viewer.png" width="30%">  
 
