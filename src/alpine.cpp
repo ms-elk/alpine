@@ -121,6 +121,8 @@ private:
     Camera mCamera;
 
     std::unique_ptr<LightSampler> mLightSampler;
+
+    std::unique_ptr<EnvironmentMap> mEnvironmentMap;
 };
 
 Alpine::Alpine(
@@ -251,7 +253,7 @@ Alpine::buildLightSampler(LightSamplerType lightSamplerType)
 bool
 Alpine::loadEnvironmentMap(std::string_view filename)
 {
-    return loadHdr(&mScene, filename);
+    return loadHdr(mEnvironmentMap, filename);
 }
 
 void
@@ -315,8 +317,9 @@ Alpine::traceRayBatch(uint32_t batchId, uint32_t spp)
 
                     if (!oi.has_value())
                     {
-                        const auto& env = mScene.environmentMap;
-                        radiance += throughput * (env ? env->sample(ray.dir) : mBackgroundColor);
+                        float3 bg = mEnvironmentMap ?
+                            mEnvironmentMap->sample(ray.dir) : mBackgroundColor;
+                        radiance += throughput * bg;
                         break;
                     }
 
