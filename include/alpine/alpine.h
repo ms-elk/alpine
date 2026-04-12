@@ -13,6 +13,8 @@ bool initialize(
     uint32_t height,
     uint32_t maxDepth);
 
+void shutdown();
+
 enum class AcceleratorType {
     Bvh,
     WideBvh,

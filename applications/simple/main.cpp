@@ -154,5 +154,7 @@ main(int argc, char* argv[])
 
     alpine::saveImage(outputPath.string());
 
+    alpine::shutdown();
+
     return 0;
 }
