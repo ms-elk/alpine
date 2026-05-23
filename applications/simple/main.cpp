@@ -123,6 +123,8 @@ main(int argc, char* argv[])
 
     alpine::resetScene(acceleratorType);
 
+    alpine::setBackgroundColor(1.0f, 1.0f, 1.0f);
+
     alpine::addDiskLight(lightPower, lightColor, lightPos, lightTarget, lightRadius);
 
     bool loaded = alpine::loadScene(inputPath.string(), fileType);
