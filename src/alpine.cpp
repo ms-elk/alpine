@@ -103,7 +103,7 @@ private:
     uint32_t mHeight = 0;
     uint32_t mMaxDepth = 0;
 
-    float3 mBackgroundColor = float3(1.0f);
+    float3 mBackgroundColor = float3(0.0f);
 
     std::vector<Sampler> mSamplers;
     std::vector<denoiser::RenderTarget> mAccumBuffer;

@@ -10,7 +10,7 @@
 
 static constexpr uint32_t MEMORY_ARENA_SIZE = 512 * 1024 * 1024;
 
-static constexpr uint32_t WINDOW_WIDTH = 800;
+static constexpr uint32_t WINDOW_WIDTH = 850;
 static constexpr uint32_t WINDOW_HEIGHT = 512;
 
 static constexpr uint32_t IMAGE_WIDTH = 512;
@@ -25,6 +25,7 @@ static constexpr float DELTA_TIME = 1.0f / 60.0f;
 alpine::api::Camera* gCamera = nullptr;
 alpine::AcceleratorType gAcceleratorType = alpine::AcceleratorType::Bvh;
 
+float gBackgroundColor[3] = { 1.0f, 1.0f, 1.0f };
 bool gToneMapEnabled = true;
 
 int gFrame = 0;
@@ -206,6 +207,16 @@ void showRendererSettings()
 {
     ImGui::SeparatorText("Renderer");
 
+    if (ImGui::ColorEdit3("Background", gBackgroundColor,
+        ImGuiColorEditFlags_HDR
+        | ImGuiColorEditFlags_Float
+        | ImGuiColorEditFlags_PickerHueWheel))
+    {
+        alpine::setBackgroundColor(
+            gBackgroundColor[0], gBackgroundColor[1], gBackgroundColor[2]);
+        alpine::resetAccumulation();
+    }
+
     ImGui::Checkbox("Tone mapping (ACES)", &gToneMapEnabled);
 }
 
@@ -247,8 +258,8 @@ void showAnimationController()
 
 void showUi()
 {
-    ImGui::SetNextWindowPos(ImVec2(IMAGE_WIDTH + 16, 16), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(260, 350), ImGuiCond_Once);
+    ImGui::SetNextWindowPos(ImVec2(IMAGE_WIDTH + 32, 32), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(280, 400), ImGuiCond_Once);
 
     ImGui::Begin("UI");
 
@@ -294,6 +305,9 @@ int main(int argc, char* argv[])
         MEMORY_ARENA_SIZE, IMAGE_WIDTH, IMAGE_HEIGHT, MAX_DEPTH);
 
     alpine::resetScene(gAcceleratorType);
+
+    alpine::setBackgroundColor(
+        gBackgroundColor[0], gBackgroundColor[1], gBackgroundColor[2]);
 
     const float eye[] = { 0.0f, 0.0f, -3.0f };
     const float target[] = { 0.0f, 0.0f, 0.0f };
