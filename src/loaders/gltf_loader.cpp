@@ -50,7 +50,7 @@ private:
 
     std::shared_ptr<Material> createMaterial(uint32_t matIdx) const;
 
-    std::shared_ptr<Texture4f> createTexture(uint32_t texIdx, bool isSigned) const;
+    std::shared_ptr<Texture4f> createTexture(uint32_t texIdx, bool isSigned, bool isSrgb) const;
 
     std::shared_ptr<Light> createLight(const float4x4& matrix, uint32_t lightIdx) const;
 
@@ -389,13 +389,13 @@ GltfLoader::createMaterial(uint32_t matIdx) const
     std::shared_ptr<Texture4f> baseColorTex = nullptr;
     if (int32_t texIdx = srcMat.pbrMetallicRoughness.baseColorTexture.index; texIdx >= 0)
     {
-        baseColorTex = createTexture(texIdx, false);
+        baseColorTex = createTexture(texIdx, false, true);
     }
 
     std::shared_ptr<Texture4f> normalTex = nullptr;
     if (int32_t texIdx = srcMat.normalTexture.index; texIdx >= 0)
     {
-        normalTex = createTexture(texIdx, true);
+        normalTex = createTexture(texIdx, true, false);
     }
 
     const auto& d = srcMat.pbrMetallicRoughness.baseColorFactor;
@@ -415,13 +415,19 @@ GltfLoader::createMaterial(uint32_t matIdx) const
 }
 
 std::shared_ptr<Texture4f>
-GltfLoader::createTexture(uint32_t texIdx, bool isSigned) const
+GltfLoader::createTexture(uint32_t texIdx, bool isSigned, bool isSrgb) const
 {
     uint32_t imgIdx = mSrcModel.textures[texIdx].source;
     const auto& srcImage = mSrcModel.images[imgIdx];
 
     if (srcImage.component == 3 || srcImage.component == 4)
     {
+        const auto srgbToLinear = [](float c) {
+            return c <= 0.04045f
+                ? c / 12.92f
+                : std::pow((c + 0.055f) / 1.055f, 2.4f);
+        };
+
         std::vector<float4> texData(srcImage.width * srcImage.height);
         for (uint32_t i = 0; i < texData.size(); ++i)
         {
@@ -439,6 +445,13 @@ GltfLoader::createTexture(uint32_t texIdx, bool isSigned) const
             if (isSigned)
             {
                 texData[i] = texData[i] * 2.0f - 1.0f;
+            }
+
+            if (isSrgb)
+            {
+                texData[i].x = srgbToLinear(texData[i].x);
+                texData[i].y = srgbToLinear(texData[i].y);
+                texData[i].z = srgbToLinear(texData[i].z);
             }
         }
 

@@ -157,6 +157,11 @@ public:
         return { x * rhs.x, y * rhs.y, z * rhs.z };
     }
 
+    Vector3<T> operator/(const Vector3<T>& rhs) const
+    {
+        return { x / rhs.x, y / rhs.y, z / rhs.z };
+    }
+
     Vector3<T> operator*(const T rhs) const
     {
         return { x * rhs, y * rhs, z * rhs };

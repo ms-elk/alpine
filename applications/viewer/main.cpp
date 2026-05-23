@@ -25,6 +25,8 @@ static constexpr float DELTA_TIME = 1.0f / 60.0f;
 alpine::api::Camera* gCamera = nullptr;
 alpine::AcceleratorType gAcceleratorType = alpine::AcceleratorType::Bvh;
 
+bool gToneMapEnabled = true;
+
 int gFrame = 0;
 int gEndFrame = 60;
 
@@ -200,6 +202,13 @@ void showEnvironmentMapLoader()
     }
 }
 
+void showRendererSettings()
+{
+    ImGui::SeparatorText("Renderer");
+
+    ImGui::Checkbox("Tone mapping (ACES)", &gToneMapEnabled);
+}
+
 void showAnimationController()
 {
     ImGui::SeparatorText("Animation (60 FPS)");
@@ -239,12 +248,13 @@ void showAnimationController()
 void showUi()
 {
     ImGui::SetNextWindowPos(ImVec2(IMAGE_WIDTH + 16, 16), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(260, 300), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(260, 350), ImGuiCond_Once);
 
     ImGui::Begin("UI");
 
     showSceneLoader();
     showEnvironmentMapLoader();
+    showRendererSettings();
     showAnimationController();
 
     ImGui::End();
@@ -303,7 +313,7 @@ int main(int argc, char* argv[])
         glfwPollEvents();
 
         alpine::render(1);
-        alpine::resolve(false);
+        alpine::resolve(false, gToneMapEnabled);
 
         updateRenderTexture(rt, pixels);
 
