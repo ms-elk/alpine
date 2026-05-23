@@ -17,11 +17,11 @@
 
 ## Requirements
 - C++ 20
-- CMake 3.15 or later
+- CMake 4.2 or later
 - OpenGL (optional; required for [viewer](#viewer))
 
 ### Windows
-- Visual Studio 2022
+- Visual Studio 2026
 
 ## Build Instructions
 1. Fetch git submodules
