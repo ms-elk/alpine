@@ -328,6 +328,8 @@ int main(int argc, char* argv[])
 
     glDeleteTextures(1, &rt);
 
+    alpine::shutdown();
+
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
