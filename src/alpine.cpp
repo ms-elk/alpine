@@ -84,7 +84,7 @@ public:
 
     void render(uint32_t spp);
 
-    void resolve(bool denoise);
+    void resolve(bool denoise, bool tonemap);
 
     void saveImage(std::string_view filename) const;
 
@@ -431,8 +431,20 @@ Alpine::estimateDirectIllumination(
     return radiance / lss.pdf;
 }
 
+namespace {
+float3 applyAcesTone(const float3& color)
+{
+    const float a = 2.51f;
+    const float b = 0.03f;
+    const float c = 2.43f;
+    const float d = 0.59f;
+    const float e = 0.14f;
+    return (color * (color * a + b)) / (color * (color * c + d) + e);
+}
+}
+
 void
-Alpine::resolve(bool denoise)
+Alpine::resolve(bool denoise, bool tonemap)
 {
     for (uint32_t i = 0; i < mResolvedBuffer.size(); ++i)
     {
@@ -447,14 +459,26 @@ Alpine::resolve(bool denoise)
         denoiser::denoise(mResolvedBuffer.data(), mWidth, mHeight);
     }
 
+    const auto linearToSrgb = [](float c) {
+        return c <= 0.0031308f
+            ? 12.92f * c
+            : 1.055f * std::pow(c, 1.0f / 2.4f) - 0.055f;
+    };
+
     for (uint32_t i = 0; i < mFrameBuffer.size(); ++i)
     {
-        const auto& pixel = mResolvedBuffer[i].color;
+        auto pixel = mResolvedBuffer[i].color;
+
+        pixel = tonemap ? applyAcesTone(pixel) : pixel;
+
+        float r = linearToSrgb(std::clamp(pixel.x, 0.0f, 1.0f));
+        float g = linearToSrgb(std::clamp(pixel.y, 0.0f, 1.0f));
+        float b = linearToSrgb(std::clamp(pixel.z, 0.0f, 1.0f));
 
         auto& fb = mFrameBuffer[i];
-        fb.x = static_cast<uint8_t>(std::clamp(pixel.x, 0.0f, 1.0f) * 255.0f + 0.5f);
-        fb.y = static_cast<uint8_t>(std::clamp(pixel.y, 0.0f, 1.0f) * 255.0f + 0.5f);
-        fb.z = static_cast<uint8_t>(std::clamp(pixel.z, 0.0f, 1.0f) * 255.0f + 0.5f);
+        fb.x = static_cast<uint8_t>(r * 255.0f + 0.5f);
+        fb.y = static_cast<uint8_t>(g * 255.0f + 0.5f);
+        fb.z = static_cast<uint8_t>(b * 255.0f + 0.5f);
     }
 }
 
@@ -590,9 +614,9 @@ render(uint32_t spp)
 }
 
 void
-resolve(bool denoise)
+resolve(bool denoise, bool tonemap)
 {
-    alpine().resolve(denoise);
+    alpine().resolve(denoise, tonemap);
 }
 
 const void*

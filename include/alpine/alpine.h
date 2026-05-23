@@ -60,7 +60,7 @@ api::Camera* getCamera();
 void resetAccumulation();
 void render(uint32_t spp);
 
-void resolve(bool denoise);
+void resolve(bool denoise, bool tonemap);
 
 const void* getFrameBuffer();
 void saveImage(std::string_view filename);
