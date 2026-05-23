@@ -121,6 +121,8 @@ private:
     Camera mCamera;
 
     std::unique_ptr<LightSampler> mLightSampler;
+
+    std::unique_ptr<EnvironmentMap> mEnvironmentMap;
 };
 
 Alpine::Alpine(
@@ -251,7 +253,7 @@ Alpine::buildLightSampler(LightSamplerType lightSamplerType)
 bool
 Alpine::loadEnvironmentMap(std::string_view filename)
 {
-    return loadHdr(&mScene, filename);
+    return loadHdr(mEnvironmentMap, filename);
 }
 
 void
@@ -315,8 +317,9 @@ Alpine::traceRayBatch(uint32_t batchId, uint32_t spp)
 
                     if (!oi.has_value())
                     {
-                        const auto& env = mScene.environmentMap;
-                        radiance += throughput * (env ? env->sample(ray.dir) : mBackgroundColor);
+                        float3 bg = mEnvironmentMap ?
+                            mEnvironmentMap->sample(ray.dir) : mBackgroundColor;
+                        radiance += throughput * bg;
                         break;
                     }
 
@@ -477,6 +480,12 @@ Alpine::addDebugScene()
 ///////////////////////////////////////////////////////////////
 namespace {
 std::unique_ptr<Alpine> sAlpine;
+
+Alpine& alpine()
+{
+    assert(sAlpine);
+    return *sAlpine;
+}
 }
 
 bool
@@ -486,51 +495,51 @@ initialize(
     uint32_t height,
     uint32_t maxDepth)
 {
-    if (!sAlpine)
-    {
-        sAlpine = std::make_unique<Alpine>(
-            memoryArenaSize, width, height, maxDepth);
-        return true;
-    }
-    else
+    if (sAlpine)
     {
         return false;
     }
+
+    sAlpine = std::make_unique<Alpine>(
+        memoryArenaSize, width, height, maxDepth);
+
+    return true;
+}
+
+void
+shutdown()
+{
+    sAlpine.reset();
 }
 
 void
 resetScene(AcceleratorType acceleratorType)
 {
-    assert(sAlpine);
-    sAlpine->resetScene(acceleratorType);
+    alpine().resetScene(acceleratorType);
 }
 
 bool
 loadScene(std::string_view filename, FileType fileType)
 {
-    assert(sAlpine);
-    return sAlpine->loadScene(filename, fileType);
+    return alpine().loadScene(filename, fileType);
 }
 
 void
 updateScene(float time)
 {
-    assert(sAlpine);
-    sAlpine->updateScene(time);
+    alpine().updateScene(time);
 }
 
 bool
 isDynamicScene()
 {
-    assert(sAlpine);
-    return sAlpine->isDynamicScene();
+    return alpine().isDynamicScene();
 }
 
 api::Light*
 addPointLight(float power, const float color[3], const float position[3])
 {
-    assert(sAlpine);
-    return sAlpine->addPointLight(power, color, position);
+    return alpine().addPointLight(power, color, position);
 }
 
 api::Light*
@@ -541,77 +550,66 @@ addDiskLight(
     const float target[3],
     float radius)
 {
-    assert(sAlpine);
-    return sAlpine->addDiskLight(power, color, position, target, radius);
+    return alpine().addDiskLight(power, color, position, target, radius);
 }
 
 void
 buildLightSampler(LightSamplerType lightSamplerType)
 {
-    assert(sAlpine);
-    sAlpine->buildLightSampler(lightSamplerType);
+    alpine().buildLightSampler(lightSamplerType);
 }
 
 void
 setBackgroundColor(float r, float g, float b)
 {
-    assert(sAlpine);
-    sAlpine->setBackgroundColor(r, g, b);
+    alpine().setBackgroundColor(r, g, b);
 }
 
 bool
 loadEnvironmentMap(std::string_view filename)
 {
-    assert(sAlpine);
-    return sAlpine->loadEnvironmentMap(filename);
+    return alpine().loadEnvironmentMap(filename);
 }
 
 api::Camera*
 getCamera()
 {
-    assert(sAlpine);
-    return sAlpine->getCamera();
+    return alpine().getCamera();
 }
 
 void
 resetAccumulation()
 {
-    assert(sAlpine);
-    sAlpine->resetAccumulation();
+    alpine().resetAccumulation();
 }
 
 void
 render(uint32_t spp)
 {
-    assert(sAlpine);
-    sAlpine->render(spp);
+    alpine().render(spp);
 }
 
 void
 resolve(bool denoise)
 {
-    assert(sAlpine);
-    sAlpine->resolve(denoise);
+    alpine().resolve(denoise);
 }
 
 const void*
 getFrameBuffer()
 {
-    assert(sAlpine);
-    return sAlpine->getFrameBuffer();
+    return alpine().getFrameBuffer();
 }
 
 void
 saveImage(std::string_view filename)
 {
-    assert(sAlpine);
-    sAlpine->saveImage(filename);
+    alpine().saveImage(filename);
 }
 
 void
 addDebugScene()
 {
-    assert(sAlpine);
-    sAlpine->addDebugScene();
+    alpine().addDebugScene();
 }
 }
