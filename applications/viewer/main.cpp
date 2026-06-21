@@ -327,7 +327,7 @@ int main(int argc, char* argv[])
         glfwPollEvents();
 
         alpine::render(1);
-        alpine::resolve(false, gToneMapEnabled);
+        alpine::postProcess(false, gToneMapEnabled);
 
         updateRenderTexture(rt, pixels);
 

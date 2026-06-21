@@ -152,7 +152,7 @@ main(int argc, char* argv[])
         alpine::render(spp);
     }
 
-    alpine::resolve(denoise, true);
+    alpine::postProcess(denoise, true);
 
     alpine::saveImage(outputPath.string());
 

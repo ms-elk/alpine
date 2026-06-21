@@ -84,7 +84,7 @@ public:
 
     void render(uint32_t spp);
 
-    void resolve(bool denoise, bool tonemap);
+    void postProcess(bool denoise, bool tonemap);
 
     void saveImage(std::string_view filename) const;
 
@@ -444,7 +444,7 @@ float3 applyAcesTone(const float3& color)
 }
 
 void
-Alpine::resolve(bool denoise, bool tonemap)
+Alpine::postProcess(bool denoise, bool tonemap)
 {
     for (uint32_t i = 0; i < mResolvedBuffer.size(); ++i)
     {
@@ -614,9 +614,9 @@ render(uint32_t spp)
 }
 
 void
-resolve(bool denoise, bool tonemap)
+postProcess(bool denoise, bool tonemap)
 {
-    alpine().resolve(denoise, tonemap);
+    alpine().postProcess(denoise, tonemap);
 }
 
 const void*
