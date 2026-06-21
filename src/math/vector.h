@@ -198,9 +198,9 @@ T length(const Vector3<T>& v)
 template <typename T>
 Vector3<T> cross(const Vector3<T>& v0, const Vector3<T>& v1)
 {
-    float x = v0.y * v1.z - v0.z * v1.y;
-    float y = v0.z * v1.x - v0.x * v1.z;
-    float z = v0.x * v1.y - v0.y * v1.x;
+    T x = v0.y * v1.z - v0.z * v1.y;
+    T y = v0.z * v1.x - v0.x * v1.z;
+    T z = v0.x * v1.y - v0.y * v1.x;
 
     return { x, y, z };
 }
@@ -224,9 +224,9 @@ std::tuple<Vector3<T>, Vector3<T>> getBasis(const Vector3<T>& v)
 template <typename T>
 Vector3<T> min(const Vector3<T>& v0, const Vector3<T>& v1)
 {
-    float x = std::min(v0.x, v1.x);
-    float y = std::min(v0.y, v1.y);
-    float z = std::min(v0.z, v1.z);
+    T x = std::min(v0.x, v1.x);
+    T y = std::min(v0.y, v1.y);
+    T z = std::min(v0.z, v1.z);
 
     return { x, y, z };
 }
@@ -234,9 +234,9 @@ Vector3<T> min(const Vector3<T>& v0, const Vector3<T>& v1)
 template <typename T>
 Vector3<T> max(const Vector3<T>& v0, const Vector3<T>& v1)
 {
-    float x = std::max(v0.x, v1.x);
-    float y = std::max(v0.y, v1.y);
-    float z = std::max(v0.z, v1.z);
+    T x = std::max(v0.x, v1.x);
+    T y = std::max(v0.y, v1.y);
+    T z = std::max(v0.z, v1.z);
 
     return { x, y, z };
 }

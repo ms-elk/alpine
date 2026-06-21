@@ -55,7 +55,7 @@ inline float powerHeuristic(uint32_t na, float aPdf, uint32_t nb, float bPdf)
 
 inline float3 schlickFresnel(const float3& f0, const float3& wi, const float3& wh)
 {
-    float f = pow(1.0f - dot(wi, wh), 5.0f);
+    float f = std::pow(std::max(0.0f, 1.0f - dot(wi, wh)), 5.0f);
     return float3(f) + f0 * (1.0f - f);
 }
 

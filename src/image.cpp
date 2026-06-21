@@ -25,7 +25,7 @@ writePPM(std::string_view filename, uint32_t width, uint32_t height, const byte3
             auto r = static_cast<uint32_t>(pixel.x);
             auto g = static_cast<uint32_t>(pixel.y);
             auto b = static_cast<uint32_t>(pixel.z);
-            ppm << r << ' ' << g << ' ' << b << std::endl;
+            ppm << r << ' ' << g << ' ' << b << '\n';
         }
     }
 

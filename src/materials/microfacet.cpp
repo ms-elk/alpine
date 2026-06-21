@@ -51,7 +51,7 @@ Microfacet::sample(
         return {};
     }
 
-    float3 estimator = computeBsdf(wo, wi, isectAttr) * std::abs(cosTheta(wi)) / pdf;
+    float3 estimator = computeBsdf(wo, wi, baseColor) * std::abs(cosTheta(wi)) / pdf;
 
     return Sample{ estimator, wi, pdf };
 #endif
