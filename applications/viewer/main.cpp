@@ -22,7 +22,7 @@ static constexpr float ZOOM_SPEED = 0.5f;
 
 static constexpr float DELTA_TIME = 1.0f / 60.0f;
 
-alpine::api::Camera* gCamera = nullptr;
+alpine::CameraHandle* gCamera = nullptr;
 alpine::AcceleratorType gAcceleratorType = alpine::AcceleratorType::Bvh;
 
 float gBackgroundColor[3] = { 1.0f, 1.0f, 1.0f };

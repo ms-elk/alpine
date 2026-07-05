@@ -54,7 +54,7 @@ public:
         mBackgroundColor = float3(r, g, b);
     }
 
-    inline api::Camera* getCamera() { return &mCamera; }
+    inline CameraHandle* getCamera() { return &mCamera; }
 
     inline const void* getFrameBuffer() const { return mFrameBuffer.data(); }
 
@@ -66,10 +66,10 @@ public:
 
     void updateScene(float time);
 
-    api::Light* addPointLight(
+    LightHandle* addPointLight(
         float power, const float color[3], const float position[3]);
 
-    api::Light* addDiskLight(
+    LightHandle* addDiskLight(
         float power,
         const float color[3],
         const float position[3],
@@ -211,14 +211,14 @@ Alpine::updateScene(float time)
     mAccelerator->updateScene();
 }
 
-api::Light*
+LightHandle*
 Alpine::addPointLight(float power, const float color[3], const float position[3])
 {
     mScene.lights.push_back(std::make_shared<PointLight>(power, float3(color), float3(position)));
     return mScene.lights.back().get();
 }
 
-api::Light*
+LightHandle*
 Alpine::addDiskLight(
     float power,
     const float color[3],
@@ -560,13 +560,13 @@ isDynamicScene()
     return alpine().isDynamicScene();
 }
 
-api::Light*
+LightHandle*
 addPointLight(float power, const float color[3], const float position[3])
 {
     return alpine().addPointLight(power, color, position);
 }
 
-api::Light*
+LightHandle*
 addDiskLight(
     float power,
     const float color[3],
@@ -595,7 +595,7 @@ loadEnvironmentMap(std::string_view filename)
     return alpine().loadEnvironmentMap(filename);
 }
 
-api::Camera*
+CameraHandle*
 getCamera()
 {
     return alpine().getCamera();

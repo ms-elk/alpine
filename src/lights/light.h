@@ -10,7 +10,7 @@
 namespace alpine {
 struct IntersectionAttributes;
 
-class Light : public api::Light
+class Light : public LightHandle
 {
 public:
     Light() = default;

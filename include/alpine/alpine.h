@@ -32,9 +32,9 @@ void updateScene(float time);
 
 bool isDynamicScene();
 
-api::Light* addPointLight(float power, const float color[3], const float position[3]);
+LightHandle* addPointLight(float power, const float color[3], const float position[3]);
 
-api::Light* addDiskLight(
+LightHandle* addDiskLight(
     float power,
     const float color[3],
     const float position[3],
@@ -54,7 +54,7 @@ void setBackgroundColor(float r, float g, float b);
 
 bool loadEnvironmentMap(std::string_view filename);
 
-api::Camera* getCamera();
+CameraHandle* getCamera();
 
 // Render
 void resetAccumulation();

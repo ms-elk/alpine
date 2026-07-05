@@ -8,7 +8,7 @@
 namespace alpine {
 struct Ray;
 
-class Camera : public api::Camera
+class Camera : public CameraHandle
 {
 public:
     Camera() {};

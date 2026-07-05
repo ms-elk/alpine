@@ -1,7 +1,7 @@
 #pragma once
 
-namespace alpine::api {
-class Camera
+namespace alpine {
+class CameraHandle
 {
 public:
     virtual void setLookAt(
